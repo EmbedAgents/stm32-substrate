@@ -107,6 +107,59 @@ the CLI). The substrate captures tool output and outcomes — it doesn't
 second-guess them — and surfaces failures as structured errors with an
 actionable hint rather than a raw traceback.
 
+## Uninstall
+
+Remove the plugin and the package — nothing else is left behind.
+
+```bash
+# Remove the Claude Code plugin + its marketplace entry
+claude plugin uninstall stm32-substrate
+claude plugin marketplace remove stm32
+
+# Uninstall the Python package / `stm32` CLI
+pip uninstall stm32-substrate
+```
+
+If you created one, delete your `.claude/stm32-tools.local.jsonc`. The substrate
+leaves nothing else on your machine — no caches, no dotfiles, no daemons.
+
+## Troubleshooting
+
+- **`ConfigurationError: … not found`** — the substrate couldn't locate a tool.
+  The error names the exact env var / JSON key to set. Point it at the tool in
+  `.claude/stm32-tools.local.jsonc`, or export the named variable (e.g.
+  `STM32_PROGRAMMER_CLI`).
+- **The `/stm32*` commands don't show up** — restart Claude Code, then check
+  `claude plugin list`. Re-run Step 1 if the plugin isn't listed.
+- **`macOS is not supported`** — v1 runs on Linux and Windows only; macOS is
+  planned based on demand.
+- **Probe not found / target-connect errors** — check the ST-LINK cable and board
+  power, and make sure nothing else holds the probe. Only one debug client can own
+  the SWD probe at a time, so close the CubeIDE GUI debugger or any other running
+  gdbserver first.
+- **A destructive operation was refused** — that's the safety gate working. Re-run
+  with `confirm_destructive=True` (library) or the matching `--confirm-…` flag
+  (CLI).
+- **Schema validation failed at startup** — fix the reported field in your config.
+  For a one-off debug bypass, set `STM32_SUBSTRATE_SKIP_SCHEMA_VALIDATION=1` (it
+  warns loudly).
+
+## Privacy & Telemetry
+
+**Nothing is sent anywhere, ever.** The substrate has no telemetry, no analytics,
+no crash reporting, no usage tracking, and no phone-home — none. It makes no
+network calls at all.
+
+It runs entirely on your machine: it shells out to ST's local vendor CLIs and
+reads your serial port, and that's the whole story. No account and no API key are
+needed to use it. Its only dependencies are `jsonschema` and `pyserial`, neither
+of which contacts a server.
+
+The only things that ever touch the network are tools you already run and control
+— ST's own installers (when *you* download them) and Claude Code itself (your
+conversation with Claude, under Anthropic's terms). The substrate adds zero
+network surface of its own.
+
 ## License
 
 [MIT](LICENSE) © 2026 EmbedAgents
