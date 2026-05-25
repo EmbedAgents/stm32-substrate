@@ -46,64 +46,34 @@ The substrate is family-agnostic: if ST's tools support the chip, Claude can
 drive them against it — from an 8 MHz low-power part up to the latest Cortex-M85
 and NPU-equipped silicon.
 
-## Requirements
+## Install — 30 seconds
 
-- **Python 3.11+**
-- **Linux or Windows.** macOS is not supported in v1 (planned based on demand;
-  the substrate fails loud with a hint if run on macOS).
-- **ST's vendor tools installed** — the substrate drives them, it does not
-  bundle them. Install the ones you need from
-  [st.com](https://www.st.com/en/development-tools/stm32-software-development-tools.html):
-  STM32CubeProgrammer, STM32CubeIDE, STM32CubeMX, the ST-LINK GDB server,
-  `arm-none-eabi-gdb`, and (for signed parts) STM32_SigningTool_CLI.
-- An **ST-LINK probe** and a board for anything that touches hardware.
+**Requirements:** [Claude Code](https://docs.claude.com/en/docs/claude-code), [Python 3.11+](https://www.python.org/downloads/), [Git](https://git-scm.com/), and [ST's STM32 tools](https://www.st.com/en/development-tools/stm32-software-development-tools.html) — install the ones you need; the substrate drives them, it doesn't bundle them. Linux or Windows (macOS isn't supported yet). An ST-LINK probe and a board for anything that touches hardware.
 
-## Install
+### Step 1: Install on your machine
 
-There are two pieces: the **`stm32` CLI / Python package** (which actually
-drives the tools) and the **Claude Code plugin** (the slash commands and the
-natural-language surface).
+Open Claude Code and paste this. Claude does the rest.
 
-### 1. The package (the `stm32` CLI)
+> Install the STM32 substrate: run `pip install git+https://github.com/EmbedAgents/stm32-substrate.git` to get the `stm32` CLI, then register the plugin with `claude plugin marketplace add EmbedAgents/stm32-substrate` and `claude plugin install stm32-substrate@stm32`. Then ask me which ST tools I have installed (STM32CubeProgrammer, CubeIDE, CubeMX, the ST-LINK GDB server, arm-none-eabi-gdb, the Signing Tool) and write a `.claude/stm32-tools.local.jsonc` that points at them.
 
-```bash
-pip install git+https://github.com/EmbedAgents/stm32-substrate.git
-```
+That installs the `stm32` CLI + `stm32_substrate` library and registers the five `/stm32*` slash commands. Restart Claude Code if the commands don't show up right away.
 
-This installs the `stm32` console command and the `stm32_substrate` Python
-library.
+Prefer to do the plugin half by hand? Run `/plugin marketplace add EmbedAgents/stm32-substrate` then `/plugin install stm32-substrate@stm32`. And once it's on PyPI, the package step is simply `pip install stm32-substrate`.
 
-> Once published to PyPI, this becomes `pip install stm32-substrate`.
+### Step 2: Point it at your ST tools
 
-### 2. The Claude Code plugin
+The substrate finds each tool by **environment variable → `.claude/stm32-tools.local.jsonc` → your `PATH`**, and fails loud — naming the exact key to set — if it can't. Claude can write that file for you in Step 1; the [schema](src/stm32_substrate/schemas/stm32-tools.local.schema.json) lists every key. Set it once and you're done.
 
-```text
-/plugin marketplace add EmbedAgents/stm32-substrate
-/plugin install stm32-substrate@stm32
-```
+Then just talk:
 
-Or, for local development, point Claude Code straight at a checkout:
-
-```bash
-claude --plugin-dir /path/to/stm32-substrate
-```
-
-### 3. Tell the substrate where ST's tools live
-
-The substrate resolves each tool by **environment variable → configured path →
-`PATH` lookup**, and fails loud (naming the exact key to set) if it can't find
-one. Configure paths once in `.claude/stm32-tools.local.jsonc`, or set env vars
-such as `STM32_PROGRAMMER_CLI`. See the schema at
-`src/stm32_substrate/schemas/stm32-tools.local.schema.json` for every key.
+> **You:** build my project and flash it to the Nucleo
+> **Claude:** *(runs `stm32 build` then `stm32 prog flash …`, reports back)*
 
 ## Usage
 
-Mostly, you talk:
-
-> **You:** flash the build to my Nucleo and reset it
-> **Claude:** *(runs `stm32 prog flash … && stm32 prog reset`, reports the result)*
-
-The slash commands stay available when you want to reach for a tool directly:
+You mostly just talk, like in Step 1 — *"flash the build to my Nucleo and reset
+it"* and Claude runs the tools. The five slash commands stay available when
+you'd rather point at one directly:
 
 | Command | What it does | ST tool behind it |
 |---|---|---|
