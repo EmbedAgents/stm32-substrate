@@ -1,0 +1,24 @@
+{
+  "_metadata": {
+    "model": "claude-sonnet-4-6",
+    "cost_usd": 0.05335559999999999,
+    "duration_s": 34.376
+  },
+  "tool_calls": [
+    {
+      "name": "Skill",
+      "args": {
+        "skill": "stm32build",
+        "args": "clean rebuild \u2014 wipe previous artifacts first"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 build --clean",
+        "description": "Clean rebuild \u2014 wipe previous artifacts and build"
+      }
+    }
+  ],
+  "final_text": "The clean rebuild completed successfully. Here's the summary:\n\n| Field | Value |\n|---|---|\n| **Result** | \u2705 `success: true` (exit 0) |\n| **Duration** | 7.2 s |\n| **Project** | BLINKY / Debug |\n| **ELF** | `\u2026/STM32CubeIDE/Debug/BLINKY.elf` |\n| **Map** | `\u2026/STM32CubeIDE/Debug/BLINKY.map` |\n\n**Two non-fatal warnings to note:**\n- `Project: BLINKY doesn't appear to be a CDT project. Skipping...` \u2014 CubeIDE emitted this during the clean pass but still proceeded.\n- `No Config matched \"BLINKY/Debug\". Skipping...` \u2014 same clean-pass quirk; the build itself found and compiled the Debug config successfully.\n\nBoth warnings are cosmetic artefacts of the headless clean sweep and did not affect the output artifacts."
+}

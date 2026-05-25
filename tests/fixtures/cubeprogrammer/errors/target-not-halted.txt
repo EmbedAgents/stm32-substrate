@@ -1,0 +1,9 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0
+      -------------------------------------------------------------------
+
+ST-LINK SN  : 066BFF514852898767094734
+ST-LINK FW  : V3J11M3
+Board       : NUCLEO-L476RG
+
+Error: Target is not halted; the operation cannot be performed while the target is running.

@@ -1,0 +1,20 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0                  
+      -------------------------------------------------------------------
+
+ST-LINK SN  : 0675FF485550755187091234
+ST-LINK FW  : V2J47M34
+Board       : NUCLEO-F746ZG
+Voltage     : 3.24V
+SWD freq    : 4000 KHz
+Connect mode: Normal
+Reset mode  : Software reset
+Device ID   : 0x449
+Revision ID : Rev Z
+Device name : STM32F74x/STM32F75x
+NVM size  : 1 MBytes
+Device type : MCU
+Device CPU  : Cortex-M7
+BL Version  : 0x90
+Debug in Low Power mode enabled
+

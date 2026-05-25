@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel in-progress runs for the same branch when a new commit lands -
+# saves CI minutes on rapid push cycles.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: unit (${{ matrix.os }}, py${{ matrix.python }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install package + dev extras
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      # Bare `pytest` runs the pyproject.toml `addopts` default which
+      # excludes smoke / smoke_with_probe / hardware / hardware_destructive
+      # / eval markers. `-m unit` would collect zero tests because no test
+      # is explicitly tagged with the `unit` marker - the default is
+      # implicit-unit via negative-marker selection.
+      #
+      # Smoke + hardware layers stay on the developer bench: they need
+      # STM32 vendor CLIs installed (CubeProgrammer / CubeIDE / CubeMX /
+      # CubeCLT) which GitHub-hosted runners don't have. Automating
+      # those installs (download URLs, EULA click-through) is its own
+      # workstream, deferred for now.
+      - name: Run unit tests
+        run: pytest -v

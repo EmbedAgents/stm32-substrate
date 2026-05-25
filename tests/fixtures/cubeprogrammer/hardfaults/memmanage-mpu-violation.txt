@@ -1,0 +1,29 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0
+      -------------------------------------------------------------------
+
+ST-LINK SN  : 066BFF514852898767094734
+ST-LINK FW  : V3J11M3
+Board       : NUCLEO-L476RG
+Device name : STM32L47xxx/L48xxx
+
+HardFault Analyzer
+------------------
+Status: HardFault detected
+
+Faulty PC      : 0x08001234
+NVIC position  : -1
+Fault type     : MemManage (escalated)
+
+Configurable Fault Status Register (CFSR) : 0x00000082
+    MemManage Status Register (MMFSR):
+        - DACCVIOL: Data access violation
+        - MMARVALID: MMFAR holds valid fault address
+
+Hard Fault Status Register (HFSR) : 0x40000000
+    - FORCED: Forced HardFault
+
+System Control Block (SCB):
+    MMFAR : 0x20020000
+    BFAR  : 0xE000ED38
+    SHCSR : 0x00010000

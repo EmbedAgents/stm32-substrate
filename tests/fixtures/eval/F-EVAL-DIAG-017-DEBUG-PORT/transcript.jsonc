@@ -1,0 +1,17 @@
+{
+  "_metadata": {
+    "model": "claude-sonnet-4-6",
+    "cost_usd": 0.04969965,
+    "duration_s": 14.994
+  },
+  "tool_calls": [
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 debug read-peripheral DBGMCU",
+        "description": "Read DBGMCU peripheral registers via SVD decode"
+      }
+    }
+  ],
+  "final_text": "**The debug port is not disabled in software.** Here's the summary:\n\n### DBGMCU Results\n\n| Register | Raw Value | Verdict |\n|---|---|---|\n| `IDCODE` | `0x10076415` | DEV_ID = `0x6415` (STM32L476), REV_ID = `0x1007` |\n| **`CR`** | **`0x00000000`** | All debug bits clear |\n| `APB1_FZR1` | `0x00000000` | All freeze bits clear |\n| `APB1_FZR2` | `0x00000000` | All freeze bits clear |\n| `APB2_FZR` | `0x00000000` | All freeze bits clear |\n\n### `DBGMCU_CR` breakdown (the relevant register)\n\n| Field | Value | Meaning |\n|---|---|---|\n| `DBG_SLEEP` | 0 | Debug clock **not** kept alive in Sleep |\n| `DBG_STOP` | 0 | Debug clock **not** kept alive in Stop |\n| `DBG_STANDBY` | 0 | Debug clock **not** kept alive in Standby |\n| `TRACE_IOEN` | 0 | Trace pins not enabled |\n\n**No software-side debug suppression is active.** The `CR` register is all zeros \u2014 nothing in firmware has called `__HAL_DBGMCU_FREEZE_*` or written `DBG_SLEEP/STOP/STANDBY`. The debug port itself is gated by the Option Bytes (`nSWBOOT0`, `nBOOT0`, and especially `DBANK`/`RDP`), not by `DBGMCU_CR`, so if you're seeing a connectivity problem it's worth checking `FLASH_OPTR` (RDP level) next."
+}

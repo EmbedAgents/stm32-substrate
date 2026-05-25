@@ -1,0 +1,17 @@
+{
+  "_metadata": {
+    "model": "claude-sonnet-4-6",
+    "cost_usd": 0.10412775,
+    "duration_s": 46.638
+  },
+  "tool_calls": [
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 debug read-peripheral GPIOA",
+        "description": "Read GPIOA peripheral state to inspect PA13/PA14 pin modes"
+      }
+    }
+  ],
+  "final_text": "I'll read the GPIOA mode register live off the target \u2014 that'll tell us definitively whether PA13/PA14 are still in AF (SWD) mode or have been clobbered to plain GPIO.\n**No, the SWD pins were not clobbered.** Here's what the live register state shows:\n\n| Pin | MODER | What it means |\n|-----|-------|---------------|\n| PA13 (SWDIO) | **2 = Alternate Function** | \u2705 Still in AF mode |\n| PA14 (SWCLK) | **2 = Alternate Function** | \u2705 Still in AF mode |\n\nFor completeness on the AF register (AFRH):\n\n| Pin | AFRH value | Note |\n|-----|-----------|------|\n| PA13 | 15 (0xF) | Non-zero, but irrelevant \u2014 see below |\n| PA14 | 11 (0xB) | Same |\n\nThe non-zero AF selector values look odd (SWD reset-state is AF0), but they **don't matter** for SWD. On STM32L4, the Cortex-M4 DAP hardware owns PA13/PA14 at the physical level and overrides the GPIO AF mux for debug traffic \u2014 what's in `AFRH` only matters if the debug interface were disabled via `DBGMCU_CR`. And the strongest proof that everything is fine: **we successfully halted the core and read back these registers over SWD**, which is impossible if the pins had been clobbered to plain GPIO.\n\nIf you're worried about the non-AF0 values in AFRH, the safe fix in code is to not touch PA13/PA14 in your GPIO init at all, or to explicitly write `GPIO_AF0_SWD` (0x0) for those two pins. But functionally, the debug interface is intact and your firmware hasn't broken it."
+}

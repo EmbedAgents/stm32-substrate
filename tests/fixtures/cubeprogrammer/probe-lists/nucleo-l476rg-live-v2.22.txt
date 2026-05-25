@@ -1,0 +1,32 @@
+      -------------------------------------------------------------------
+                       STM32CubeProgrammer v2.22.0                  
+      -------------------------------------------------------------------
+
+=====  DFU Interface   =====
+
+No STM32 device in DFU mode connected
+
+===== J-Link Interface =====
+No J-Link/flasher probe detected.
+===== STLink Interface =====
+
+-------- Connected ST-LINK Probes List --------
+
+ST-Link Probe 0 :
+   ST-LINK SN  : 066DFF485754727567021514
+   ST-LINK FW  : V2J46M32
+   Access Port Number  : 1
+   Board Name  : NUCLEO-L476RG
+-----------------------------------------------
+
+=====  UART Interface  =====
+
+Total number of serial ports available: 1
+
+Board Name  : NUCLEO-L476RG
+ST-LINK SN: 066DFF485754727567021514
+Port: COM3
+Location: \\.\COM3
+Description: STMicroelectronics STLink Virtual COM Port
+Manufacturer: STMicroelectronics
+

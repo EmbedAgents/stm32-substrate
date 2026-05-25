@@ -1,0 +1,26 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0
+      -------------------------------------------------------------------
+
+ST-LINK SN  : 066BFF514852898767094734
+ST-LINK FW  : V3J11M3
+Board       : NUCLEO-L476RG
+Voltage     : 3.28V
+SWD freq    : 4000 KHz
+Device ID   : 0x415
+Device name : STM32L47xxx/L48xxx
+Flash size  : 1 MBytes (default)
+Device type : MCU
+Device CPU  : Cortex-M4
+
+OB DISPLAY ============================================================
+
+Read Out Protection:
+  RDP          : 0x55 (Level 1, read protection enabled)
+
+BOR Level:
+  BOR_LEV      : 0x0 (BOR Level 0)
+
+User Configuration:
+  IWDG_SW      : 0x1 (Software independent watchdog)
+  WWDG_SW      : 0x1 (Software window watchdog)

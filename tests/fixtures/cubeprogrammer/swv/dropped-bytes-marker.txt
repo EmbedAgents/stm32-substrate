@@ -1,0 +1,11 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0
+      -------------------------------------------------------------------
+
+SWV started on port 0, frequency 80 MHz
+
+ITM channel 0: counter=0
+ITM channel 0: counter=1
+WARNING: SWV dropped 16 bytes (overflow)
+ITM channel 0: counter=2
+ITM channel 0: counter=3

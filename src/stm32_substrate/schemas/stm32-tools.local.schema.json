@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/EmbedAgents/stm32-substrate/schemas/stm32-tools.local.schema.json",
+  "title": "STM32 substrate — local host tool discovery",
+  "description": "Machine-local tool path discovery for the six ST vendor CLIs plus the STM32CubeCLT umbrella install. Loaded by SubstrateContext.from_environment() and validated at load time. Linux and Windows are supported; the darwin candidate block is reserved and ignored on unsupported hosts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "tools"],
+  "properties": {
+    "$schema": {
+      "description": "Optional JSON Schema reference for IDE validation; substrate ignores.",
+      "type": "string"
+    },
+    "_comment": {
+      "description": "Free-form note ignored by substrate.",
+      "type": "string"
+    },
+    "version": {
+      "description": "Schema version. Pinned to 1 for v1.",
+      "type": "integer",
+      "const": 1
+    },
+    "programmer": {
+      "description": "Cubeprogrammer-related host-local config that is not strictly a tool path.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "_comment": { "type": "string" },
+        "default_probe_sn": {
+          "description": "Default ST-LINK serial used by every per-target tool method when caller does not override. Loaded into SubstrateContext.default_probe_sn. Env var override: STM32_PROGRAMMER_DEFAULT_SN.",
+          "type": "string"
+        }
+      }
+    },
+    "tools": {
+      "description": "Machine-local tool discovery overrides keyed by supported tool name. Resolution order: env var -> configured candidates -> shutil.which against executable_name -> loud ConfigurationError naming the JSON key.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cube_programmer": {
+          "description": "STM32CubeProgrammer CLI (STM32_Programmer_CLI). Primary consumer: cubeprogrammer module. Also read by debug for the -cp argument to gdbserver and as the third SVD-source root.",
+          "$ref": "#/$defs/toolDefinition"
+        },
+        "cubeide": {
+          "description": "STM32CubeIDE install root. Used by cubeide module for headless-build.sh discovery and by debug as the first-priority SVD-source root (per debug-api Q5).",
+          "$ref": "#/$defs/toolDefinition"
+        },
+        "cubemx": {
+          "description": "STM32CubeMX launcher binary (cubemx-api Q3: launcher-only in v1, no jar fallback).",
+          "$ref": "#/$defs/toolDefinition"
+        },
+        "stlink_gdb_server": {
+          "description": "ST-LINK GDB server. Used by debug module for live debugging sessions.",
+          "$ref": "#/$defs/toolDefinition"
+        },
+        "arm_gdb": {
+          "description": "arm-none-eabi-gdb client (MI3 mode in v1 per debug-api Q3).",
+          "$ref": "#/$defs/toolDefinition"
+        },
+        "stm32_signing_tool_cli": {
+          "description": "STM32_SigningTool_CLI. Used by signing module for F-013 trusted-binary signing. STM32N6 / MP1 / MP2 only per SC-009 / UM2543 Table 1. Typically bundled with the STM32CubeCLT umbrella install at <clt>/STM32CubeProgrammer/bin/STM32_SigningTool_CLI.",
+          "$ref": "#/$defs/toolDefinition"
+        },
+        "stm32cubeclt": {
+          "description": "STM32CubeCLT umbrella install root. Used by debug module as the fallback SVD-source root (priority order: cubeide -> cube_programmer -> stm32cubeclt per debug-api P-033). Optional; substrate degrades gracefully when fewer than three SVD sources are present.",
+          "$ref": "#/$defs/toolDefinition"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "toolDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "env_var": {
+          "description": "Environment variable checked before config candidates and PATH lookup.",
+          "type": "string"
+        },
+        "executable_name": {
+          "description": "Executable or launcher basename used for shutil.which fallback when no explicit path candidate resolves.",
+          "type": "string"
+        },
+        "candidates": {
+          "description": "Per-platform candidate paths checked before generic PATH fallback. `linux` and `windows` are read on their respective platforms; `darwin` is reserved.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "linux": {
+              "description": "Ordered candidate paths checked on Linux hosts (v1 primary).",
+              "$ref": "#/$defs/pathList"
+            },
+            "windows": {
+              "description": "Ordered candidate paths checked on Windows hosts (reserved for v2; ignored in v1).",
+              "$ref": "#/$defs/pathList"
+            },
+            "darwin": {
+              "description": "Ordered candidate paths checked on macOS hosts (reserved for v2; ignored in v1).",
+              "$ref": "#/$defs/pathList"
+            }
+          }
+        }
+      }
+    },
+    "pathList": {
+      "description": "Array of non-empty candidate paths.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

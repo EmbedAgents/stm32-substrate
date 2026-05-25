@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stm32-substrate"
+version = "0.1.0"
+description = "Deterministic Python wrapper around the six ST vendor CLIs (CubeProgrammer, CubeIDE, CubeMX, ST-LINK gdbserver, arm-none-eabi-gdb, STM32_SigningTool_CLI) plus a USB virtual COM port reader. Surfaces a Python library, a `stm32` CLI, and five Claude-Code slash commands."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "EmbedAgents", email = "akd.jls@gmail.com" }]
+license = { file = "LICENSE" }
+keywords = ["stm32", "embedded", "microcontroller", "arm", "cortex-m", "claude", "claude-code", "stlink", "cubeprogrammer", "cubeide", "gdb", "firmware"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Environment :: Console",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Topic :: Software Development :: Embedded Systems",
+    "Topic :: Software Development :: Build Tools",
+]
+dependencies = [
+    "jsonschema>=4.21",
+    "pyserial>=3.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/EmbedAgents/stm32-substrate"
+Repository = "https://github.com/EmbedAgents/stm32-substrate"
+Issues = "https://github.com/EmbedAgents/stm32-substrate/issues"
+Changelog = "https://github.com/EmbedAgents/stm32-substrate/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-xdist>=3.5",
+]
+eval = [
+    # Pass-1 step 11/12: drives Claude through real slash-command flows
+    # for eval-layer regression tests. Required only when STM32_EVAL_MODE=live;
+    # default replay mode reads recorded transcripts and needs no extra dep.
+    "claude-agent-sdk>=0.0.20",
+]
+
+[project.scripts]
+stm32 = "stm32_substrate.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+stm32_substrate = ["py.typed", "schemas/*.schema.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# User-provides project fixture trees (RES-019) ship with their own
+# unrelated test_*.py files (e.g. mbed-crypto under
+# STM32CubeH7RS/Middlewares/Third_Party). Skip those during collection.
+norecursedirs = [
+    "tests/fixtures/projects",
+    "tests/fixtures/n6-projects",
+]
+markers = [
+    "unit: pure unit tests; CLIs mocked; runs anywhere (default)",
+    "smoke: real vendor CLIs invoked (--help / --version); no hardware required",
+    "smoke_with_probe: ST-LINK probe present; no specific board required",
+    "hardware: attached NUCLEO required; serialised via session-scoped probe-lock fixture",
+    "hardware_destructive: hardware + explicit opt-in for erase / OB-write / RDP regression",
+    "eval: Claude Code SDK eval tests; slow, expensive; opt-in via `pytest -m eval`",
+]
+addopts = "-m 'not (smoke or smoke_with_probe or hardware or hardware_destructive or eval)' --strict-markers"

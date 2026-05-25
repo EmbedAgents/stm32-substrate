@@ -1,0 +1,60 @@
+// F-EVAL-DBG009-MALLOC-FAILURE — hand-authored transcript stub (Wave-3a T3, RES-031).
+//
+// Stand-in so default replay-mode runs green. The tool-call shape
+// mirrors a representative loop iteration (gather → edit → rebuild →
+// reflash → re-observe); a live record may differ in iteration count
+// and in CLI-vs-Python composition (RES-026). Replace on a bench with
+// an attached NUCLEO-L476RG:
+//   STM32_EVAL_MODE=record pytest tests/eval/test_t3_loops_eval.py -m eval -v
+{
+  "_metadata": {
+    "model": "hand-authored",
+    "note": "Wave-3a T3 stub (RES-031); re-record live on bench to replace."
+  },
+  "tool_calls": [
+    {
+      "name": "Skill",
+      "args": {
+        "skill": "stm32debug",
+        "args": "check whether malloc is failing; grow the heap until allocations succeed"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "python3 - <<'PY'\nfrom stm32_substrate import SubstrateContext\nfrom stm32_substrate.debug import Debug\nctx = SubstrateContext.from_environment()\nwith Debug(ctx).start_session() as s:   # DebugSession\n    s.set_breakpoint('_sbrk')\n    s.run_until_breakpoint()\n    print(s.read_registers())\nPY",
+        "description": "break at _sbrk + read program-break vs SP via a DebugSession"
+      }
+    },
+    {
+      "name": "Edit",
+      "args": {
+        "file_path": "STM32CubeIDE/STM32L476RGTX_FLASH.ld",
+        "old_string": "_Min_Heap_Size = 0x200 ;",
+        "new_string": "_Min_Heap_Size = 0x800 ;"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 build",
+        "description": "rebuild with the larger heap"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 prog flash STM32CubeIDE/Debug/BLINKY.elf",
+        "description": "reflash"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "python3 - <<'PY'\nfrom stm32_substrate import SubstrateContext\nfrom stm32_substrate.debug import Debug\nctx = SubstrateContext.from_environment()\nwith Debug(ctx).start_session() as s:   # DebugSession\n    s.set_breakpoint('_sbrk')\n    s.run_until_breakpoint()\n    print(s.read_registers())\nPY",
+        "description": "re-gather to confirm the allocation succeeds"
+      }
+    }
+  ],
+  "final_text": "Broke at `_sbrk` via a DebugSession and read the program break against the stack pointer: `_sbrk` had returned -1 (the heap hit the stack) \u2014 malloc failure confirmed. I grew `_Min_Heap_Size` from 0x200 to 0x800, rebuilt, reflashed, and re-ran: the previously-failing allocation now succeeds with margin to spare. resolved: true (heap_size_before 0x200 \u2192 after 0x800). Free-bytes is stable across runs, so this is under-sizing, not a leak."
+}

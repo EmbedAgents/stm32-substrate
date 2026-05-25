@@ -1,0 +1,32 @@
+// stm32-project.jsonc — NUCLEO-L476RG RTC IOC fixture descriptor.
+//
+// Validated against src/stm32_substrate/schemas/stm32-project.schema.json
+// at SubstrateContext.from_environment() load time (M-016).
+//
+// Single-IOC fixture used by:
+//   - tests/test_cubemx_hardware.py — F.6 smoke `stm32 mx generate`.
+//   - tests/eval/test_stm32project_eval.py — F-EVAL-MX-DEFAULT NL→CLI mapping.
+//
+// `cubemx.ioc_path` is what enables `stm32 mx generate` (no arg) to
+// autodiscover the IOC from cwd per the recipe-flow autodiscovery
+// rule documented in .claude/commands/stm32project.md.
+{
+  "$schema": "../../../../src/stm32_substrate/schemas/stm32-project.schema.json",
+  "version": 1,
+  "project_name": "nucleo-l476rg-rtc",
+  "board": {
+    "name": "NUCLEO-L476RG",
+    "mcu": "STM32L476RGTx",
+    "interface": "swd"
+  },
+  "firmware": {
+    "flash_address": "0x08000000",
+    "device_family": "STM32L4",
+    "board": "NUCLEO-L476RG"
+  },
+  "cubemx": {
+    "ioc_path": "nucleo-l476rg-rtc.ioc",
+    "project_name": "nucleo-l476rg-rtc",
+    "toolchain": "STM32CubeIDE"
+  }
+}

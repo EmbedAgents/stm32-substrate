@@ -1,0 +1,35 @@
+      -------------------------------------------------------------------
+                       STM32CubeProgrammer v2.22.0                  
+      -------------------------------------------------------------------
+
+ST-LINK SN  : 066DFF485754727567021514
+ST-LINK FW  : V2J47M34
+Board       : NUCLEO-L476RG
+Voltage     : 3.26V
+SWD freq    : 4000 KHz
+Connect mode: Hot Plug
+Reset mode  : Software reset
+Device ID   : 0x415
+Revision ID : Rev 4
+Device name : STM32L4x1/STM32L475xx/STM32L476xx/STM32L486xx
+NVM size  : 1 MBytes
+Device type : MCU
+Device CPU  : Cortex-M4
+BL Version  : 0x92
+Debug in Low Power mode enabled
+
+STM32CubeProgrammer Fault Analyzer
+
+
+Execution Mode   : Handler
+
+Hard Fault detected in instruction located at 0x2000089F
+
+Faulty function called at this location 0x00000000 
+
+Hard Fault State Register information : 
+
+Exception return information : 
+
+Return to Thread mode, exception return uses non-floating-point
+state from MSP and execution uses MSP after return.

@@ -1,0 +1,60 @@
+// F-EVAL-B021-BUILD-FIX — hand-authored transcript stub (Wave-3a T3, RES-031).
+//
+// Stand-in so default replay-mode runs green. The tool-call shape
+// mirrors a representative loop iteration (gather → edit → rebuild →
+// reflash → re-observe); a live record may differ in iteration count
+// and in CLI-vs-Python composition (RES-026). Replace on a bench with
+// an attached NUCLEO-L476RG:
+//   STM32_EVAL_MODE=record pytest tests/eval/test_t3_loops_eval.py -m eval -v
+{
+  "_metadata": {
+    "model": "hand-authored",
+    "note": "Wave-3a T3 stub (RES-031); re-record live on bench to replace."
+  },
+  "tool_calls": [
+    {
+      "name": "Skill",
+      "args": {
+        "skill": "stm32build",
+        "args": "get it compiling, then flash it and prove it runs"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 build",
+        "description": "initial build \u2014 capture the errors"
+      }
+    },
+    {
+      "name": "Edit",
+      "args": {
+        "file_path": "Core/Src/main.c",
+        "old_string": "/* USER CODE BEGIN Includes */",
+        "new_string": "/* USER CODE BEGIN Includes */\n#include \"stm32l4xx_hal.h\""
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 build",
+        "description": "rebuild after the include fix"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 prog flash STM32CubeIDE/Debug/BLINKY.elf",
+        "description": "flash the clean build"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 debug decode-hardfault",
+        "description": "on-target verify \u2014 confirm no fault on run"
+      }
+    }
+  ],
+  "final_text": "Ran the B-021 build-fix loop. The initial `stm32 build` failed with `main.c:42: implicit declaration of 'HAL_Delay'` \u2014 a missing `#include \"stm32l4xx_hal.h\"`. I added the include and rebuilt clean (iteration 2 of 5). A device is attached, so a clean build alone is not 'resolved' (prelude \u00a74): I flashed and verified on target \u2014 decode-hardfault reports no fault and the firmware is running. resolved: true (build_clean + verified_on_target)."
+}

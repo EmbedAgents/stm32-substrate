@@ -1,0 +1,43 @@
+// stm32-project.jsonc — x-cube-n6-ai-multi-pose-estimation umbrella descriptor.
+//
+// Validated against src/stm32_substrate/schemas/stm32-project.schema.json
+// at SubstrateContext.from_environment() load time (M-016).
+//
+// As of the 2026-05-19 fixture-tree restructure, this single F-PROJ root
+// hosts multiple per-role sub-projects (BLINKY, VCP-ECHO, FAULTING,
+// BROKEN-COMPILE, BROKEN-LINK), all sharing the same Drivers/ +
+// Middlewares/ HAL tree. The default project resolved by this descriptor
+// is the BLINKY blinky firmware (Projects/NUCLEO-L476RG/Examples/GPIO/
+// BLINKY/STM32CubeIDE/); tests that target other roles point at their
+// own subdirs via the `project=` kwarg to CubeIDE.build().
+//
+// No .ioc — hand-authored ST example. Built ELF lands at
+// <cubeide_project>/Debug/BLINKY.elf (project renamed from
+// GPIO_IOToggle as part of the restructure; artifact name follows
+// .project <name> via the .cproject ${ProjName} substitution).
+{
+  "$schema": "../../../../src/stm32_substrate/schemas/stm32-project.schema.json",
+  "version": 1,
+  "project_name": "pose-estimation",
+  "board": {
+    "name": "STM32N6570-DK",
+    "mcu": "STM32N6570",
+    "interface": "swd"
+  },
+  "firmware": {
+    "flash_address": "0x34000400",
+    "device_family": "STM32N6",
+    "board": "STM32N6570-DK"
+  },
+  "build": {
+    "workspace": ".stm32-substrate-workspace",
+    "project_path": "STM32CubeIDE",
+    "project_name": "x-cube-n6-ai-multi-pose-estimation",
+    "default_configuration": "Debug",
+    "configurations": ["Debug"],
+    "artifact": "Debug/x-cube-n6-ai-multi-pose-estimation.elf"
+  },
+  "debug": {
+    "elf_path": "STM32CubeIDE/Debug/x-cube-n6-ai-multi-pose-estimation.elf"
+  }
+}

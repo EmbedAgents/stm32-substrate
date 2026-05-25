@@ -1,0 +1,13 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0
+      -------------------------------------------------------------------
+
+ST-LINK SN  : 066BFF514852898767094734
+ST-LINK FW  : V3J11M3
+Board       : NUCLEO-L476RG
+Voltage     : 3.28V
+Device name : STM32L47xxx/L48xxx
+
+HardFault Analyzer
+------------------
+Status: No fault detected

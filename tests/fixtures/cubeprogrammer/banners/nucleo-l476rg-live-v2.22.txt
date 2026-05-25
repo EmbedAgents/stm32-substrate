@@ -1,0 +1,20 @@
+      -------------------------------------------------------------------
+                       STM32CubeProgrammer v2.22.0                  
+      -------------------------------------------------------------------
+
+ST-LINK SN  : 066DFF485754727567021514
+ST-LINK FW  : V2J46M32
+Board       : NUCLEO-L476RG
+Voltage     : 3.25V
+SWD freq    : 4000 KHz
+Connect mode: Normal
+Reset mode  : Software reset
+Device ID   : 0x415
+Revision ID : Rev 4
+Device name : STM32L4x1/STM32L475xx/STM32L476xx/STM32L486xx
+NVM size  : 1 MBytes
+Device type : MCU
+Device CPU  : Cortex-M4
+BL Version  : 0x92
+Debug in Low Power mode enabled
+

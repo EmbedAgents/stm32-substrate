@@ -1,0 +1,18 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0
+      -------------------------------------------------------------------
+
+ST-LINK SN  : 002D003D3438511434343935
+ST-LINK FW  : V2J37M27
+Board       : --
+Voltage     : 3.24V
+SWD freq    : 4000 KHz
+Connect mode: Normal
+Reset mode  : Software reset
+Device ID   : 0x435
+Revision ID : Rev Y
+Device name : STM32L4x6
+Flash size  : 512 KBytes (default)
+Device type : MCU
+Device CPU  : Cortex-M4
+BL Version  : 0x90

@@ -1,0 +1,18 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0
+      -------------------------------------------------------------------
+
+ST-LINK SN  : 066BFF514852898767094734
+ST-LINK FW  : V3J11M3
+Board       : NUCLEO-F401RE
+Voltage     : 3.30V
+SWD freq    : 4000 KHz
+Connect mode: Normal
+Reset mode  : Software reset
+Device ID   : 0x423
+Revision ID : Rev Z
+Device name : STM32F401xB/C
+Flash size  : 256 KBytes (default)
+Device type : MCU
+Device CPU  : Cortex-M4
+BL Version  : 0x90

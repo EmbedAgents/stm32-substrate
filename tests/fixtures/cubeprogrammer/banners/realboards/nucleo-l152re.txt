@@ -1,0 +1,20 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0                  
+      -------------------------------------------------------------------
+
+ST-LINK SN  : 0668FF545454885087255551
+ST-LINK FW  : V2J47M34
+Board       : NUCLEO-L152RE
+Voltage     : 3.26V
+SWD freq    : 4000 KHz
+Connect mode: Normal
+Reset mode  : Software reset
+Device ID   : 0x437
+Revision ID : Rev A
+Device name : STM32L15xxE/STM32L162xE
+NVM size  : 512 KBytes
+Device type : MCU
+Device CPU  : Cortex-M3
+BL Version  : 0x40
+Debug in Low Power mode enabled
+

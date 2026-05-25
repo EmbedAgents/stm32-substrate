@@ -1,0 +1,10 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0
+      -------------------------------------------------------------------
+
+ST-LINK SN  : 066BFF514852898767094734
+ST-LINK FW  : V3J11M3
+Voltage     : 3.28V
+SWD freq    : 4000 KHz
+
+Error: Unknown MCU target detected. Please check device ID.

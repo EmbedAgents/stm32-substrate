@@ -1,0 +1,58 @@
+{
+  "_metadata": {
+    "model": "claude-sonnet-4-6",
+    "cost_usd": 0.31002019999999997,
+    "duration_s": 129.328
+  },
+  "tool_calls": [
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 debug read-peripheral DBGMCU",
+        "description": "Read DBGMCU to identify chip revision"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 debug read-peripheral DMA1",
+        "description": "Read DMA1 peripheral registers"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 debug read-peripheral SCB",
+        "description": "Read SCB (System Control Block) \u2014 cache enable bits, CCR, etc."
+      }
+    },
+    {
+      "name": "Read",
+      "args": {
+        "file_path": "/home/user/.claude/projects/-home-user-claude-projects-stm32-substrate-tests-fixtures-projects-STM32CubeL4-Projects-NUCLEO-L476RG-Examples-GPIO-GPIO-IOToggle-STM32CubeIDE/4ad12f72-e170-4b40-8599-4b2c47e3c197/tool-results/by88bkdjx.txt"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 debug read-peripheral DMA2",
+        "description": "Read DMA2 peripheral registers"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 debug read-peripheral FLASH",
+        "description": "Read FLASH peripheral registers (ART accelerator cache bits in ACR)"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 debug read-peripheral MPU",
+        "description": "Read MPU registers to check memory region attributes (cache policy)"
+      }
+    }
+  ],
+  "final_text": "I'll start by identifying the chip and then pull the DMA, cache (SCB/MPU), and memory-protection state in parallel so we can see the full picture at once.\nGood \u2014 chip identified as **STM32L476** (Cortex-M4, DEV_ID `0x415`). Now let me read the full SCB output and pull DMA2 and the Flash ART accelerator in parallel \u2014 all three are relevant to this bug.\nI have everything I need. Here's the full diagnosis.\n\n---\n\n## Diagnosis: DMA stale-data bug on STM32L476 (Cortex-M4)\n\n### Hardware state summary\n\n| Peripheral | Key findings |\n|---|---|\n| **DBGMCU** | DEV_ID `0x415` \u2192 **STM32L476**, halted at reset (DFSR.VCATCH=1) |\n| **DMA1** | All 7 channels: EN=0, CMAR=0, CPAR=0, NDT=0 \u2014 no active transfer at halt |\n| **DMA2** | No SVD registers decoded \u2014 not in use |\n| **FLASH ACR** | `ICEN=1`, **`DCEN=1`** \u2014 ART accelerator D-cache is ON; PRFTEN=0, LATENCY=0 |\n| **SCB CCR** | No DC/IC bits (correct \u2014 Cortex-M4 has no hardware L1 D-cache); ACTLR.DISDEFWBUF=0 (write buffer **active**) |\n| **MPU** | `MPU_CTRL.ENABLE=0` \u2014 **MPU is completely disabled**, no region attributes set |\n| **Faults** | CFSR/HFSR all clear \u2014 no fault has fired |\n\n---\n\n### Root cause: this is NOT a hardware cache problem\n\nThe **Cortex-M4 has no hardware L1 data cache**. The ART accelerator's `DCEN` only caches reads from **Flash** (`0x08000000`), not SRAM. DMA buffers live in SRAM. So the hardware itself cannot produce the cache incoherency you see on an H7.\n\nThe \"stale data\" is a **software visibility problem**, one of two causes:\n\n---\n\n### Cause 1 \u2014 Missing `volatile` (most likely)\n\nThe compiler sees the buffer pointer never written by the CPU, so it hoists the load into a register and never re-reads SRAM after the DMA writes it:\n\n```c\n// \u274c Wrong \u2014 compiler will keep old value in register\nuint8_t dma_buf[64];\n\n// \u2705 Correct \u2014 forces every read to go to SRAM\nvolatile uint8_t dma_buf[64];\n// HAL equivalent:\n__IO uint8_t dma_buf[64];\n```\n\n---\n\n### Cause 2 \u2014 Missing `__DMB()` barrier before consuming the buffer\n\nIf a TC interrupt sets a `dma_done` flag and your main loop polls it, the Cortex-M4 write buffer (`DISDEFWBUF=0`) plus compiler reordering can let the CPU speculatively load `dma_buf` *before* the flag load retires:\n\n```c\n// \u274c Without barrier \u2014 CPU can speculatively read dma_buf before the flag check\nif (dma_done) {\n    use(dma_buf[0]);\n}\n\n// \u2705 With barrier \u2014 DMB enforces: flag read happens-before buffer read\nif (dma_done) {\n    __DMB();               // Data Memory Barrier\n    use(dma_buf[0]);       // guaranteed to see DMA-written data\n}\n```\n\nThe `__DMB()` is the ISR/main-thread handshake \u2014 it ensures all bus transactions from the DMA (as seen by the AHB bus matrix) are visible to the CPU before the subsequent load.\n\n---\n\n### Cause 3 \u2014 ART data cache (secondary; only if buffer is in Flash)\n\n`FLASH_ACR.DCEN=1` is live. If you ever place a constant table in Flash that a DMA write was supposed to update, the ART D-cache would serve stale Flash data. Fix: set `FLASH_ACR.DCRST=1` to reset the ART data cache after the DMA completes. But **this only applies to Flash-resident data** \u2014 if your buffer is in SRAM1/SRAM2 it is irrelevant.\n\n---\n\n### The MPU note\n\nThe MPU is disabled. On an H7 you'd configure DMA buffers as `Non-cacheable` via MPU region. On the L476 that's unnecessary for SRAM (no M4 D-cache), but enabling the MPU with `PRIVDEFENA=1` and an explicit `Non-shareable` region for the DMA buffer is still best practice \u2014 it catches mis-mapped buffers and prevents speculative prefetch surprises.\n\n---\n\n### Fix checklist\n\n1. **Declare the buffer `volatile`** (or `__IO`) \u2014 eliminates Cause 1.\n2. **Add `__DMB()` before reading the buffer** after any ISR/flag handoff \u2014 eliminates Cause 2.\n3. **Confirm buffer is in SRAM, not Flash** \u2014 if it's in `.rodata` or a `const` section, that's a linker bug and also explains stale reads under `DCEN=1`.\n4. If you move to an H7 later, also add `SCB_InvalidateDCache_by_Addr()` before reading \u2014 but that's not needed here on the M4."
+}

@@ -1,0 +1,20 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0                  
+      -------------------------------------------------------------------
+
+ST-LINK SN  : 0669FF313335415043185829
+ST-LINK FW  : V2J47M34
+Board       : P-NUCLEO-WB55
+Voltage     : 3.26V
+SWD freq    : 4000 KHz
+Connect mode: Normal
+Reset mode  : Software reset
+Device ID   : 0x495
+Revision ID : Rev Y
+Device name : STM32WB5x/35xx
+NVM size  : 1 MBytes
+Device type : MCU
+Device CPU  : Cortex-M4
+BL Version  : 0xD5
+Debug in Low Power mode enabled
+

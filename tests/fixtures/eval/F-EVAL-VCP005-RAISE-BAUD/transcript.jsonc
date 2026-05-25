@@ -1,0 +1,60 @@
+// F-EVAL-VCP005-RAISE-BAUD — hand-authored transcript stub (Wave-3a T3, RES-031).
+//
+// Stand-in so default replay-mode runs green. The tool-call shape
+// mirrors a representative loop iteration (gather → edit → rebuild →
+// reflash → re-observe); a live record may differ in iteration count
+// and in CLI-vs-Python composition (RES-026). Replace on a bench with
+// an attached NUCLEO-L476RG:
+//   STM32_EVAL_MODE=record pytest tests/eval/test_t3_loops_eval.py -m eval -v
+{
+  "_metadata": {
+    "model": "hand-authored",
+    "note": "Wave-3a T3 stub (RES-031); re-record live on bench to replace."
+  },
+  "tool_calls": [
+    {
+      "name": "Skill",
+      "args": {
+        "skill": "stm32agent",
+        "args": "serial is too slow \u2014 fastest baud both ends support, then validate"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 debug read-peripheral USART2",
+        "description": "current baud + USART kernel clock to compute the achievable max"
+      }
+    },
+    {
+      "name": "Edit",
+      "args": {
+        "file_path": "Core/Src/main.c",
+        "old_string": "huart2.Init.BaudRate = 115200;",
+        "new_string": "huart2.Init.BaudRate = 921600;"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 build",
+        "description": "rebuild firmware with the higher baud"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 prog flash STM32CubeIDE/Debug/BLINKY.elf",
+        "description": "reflash"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 vcp tail --lines 5",
+        "description": "reopen the host reader at 921600 and validate"
+      }
+    }
+  ],
+  "final_text": "Current baud is 115200. The host max and the device's highest BRR-achievable rate with <2% error both support 921600, under the sane ceiling \u2014 so target_baud = 921600. I edited the firmware USART2 baud, rebuilt, reflashed, then reopened the host reader at 921600 and re-tailed: output is clean with no framing errors, so no step-down was needed. applied: true, validated: true (baud 115200 \u2192 921600)."
+}

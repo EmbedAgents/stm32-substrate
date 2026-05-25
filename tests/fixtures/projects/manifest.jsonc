@@ -1,0 +1,161 @@
+// STM32 substrate — shared reference-project manifest.
+//
+// Declarative test-side index of every F-PROJ-<board>-<role> entry.
+// Tests parametrize over these via tests/conftest.py helpers
+// (projects_for_role / etc).
+//
+// Fields follow the F-PROJ-<board>-<role> taxonomy (RES-019).
+//
+// Conventions:
+//   - `id` is canonical "F-PROJ-<board>-<role>" (logical identifier).
+//   - `path` is relative to tests/fixtures/projects/. As of the
+//     2026-05-19 fixture-tree restructure, multiple roles share a
+//     single F-PROJ-<board>/ root with per-role subdirs under
+//     Projects/<board>/Examples/<group>/<role>/. The `path` field
+//     points at the shared umbrella root; `cubeide_project_path`
+//     locates the specific role's STM32CubeIDE dir within it.
+//   - `cubeide_project_path` is relative to `path`; locates the dir
+//     containing .cproject + .project.
+//   - `elf` / `bin` / `ioc` are relative to `path`; null when the artifact
+//     is not pre-built or not applicable (e.g. ST examples have no .ioc).
+//   - `capabilities` is a free-form tag list tests can filter against.
+{
+  "version": 1,
+  "projects": [
+    {
+      "id": "F-PROJ-NUCLEO-L476RG-BLINKY",
+      "board": "NUCLEO-L476RG",
+      "role": "blinky",
+      "path": "F-PROJ-NUCLEO-L476RG",
+      "cubeide_project_path": "Projects/NUCLEO-L476RG/Examples/GPIO/BLINKY/STM32CubeIDE",
+      "cubeide_project_name": "BLINKY",
+      "cubeide_configuration": "Debug",
+      "ioc": null,
+      "elf": "Projects/NUCLEO-L476RG/Examples/GPIO/BLINKY/STM32CubeIDE/Debug/BLINKY.elf",
+      "bin": null,
+      "descriptor": "stm32-project.jsonc",
+      "capabilities": ["flash", "debug-attach", "fpu", "build-success"],
+      "notes": "ST sample GPIO/GPIO_IOToggle from STM32CubeL4 firmware bundle, retargeted as the canonical blinky role. Source-only on disk; .elf produced by headless build under <cubeide_project_path>/Debug/. Toggles PA.05 (LED2). No UART; no .ioc — hand-authored Eclipse project."
+    },
+    {
+      "id": "F-PROJ-NUCLEO-L476RG-VCP-ECHO",
+      "board": "NUCLEO-L476RG",
+      "role": "vcp-echo",
+      "path": "F-PROJ-NUCLEO-L476RG",
+      "cubeide_project_path": "Projects/NUCLEO-L476RG/Examples/PWR/VCP-ECHO/STM32CubeIDE",
+      "cubeide_project_name": "VCP-ECHO",
+      "cubeide_configuration": "Debug",
+      "ioc": null,
+      "elf": "Projects/NUCLEO-L476RG/Examples/PWR/VCP-ECHO/STM32CubeIDE/Debug/VCP-ECHO.elf",
+      "bin": null,
+      "descriptor": "stm32-project.jsonc",
+      "capabilities": ["flash", "vcp", "build-success"],
+      "notes": "PWR_ModesSelection retargeted as polled-char-echo over USART2 at 115200-8-N-1. Used by test_vcp_hardware echo-loopback tests."
+    },
+    {
+      "id": "F-PROJ-NUCLEO-L476RG-FAULTING",
+      "board": "NUCLEO-L476RG",
+      "role": "faulting",
+      "path": "F-PROJ-NUCLEO-L476RG",
+      "cubeide_project_path": "Projects/NUCLEO-L476RG/Examples/PWR/FAULTING/STM32CubeIDE",
+      "cubeide_project_name": "FAULTING",
+      "cubeide_configuration": "Debug",
+      "ioc": null,
+      "elf": "Projects/NUCLEO-L476RG/Examples/PWR/FAULTING/STM32CubeIDE/Debug/FAULTING.elf",
+      "bin": null,
+      "descriptor": "stm32-project.jsonc",
+      "capabilities": ["flash", "hardfault", "build-success"],
+      "notes": "Runtime-faulting firmware for analyze_hardfault (DIAG-001 binary path) hardware tests. Source needs a fault-triggering insertion (e.g. UDF #0); cubeide build produces a flashable ELF that lands the chip in HardFault_Handler after reset."
+    },
+    {
+      "id": "F-PROJ-NUCLEO-L476RG-BROKEN-COMPILE",
+      "board": "NUCLEO-L476RG",
+      "role": "broken-compile",
+      "path": "F-PROJ-NUCLEO-L476RG",
+      "cubeide_project_path": "Projects/NUCLEO-L476RG/Examples/FLASH/BROKEN-COMPILE/STM32CubeIDE",
+      "cubeide_project_name": "BROKEN-COMPILE",
+      "cubeide_configuration": "Debug",
+      "ioc": null,
+      "elf": null,
+      "bin": null,
+      "descriptor": "stm32-project.jsonc",
+      "capabilities": ["build-fail"],
+      "notes": "Source with a deliberate compile error (missing semicolon) for cubeide BuildResult(success=False) coverage. No ELF — the build never completes."
+    },
+    {
+      "id": "F-PROJ-NUCLEO-L476RG-BROKEN-LINK",
+      "board": "NUCLEO-L476RG",
+      "role": "broken-link",
+      "path": "F-PROJ-NUCLEO-L476RG",
+      "cubeide_project_path": "Projects/NUCLEO-L476RG/Examples/FLASH/BROKEN-LINK/STM32CubeIDE",
+      "cubeide_project_name": "BROKEN-LINK",
+      "cubeide_configuration": "Debug",
+      "ioc": null,
+      "elf": null,
+      "bin": null,
+      "descriptor": "stm32-project.jsonc",
+      "capabilities": ["link-fail"],
+      "notes": "Source with a deliberate undefined-extern reference for cubeide link-stage failure coverage. No ELF — the link fails after compile succeeds."
+    },
+    {
+      "id": "F-PROJ-STM32H7S78-DK-MULTI-FOLDER",
+      "board": "STM32H7S78-DK",
+      "role": "multi-folder",
+      "path": "STM32CubeH7RS",
+      "cubeide_project_path": "Projects/STM32H7S78-DK/Applications/USB_Device/MSC_Standalone/STM32CubeIDE",
+      "cubeide_project_name": "MSC_Standalone",
+      "cubeide_configuration": "Debug",
+      "ioc": "Projects/STM32H7S78-DK/Applications/USB_Device/MSC_Standalone/MSC_Standalone.ioc",
+      "elf": null,
+      "bin": null,
+      "descriptor": null,
+      "capabilities": ["multi-folder", "nested-projects"],
+      "notes": "Real ST USB-MSC standalone example using the nested-CubeIDE-workspace pattern: parent STM32CubeIDE/.project references two child Eclipse projects, Appli/.cproject (RAM/ROM XSPI app) + Boot/.cproject (FLASH boot). Drives B-018/019 find_project discovery + ambiguity callback. User-provides per RES-019; cloned from STM32CubeH7RS firmware bundle."
+    },
+    {
+      "id": "F-PROJ-NUCLEO-F401RE-PERIPHERALS",
+      "board": "NUCLEO-F401RE",
+      "role": "peripherals",
+      "path": "X-CUBE-MEMS1",
+      "cubeide_project_path": "Projects/NUCLEO-F401RE/Applications/IKS02A1/DataLogFusion/STM32CubeIDE",
+      "cubeide_project_name": "DataLogFusion",
+      "cubeide_configuration": "Debug",
+      "ioc": "Projects/NUCLEO-F401RE/Applications/IKS02A1/DataLogFusion/DataLogFusion.ioc",
+      "elf": null,
+      "bin": null,
+      "descriptor": null,
+      "capabilities": ["i2c", "uart", "dma", "timer", "sensor-bus", "nvic-armed"],
+      "notes": "Real ST X-CUBE-MEMS1 sample: IKS02A1 sensor expansion board (LSM6DSO + LSM303AGR + LIS2DW12 + STTS22H) on NUCLEO-F401RE; exercises I2C (sensor bus), USART2 (VCP streaming), DMA + timers (sample cadence), NVIC with multiple handlers bound, plus MotionFX software fusion. Drives DBG-007 (peripheral dump) + DIAG-002..017 happy paths (clock enabled, NVIC armed, GPIO AF set, etc.). User-provides per RES-019; cloned from X-CUBE-MEMS1 firmware bundle."
+    },
+    {
+      "id": "F-PROJ-DISCO-H747XI-DUAL-CORE",
+      "board": "STM32H747I-DISCO",
+      "role": "dual-core",
+      "path": "STM32CubeH7",
+      "cubeide_project_path": "Projects/STM32H747I-DISCO/Applications/USB_Host/MSC_Standalone/STM32CubeIDE",
+      "cubeide_project_name": "MSC_Standalone",
+      "cubeide_configuration": "Debug",
+      "ioc": null,
+      "elf": null,
+      "bin": null,
+      "descriptor": null,
+      "capabilities": ["dual-core", "nested-projects", "cortex-m7", "cortex-m4", "fpu"],
+      "notes": "Real ST USB-Host MSC standalone example on STM32H747I-DISCO. Nested CubeIDE workspace: parent STM32CubeIDE/.project + STM32CubeIDE/CM7/.cproject (Cortex-M7 @ 480 MHz; host stack) + STM32CubeIDE/CM4/.cproject (Cortex-M4 @ 240 MHz; companion core). Use find_project(name='CM7') / find_project(name='CM4') to disambiguate. Drives nested-project discovery + dual-core debug attach. User-provides per RES-019; cloned from STM32CubeH7 firmware bundle."
+    },
+    {
+      "id": "F-PROJ-DISCO-H747XI-FPU",
+      "board": "STM32H747I-DISCO",
+      "role": "fpu",
+      "path": "STM32CubeH7",
+      "cubeide_project_path": "Projects/STM32H747I-DISCO/Applications/FPU/FPU_Fractal/STM32CubeIDE",
+      "cubeide_project_name": "FPU_Fractal",
+      "cubeide_configuration": "Debug",
+      "ioc": null,
+      "elf": null,
+      "bin": null,
+      "descriptor": null,
+      "capabilities": ["fpu", "cortex-m7", "dual-core", "nested-projects", "floating-point"],
+      "notes": "Real ST FPU_Fractal example on STM32H747I-DISCO. Mandelbrot-style floating-point exerciser on the CM7 (480 MHz, fpv5-d16 double-precision FPU). Same nested CM7/CM4 layout as DUAL-CORE; CM7 carries the FPU workload. Drives build(preset='fast') FPU edit application against H7 family (FAMILY_FPU_TABLE['STM32H7'] = ('fpv5-d16', 'hard')). User-provides per RES-019; cloned from STM32CubeH7 firmware bundle."
+    }
+  ]
+}

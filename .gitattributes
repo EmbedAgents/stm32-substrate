@@ -1,0 +1,20 @@
+# Default: treat as text, normalize to LF on commit, LF on checkout (any OS).
+* text=auto eol=lf
+
+# Windows-native script extensions: CRLF on checkout (cmd.exe / PowerShell
+# can mishandle LF for some script constructs).
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary asset types: never touch.
+*.png binary
+*.svg binary
+*.bin binary
+*.elf binary
+*.hex binary
+*.exe binary
+*.stldr binary
+*.pdf binary
+*.ico binary
+*.zip binary
+*.gz binary

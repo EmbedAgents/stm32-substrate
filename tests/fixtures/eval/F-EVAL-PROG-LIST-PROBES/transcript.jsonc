@@ -1,0 +1,22 @@
+// F-EVAL-PROG-LIST-PROBES — hand-authored transcript.
+//
+// Run STM32_EVAL_MODE=record once the SDK is configured to overwrite
+// this with the live-captured shape. The hand-authored content here is
+// a stand-in so default replay-mode runs green out of the box.
+{
+    "_metadata": {
+        "model": "hand-authored",
+        "cost_usd": 0.0,
+        "duration_s": 0.0
+    },
+    "tool_calls": [
+        {
+            "name": "Bash",
+            "args": {
+                "command": "stm32 prog list-probes",
+                "description": "List attached ST-LINK probes"
+            }
+        }
+    ],
+    "final_text": "One ST-LINK probe is attached: NUCLEO-L476RG (SN 066DFF485754727567021514, FW V2J47M34) on access port 1."
+}

@@ -1,0 +1,23 @@
+{
+  "_metadata": {
+    "model": "claude-sonnet-4-6",
+    "cost_usd": 0.1290406,
+    "duration_s": 53.092
+  },
+  "tool_calls": [
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 debug read-peripheral RCC",
+        "description": "Read RCC peripheral registers to inspect clock tree state"
+      }
+    },
+    {
+      "name": "Read",
+      "args": {
+        "file_path": "/home/user/.claude/projects/-home-user-claude-projects-stm32-substrate-tests-fixtures-projects-STM32CubeL4-Projects-NUCLEO-L476RG-Examples-GPIO-GPIO-IOToggle-STM32CubeIDE/ad8f95be-23dc-4099-82a4-e92a9adb5a0b/tool-results/b00prurvd.txt"
+      }
+    }
+  ],
+  "final_text": "Here's what the RCC register dump tells us about the live clock tree state:\n\n---\n\n## Clock Tree Analysis \u2014 NUCLEO-L476RG\n\n### Active SYSCLK path\n\n| Register | Field | Value | Meaning |\n|---|---|---|---|\n| `CR` | `MSION` / `MSIRDY` | 1 / 1 | MSI oscillator ON and locked |\n| `CR` | `HSEON` / `HSERDY` | 0 / 0 | HSE **off** |\n| `CR` | `HSION` / `HSIRDY` | 0 / 0 | HSI16 **off** |\n| `CR` | `PLLON` / `PLLRDY` | 0 / 0 | Main PLL **off** |\n| `CFGR` | `SW` / `SWS` | 0 / 0 | MSI is both selected and confirmed as SYSCLK source |\n| `CFGR` | `HPRE` | 0 | AHB prescaler = \u00f71 \u2192 **HCLK = SYSCLK** |\n| `CFGR` | `PPRE1` / `PPRE2` | 0 / 0 | APB1 & APB2 prescalers = \u00f71 |\n\n### MSI frequency\n\n`CR.MSIRGSEL = 0` \u2192 range is taken from **`CSR.MSISRANGE`** (not `CR.MSIRANGE`).\n`CSR.MSISRANGE = 6` \u2192 **MSI = 4 MHz**.\n\n> **SYSCLK = HCLK = PCLK1 = PCLK2 = 4 MHz**\n\nThis is the **post-reset default** \u2014 exactly what the STM32L476 hardware boots to before `SystemClock_Config()` runs.\n\n---\n\n### \u26a0\ufe0f The PLL has never been configured\n\nThe `PLLCFGR` register holds its reset value (`PLLN = 16`, `PLLM = 0`, `PLLSRC = 0b00 = no clock`) and `PLLON = 0`. Nothing touched the PLL at all.\n\n**Possible explanations:**\n1. **`SystemClock_Config()` hasn't run yet** \u2014 the debug halt caught the MCU before or during startup (e.g. breakpoint at `main()` before the call).\n2. **`SystemClock_Config()` was never called** \u2014 it's missing from `main()` or was accidentally removed/commented out.\n3. **This is intentional** \u2014 the GPIO IOToggle example for this board genuinely targets 4 MHz MSI (some CubeL4 examples do this).\n\n---\n\n### Reset cause (from `CSR`)\n\n| Flag | Value | Meaning |\n|---|---|---|\n| `PINRSTF` | 1 | Pin (NRST) reset occurred |\n| `BORRSTF` | 1 | BOR (power-on) reset occurred |\n| `SFTRSTF` | 1 | Software reset occurred (most recent \u2014 likely from the debug probe attaching) |\n\n---\n\n### What to check next\n\nIf you expected 80 MHz (typical for NUCLEO-L476RG at full speed), run and then re-halt *after* `SystemClock_Config()` completes \u2014 or share the `SystemClock_Config()` source so I can confirm whether the PLL setup is correct. If this is the IOToggle example with intentional 4 MHz, the state is consistent."
+}

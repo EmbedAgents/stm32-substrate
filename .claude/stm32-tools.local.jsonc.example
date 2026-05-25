@@ -1,0 +1,128 @@
+// Example .claude/stm32-tools.local.jsonc — per-host tool-path overrides.
+//
+// Copy this file to .claude/stm32-tools.local.jsonc and edit the
+// candidates lists to match your install. Substrate's resolution order
+// per ADR-007 is:
+//
+//   1. Env var (see env_var per tool below; e.g. STM32_PROGRAMMER_CLI).
+//   2. Configured candidates for sys.platform (linux / windows / darwin).
+//   3. shutil.which against executable_name (uses PATH; on Windows
+//      also handles PATHEXT for .exe / .bat / .cmd auto-resolution).
+//   4. Loud ConfigurationError naming the JSON key to set.
+//
+// Linux + Windows ship as first-class platforms in v1 per ADR-007
+// (supersedes ADR-005). macOS is deferred pending marketplace demand;
+// the darwin block is kept for v1.1+ forward-compat.
+//
+// Skip this file entirely when env vars or PATH already resolve every
+// tool you need — substrate works without it. Substrate also falls
+// back to a built-in tool-defaults table when this file is absent.
+{
+  "$schema": "../src/stm32_substrate/schemas/stm32-tools.local.schema.json",
+  "version": 1,
+  "programmer": {
+    // Default ST-LINK serial used when caller doesn't override; honors
+    // env override STM32_PROGRAMMER_DEFAULT_SN.
+    // "default_probe_sn": "066DFF485754727567021514"
+  },
+  "tools": {
+    "cube_programmer": {
+      "env_var": "STM32_PROGRAMMER_CLI",
+      "executable_name": "STM32_Programmer_CLI",
+      "candidates": {
+        "linux": [
+          "/opt/st/stm32cubeprogrammer/bin/STM32_Programmer_CLI",
+          "/opt/st/stm32cubeclt_1.21.0/STM32CubeProgrammer/bin/STM32_Programmer_CLI"
+        ],
+        "windows": [
+          "C:\\Program Files\\STMicroelectronics\\STM32Cube\\STM32CubeProgrammer\\bin\\STM32_Programmer_CLI.exe",
+          "C:\\ST\\STM32CubeCLT_1.21.0\\STM32CubeProgrammer\\bin\\STM32_Programmer_CLI.exe"
+        ],
+        "darwin": [
+          // TODO(v2-macos): /Applications/STMicroelectronics/STM32CubeProgrammer/...
+        ]
+      }
+    },
+    "cubeide": {
+      "env_var": "STM32CUBEIDE",
+      "executable_name": "stm32cubeide",
+      "candidates": {
+        "linux": [
+          "/opt/st/stm32cubeide_1.18.0/stm32cubeide"
+        ],
+        "windows": [
+          "C:\\ST\\STM32CubeIDE_2.1.1\\STM32CubeIDE\\stm32cubeide.exe",
+          "C:\\ST\\STM32CubeIDE_1.18.0\\STM32CubeIDE\\stm32cubeide.exe"
+        ],
+        "darwin": []
+      }
+    },
+    "cubemx": {
+      "env_var": "STM32CUBEMX_PATH",
+      "executable_name": "STM32CubeMX",
+      "candidates": {
+        "linux": [
+          "/opt/st/stm32cubemx/STM32CubeMX"
+        ],
+        "windows": [
+          "C:\\Program Files\\STMicroelectronics\\STM32Cube\\STM32CubeMX\\STM32CubeMX.exe"
+        ],
+        "darwin": []
+      }
+    },
+    "stlink_gdb_server": {
+      "env_var": "STLINK_GDB_SERVER",
+      "executable_name": "ST-LINK_gdbserver",
+      "candidates": {
+        "linux": [
+          "/opt/st/stm32cubeclt_1.21.0/STLink-gdb-server/bin/ST-LINK_gdbserver"
+        ],
+        "windows": [
+          "C:\\ST\\STM32CubeCLT_1.21.0\\STLink-gdb-server\\bin\\ST-LINK_gdbserver.exe"
+        ],
+        "darwin": []
+      }
+    },
+    "arm_gdb": {
+      "env_var": "ARM_NONE_EABI_GDB",
+      "executable_name": "arm-none-eabi-gdb",
+      "candidates": {
+        "linux": [
+          "/opt/st/stm32cubeclt_1.21.0/GNU-tools-for-STM32/bin/arm-none-eabi-gdb"
+        ],
+        "windows": [
+          "C:\\ST\\STM32CubeCLT_1.21.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gdb.exe"
+        ],
+        "darwin": []
+      }
+    },
+    "stm32_signing_tool_cli": {
+      "env_var": "STM32_SIGNING_TOOL_CLI",
+      "executable_name": "STM32_SigningTool_CLI",
+      "candidates": {
+        "linux": [
+          "/opt/st/stm32cubeprogrammer/bin/STM32_SigningTool_CLI",
+          "/opt/st/stm32cubeclt_1.21.0/STM32CubeProgrammer/bin/STM32_SigningTool_CLI"
+        ],
+        "windows": [
+          "C:\\Program Files\\STMicroelectronics\\STM32Cube\\STM32CubeProgrammer\\bin\\STM32_SigningTool_CLI.exe",
+          "C:\\ST\\STM32CubeCLT_1.21.0\\STM32CubeProgrammer\\bin\\STM32_SigningTool_CLI.exe"
+        ],
+        "darwin": []
+      }
+    },
+    "stm32cubeclt": {
+      "env_var": "STM32CUBECLT",
+      "executable_name": "stm32cubeclt",
+      "candidates": {
+        "linux": [
+          "/opt/st/stm32cubeclt_1.21.0"
+        ],
+        "windows": [
+          "C:\\ST\\STM32CubeCLT_1.21.0"
+        ],
+        "darwin": []
+      }
+    }
+  }
+}

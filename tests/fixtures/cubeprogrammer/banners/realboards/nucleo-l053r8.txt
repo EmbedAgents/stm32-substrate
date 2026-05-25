@@ -1,0 +1,19 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0                  
+      -------------------------------------------------------------------
+
+ST-LINK SN  : 0668FF524951775087232441
+ST-LINK FW  : V2J43M28
+Board       : --
+Voltage     : 3.26V
+SWD freq    : 4000 KHz
+Connect mode: Normal
+Reset mode  : Software reset
+Device ID   : 0x417
+Revision ID : Rev A
+Device name : STM32L05x/L06x/L010
+NVM size  : 64 KBytes
+Device type : MCU
+Device CPU  : Cortex-M0+
+BL Version  : 0xC0
+

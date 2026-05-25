@@ -1,0 +1,22 @@
+// F-EVAL-PROG-READ-FLASH-256 — hand-authored transcript.
+//
+// Re-record via STM32_EVAL_MODE=record once a board is on the bench
+// AND the substrate's read-mem CLI is verified working there. This
+// hand-authored stub keeps default replay-mode green.
+{
+    "_metadata": {
+        "model": "hand-authored",
+        "cost_usd": 0.0,
+        "duration_s": 0.0
+    },
+    "tool_calls": [
+        {
+            "name": "Bash",
+            "args": {
+                "command": "stm32 prog read-mem 0x08000000 --size 256",
+                "description": "Read 256 bytes from flash@0x08000000"
+            }
+        }
+    ],
+    "final_text": "Read 256 bytes from 0x08000000. The first 16 bytes are `f8 ff ff 1f 7d 02 00 08 8d 00 00 08 91 00 00 08` — that's the Cortex-M initial stack pointer (0x1FFFFFF8) followed by reset/NMI/HardFault vectors, confirming this is a valid flashed firmware image."
+}

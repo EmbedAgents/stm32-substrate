@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/EmbedAgents/stm32-substrate/schemas/stm32-project.schema.json",
+  "title": "STM32 substrate — per-project descriptor",
+  "description": "Per-project descriptor stm32-project.jsonc. One per project folder. Loaded by SubstrateContext.from_environment() and validated against this schema at load time.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "properties": {
+    "$schema": {
+      "description": "Optional JSON Schema reference for IDE validation; substrate ignores.",
+      "type": "string"
+    },
+    "_comment": {
+      "description": "Free-form note ignored by substrate.",
+      "type": "string"
+    },
+    "version": {
+      "description": "Schema version. Pinned to 1 for v1.",
+      "type": "integer",
+      "const": 1
+    },
+    "project_name": {
+      "description": "Project identifier used in log lines and error messages.",
+      "type": "string"
+    },
+    "board": {
+      "description": "Board descriptor (advisory; ground truth for board-name resolution is firmware.board).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "_comment": { "type": "string" },
+        "name": { "type": "string" },
+        "mcu": { "type": "string" },
+        "interface": { "type": "string" }
+      }
+    },
+    "firmware": {
+      "description": "Firmware artifact + target descriptor fields. Consumed across cubeprogrammer / cubeide / cubemx / debug / vcp / signing.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "_comment": { "type": "string" },
+        "flash_address": {
+          "description": "Flash base address; hex literal with 0x prefix (SC-003).",
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]+$"
+        },
+        "device_family": {
+          "description": "Family prefix like STM32L4, STM32H7, STM32N6 for FPU detection (cubeide preset-fast per MR-1) and signing default. Optional; substrate falls back to soft-float / no-auto-align when unset.",
+          "type": "string"
+        },
+        "board": {
+          "description": "Board name e.g. 'nucleo-l476rg'. Consumed by vcp multi-probe auto-match (MR-2) and downstream slash-command routing.",
+          "type": "string"
+        },
+        "uart_baud": {
+          "description": "Default VCP baud rate. Substrate fallback: 115200 when unset.",
+          "type": "integer",
+          "minimum": 300
+        },
+        "uart_terminator": {
+          "description": "Line terminator for VCP.send_and_read(). Substrate fallback: \\n when unset.",
+          "type": "string",
+          "enum": ["\n", "\r\n"]
+        },
+        "uart_parity": {
+          "description": "Expected UART parity for DIAG-011 host-vs-device parity match check.",
+          "type": "string",
+          "enum": ["none", "even", "odd"]
+        },
+        "expected_sysclk_mhz": {
+          "description": "Expected SYSCLK in MHz for DIAG-003 clock-tree verification.",
+          "type": "number",
+          "minimum": 0
+        },
+        "cpu_freq_mhz": {
+          "description": "CPU frequency used to drive SWO sampling in tail_swo (VCP-007).",
+          "type": "number",
+          "minimum": 0
+        },
+        "expected_option_bytes": {
+          "description": "Expected option byte values for DIAG-018 verification; keys are OB names (device-specific).",
+          "type": "object",
+          "additionalProperties": true
+        },
+        "images": {
+          "description": "Image list for F-008 / F-009 dual-image flash flows.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path"],
+            "properties": {
+              "path": { "type": "string" },
+              "address": { "type": "string", "pattern": "^0x[0-9A-Fa-f]+$" }
+            }
+          }
+        },
+        "external_loader": {
+          "description": "Path to .stldr external loader for F-010 / F-015 flows.",
+          "type": "string"
+        }
+      }
+    },
+    "build": {
+      "description": "CubeIDE headless build descriptor. Consumed by cubeide module.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "_comment": { "type": "string" },
+        "workspace": {
+          "description": "Eclipse workspace location; substrate default: <repo>/.stm32-substrate-workspace/.",
+          "type": "string"
+        },
+        "project_path": {
+          "description": "Directory containing .cproject and .project.",
+          "type": "string"
+        },
+        "project_name": {
+          "description": "Project name as in .project <name> element.",
+          "type": "string"
+        },
+        "default_configuration": {
+          "description": "Default CDT configuration name (e.g. 'Debug' or 'Release').",
+          "type": "string"
+        },
+        "configurations": {
+          "description": "Available configuration names listed in .cproject.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "artifact": {
+          "description": "Expected ELF artifact path relative to project + configuration build dir.",
+          "type": "string"
+        },
+        "modify_all_configurations": {
+          "description": "If true, .cproject settings edits apply across all configs; otherwise active configuration only (cubeide-api Q6).",
+          "type": "boolean",
+          "default": false
+        },
+        "add_source_mode": {
+          "description": "Default source-add behaviour for B-013.",
+          "type": "string",
+          "enum": ["linked", "copy"],
+          "default": "copy"
+        }
+      }
+    },
+    "debug": {
+      "description": "Debug-session descriptor consumed by debug module.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "_comment": { "type": "string" },
+        "elf_path": {
+          "description": "Default ELF for Debug.start_session() when caller does not pass elf_path.",
+          "type": "string"
+        }
+      }
+    },
+    "cubemx": {
+      "description": "CubeMX generation descriptor consumed by cubemx module.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "_comment": { "type": "string" },
+        "ioc_path": {
+          "description": "Default .ioc file for CubeMX.generate().",
+          "type": "string"
+        },
+        "output_path": {
+          "description": "Default project generation target directory.",
+          "type": "string"
+        },
+        "project_name": {
+          "description": "Name embedded in the generated project.",
+          "type": "string"
+        },
+        "toolchain": {
+          "description": "Generated-project toolchain. v1 supports STM32CubeIDE only per cubemx-api Q2.",
+          "type": "string",
+          "const": "STM32CubeIDE",
+          "default": "STM32CubeIDE"
+        }
+      }
+    }
+  }
+}

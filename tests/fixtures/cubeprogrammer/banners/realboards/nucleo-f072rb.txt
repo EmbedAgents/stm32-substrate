@@ -1,0 +1,19 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0                  
+      -------------------------------------------------------------------
+
+ST-LINK SN  : 066EFF495056805087214450
+ST-LINK FW  : V2J47M34
+Board       : --
+Voltage     : 3.22V
+SWD freq    : 4000 KHz
+Connect mode: Normal
+Reset mode  : Software reset
+Device ID   : 0x448
+Revision ID : Rev Z
+Device name : STM32F07x
+NVM size  : 128 KBytes
+Device type : MCU
+Device CPU  : Cortex-M0
+BL Version  : 0xA1
+

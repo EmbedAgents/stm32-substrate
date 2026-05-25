@@ -1,0 +1,17 @@
+{
+  "_metadata": {
+    "model": "claude-sonnet-4-6",
+    "cost_usd": 0.0376693,
+    "duration_s": 10.085
+  },
+  "tool_calls": [
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 prog list-probes",
+        "description": "List attached ST-LINK probes"
+      }
+    }
+  ],
+  "final_text": "One ST-LINK probe is attached:\n\n| Field | Value |\n|---|---|\n| **Serial Number** | `003400303235511638363730` |\n| **Firmware** | V3J16M8 |\n| **Board** | STM32N6570-DK |\n| **Target** | *(none selected)* |\n\nIt's an **STM32N6570-DK** discovery kit with an ST-LINK V3 (firmware V3J16M8). Note this is an N6-series board \u2014 relevant if you're planning signed-flash operations, which require the `NUCLEO-N657X0-Q` fixture path."
+}

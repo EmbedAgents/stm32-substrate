@@ -1,0 +1,15 @@
+{
+  "name": "stm32",
+  "owner": {
+    "name": "EmbedAgents",
+    "email": "akd.jls@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "stm32-substrate",
+      "source": ".",
+      "description": "STM32 development by talking to Claude — wraps ST's vendor tools (CubeMX, CubeIDE, CubeProgrammer, ST-LINK gdbserver, Signing Tool) plus a USB serial reader, as five slash commands and the `stm32` CLI they drive.",
+      "license": "MIT"
+    }
+  ]
+}

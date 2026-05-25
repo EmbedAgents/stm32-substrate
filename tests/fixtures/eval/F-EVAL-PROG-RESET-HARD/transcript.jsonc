@@ -1,0 +1,20 @@
+// F-EVAL-PROG-RESET-HARD — hand-authored transcript.
+//
+// Re-record via STM32_EVAL_MODE=record once a board is on the bench.
+{
+    "_metadata": {
+        "model": "hand-authored",
+        "cost_usd": 0.0,
+        "duration_s": 0.0
+    },
+    "tool_calls": [
+        {
+            "name": "Bash",
+            "args": {
+                "command": "stm32 prog reset --hard",
+                "description": "Issue a hard reset to the attached board"
+            }
+        }
+    ],
+    "final_text": "Hard reset issued. The substrate confirmed `reset_issued=True`, `hard=True`. The board re-boots from flash and resumes execution at the reset vector."
+}

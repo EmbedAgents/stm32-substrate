@@ -1,0 +1,5 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0
+      -------------------------------------------------------------------
+
+Error: Some future error message the substrate doesn't recognise yet.

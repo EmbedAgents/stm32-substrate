@@ -1,0 +1,12 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0
+      -------------------------------------------------------------------
+
+SWV started on all ports, frequency 80 MHz
+
+ITM channel 0: app: state=running
+ITM channel 1: net: rx_packet len=128
+ITM channel 0: app: tick
+ITM channel 2: trace: enter ISR
+ITM channel 1: net: tx_packet len=64
+ITM channel 0: app: tock

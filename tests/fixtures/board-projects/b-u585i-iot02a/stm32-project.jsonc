@@ -1,0 +1,37 @@
+// stm32-project.jsonc — B-U585I-IOT02A board-recipe-suite descriptor (in-repo).
+//
+// Run:  STM32_BOARD_PROJECT=tests/fixtures/board-projects/b-u585i-iot02a \
+//         pytest -m hardware tests/test_board_recipe_suite.py -v
+//
+// CubeIDE project tree is user-provided + OUTSIDE the repo (ST CubeU5
+// examples checkout); the paths below are ABSOLUTE + bench-local. See the
+// nucleo-g070rb descriptor for the rationale.
+//
+// Cortex-M33 (STM32U5, TrustZone; BLE_AT_Client builds non-secure at
+// 0x08000000). HW-validated 27/1-skip (DMA1 absent — U5 uses GPDMA/LPDMA).
+{
+  "$schema": "../../../../src/stm32_substrate/schemas/stm32-project.schema.json",
+  "version": 1,
+  "project_name": "BLE_AT_Client",
+  "board": {
+    "name": "B-U585I-IOT02A",
+    "mcu": "STM32U585AIIx",
+    "interface": "swd"
+  },
+  "firmware": {
+    "flash_address": "0x08000000",
+    "device_family": "STM32U5",
+    "board": "B-U585I-IOT02A"
+  },
+  "build": {
+    "workspace": "/mnt/data/github-cubemx/.board-workspaces/b-u585i-iot02a",
+    "project_path": "/mnt/data/github-cubemx/STM32CubeU5/Projects/B-U585I-IOT02A/Applications/BLE/BLE_AT_Client/STM32CubeIDE",
+    "project_name": "BLE_AT_Client",
+    "default_configuration": "Debug",
+    "configurations": ["Debug", "Release"],
+    "artifact": "Debug/BLE_AT_Client.elf"
+  },
+  "debug": {
+    "elf_path": "/mnt/data/github-cubemx/STM32CubeU5/Projects/B-U585I-IOT02A/Applications/BLE/BLE_AT_Client/STM32CubeIDE/Debug/BLE_AT_Client.elf"
+  }
+}

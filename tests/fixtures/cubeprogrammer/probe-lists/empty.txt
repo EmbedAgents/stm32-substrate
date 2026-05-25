@@ -1,0 +1,15 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0
+      -------------------------------------------------------------------
+
+=====  DFU Interface   =====
+
+No STM32 device in DFU mode connected!
+
+
+=====  Serial Port   =====
+
+
+=====  STLink Interface  =====
+
+No STLink probes connected!

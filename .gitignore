@@ -1,0 +1,123 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Test + coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# Packaging
+*.whl
+*.tar.gz
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Virtualenv
+.venv/
+venv/
+
+# Substrate scratch
+.stm32-substrate/
+.stm32-substrate-workspace/
+
+# Claude Code — user-local permission overrides (settings.json + commands/ stay committed)
+.claude/settings.local.json
+
+# Substrate tool-path overrides — user-local per-host config. The
+# committed `.example` template is the user-facing reference; the active
+# .jsonc is bench-specific and stays uncommitted.
+.claude/stm32-tools.local.jsonc
+
+# Reference-project firmware bundles — user-provides per RES-019 + fixture-spec Q1.
+# Only the per-project descriptor (stm32-project.jsonc) and the top-level
+# manifest are committed; the actual ST firmware-bundle subtrees (HAL drivers,
+# example projects, middlewares) stay machine-local. CI does not run hardware
+# tests so these don't need to be in the repo.
+tests/fixtures/projects/F-PROJ-*/Drivers/
+tests/fixtures/projects/F-PROJ-*/Middlewares/
+tests/fixtures/projects/F-PROJ-*/Projects/
+tests/fixtures/projects/F-PROJ-*/Utilities/
+tests/fixtures/projects/F-PROJ-*/_htmresc/
+tests/fixtures/projects/F-PROJ-*/*.chm
+tests/fixtures/projects/F-PROJ-*/*.html
+tests/fixtures/projects/F-PROJ-*/LICENSE*
+tests/fixtures/projects/F-PROJ-*/Package_license*
+tests/fixtures/projects/F-PROJ-*/Release_Notes.*
+tests/fixtures/projects/F-PROJ-*/Readme.md
+tests/fixtures/projects/F-PROJ-*/package.xml
+
+# Eclipse parent-folder .project stubs that STM32CubeIDE creates when
+# importing nested projects. 200-byte placeholders with empty buildSpec
+# and natures — never a real CDT project. They cause build failures when
+# they shadow a real .project at a deeper level.
+tests/fixtures/projects/.project
+tests/fixtures/projects/F-PROJ-*/.project
+tests/fixtures/n6-projects/.project
+
+# N6 reference projects — same user-provides convention as F-PROJ-*.
+# The tests/fixtures/n6-projects/ subtree holds ST's STM32CubeN6 sample
+# repos (e.g. x-cube-n6-ai-multi-pose-estimation), cloned per bench for
+# signing / N6-hardware tests. They're hundreds of MB; only the
+# per-project descriptor (stm32-project.jsonc) is committed, the heavy
+# subtrees stay machine-local.
+tests/fixtures/n6-projects/*/Binary/
+tests/fixtures/n6-projects/*/Doc/
+tests/fixtures/n6-projects/*/EWARM/
+tests/fixtures/n6-projects/*/FSBL/
+tests/fixtures/n6-projects/*/Gcc/
+tests/fixtures/n6-projects/*/Inc/
+tests/fixtures/n6-projects/*/Lib/
+tests/fixtures/n6-projects/*/Model/
+tests/fixtures/n6-projects/*/Src/
+tests/fixtures/n6-projects/*/STM32CubeIDE/
+tests/fixtures/n6-projects/*/STM32Cube_FW_N6/
+tests/fixtures/n6-projects/*/mks/
+tests/fixtures/n6-projects/*/yolov8/
+tests/fixtures/n6-projects/*/.stm32-substrate-workspace/
+tests/fixtures/n6-projects/*/LICENSE*
+tests/fixtures/n6-projects/*/Makefile
+tests/fixtures/n6-projects/*/Release_Notes.*
+tests/fixtures/n6-projects/*/Readme.md
+tests/fixtures/n6-projects/*/README.md
+
+# Top-level ST firmware-bundle roots used as fixture sources.
+# Same user-provides convention as F-PROJ-* — these are giant ST
+# release packages (STM32Cube<family>, X-CUBE-<addon>) cloned per
+# bench. Their canonical F-PROJ-<board>-<role> aliases are recorded
+# in tests/fixtures/projects/manifest.jsonc; the bundle contents
+# themselves stay machine-local.
+tests/fixtures/projects/STM32Cube*/
+tests/fixtures/projects/X-CUBE-*/
+
+# N6 add_libraries (B-012) fixture tree — the x-cube-n6 AI sample + its
+# ~467 MB AI_Runtime lib set. User-provides per RES-019/RES-028; the
+# B-012 hardware test skips cleanly when absent. No committed descriptor
+# (the test passes project=/configuration= explicitly).
+tests/fixtures/n6-projects-lib-test/
+
+# Cubemx-projects generated outputs. The .ioc (source) and
+# stm32-project.jsonc (descriptor) are committed; everything else under
+# each project dir is what `stm32 mx generate` produces and is
+# regenerated per run.
+tests/fixtures/cubemx-projects/*/.mxproject
+tests/fixtures/cubemx-projects/*/Drivers/
+tests/fixtures/cubemx-projects/*/Inc/
+tests/fixtures/cubemx-projects/*/Src/
+tests/fixtures/cubemx-projects/*/STM32CubeIDE/
+.gstack/
+
+# Scratch: the /ultrareview prompt brief (ephemeral, not doc-surface).
+ultrareview-brief.md

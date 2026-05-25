@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/EmbedAgents/stm32-substrate/schemas/stm32-runtime-defaults.schema.json",
+  "title": "STM32 substrate — runtime defaults",
+  "description": "Repo-wide defaults for tool timeouts, retry caps, and other runtime knobs. Loaded by SubstrateContext.from_environment() and validated at load time. Organized into per-tool blocks.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "properties": {
+    "$schema": {
+      "description": "Optional JSON Schema reference for IDE validation; substrate ignores.",
+      "type": "string"
+    },
+    "_comment": {
+      "description": "Free-form note ignored by substrate.",
+      "type": "string"
+    },
+    "version": {
+      "description": "Schema version. Pinned to 1 for v1.",
+      "type": "integer",
+      "const": 1
+    },
+    "programmer": {
+      "description": "Cubeprogrammer (STM32_Programmer_CLI) runtime defaults.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "_comment": { "type": "string" },
+        "connect_timeout_s": {
+          "description": "D-* banner reads.",
+          "type": "integer", "minimum": 1, "default": 30
+        },
+        "atomic_timeout_s": {
+          "description": "F-001/002/016/017/018/020/021 + DIAG-001 (-hf) atomic operations.",
+          "type": "integer", "minimum": 1, "default": 30
+        },
+        "flash_timeout_base_s": {
+          "description": "F-003/004/006/007/008/009/011 base budget.",
+          "type": "integer", "minimum": 1, "default": 120
+        },
+        "flash_timeout_per_mb_s": {
+          "description": "F-003 etc. size-scaled bump per MB.",
+          "type": "integer", "minimum": 0, "default": 10
+        },
+        "flash_external_timeout_base_s": {
+          "description": "F-010 external-flash base.",
+          "type": "integer", "minimum": 1, "default": 300
+        },
+        "flash_external_timeout_per_mb_s": {
+          "description": "F-010 size-scaled bump per MB.",
+          "type": "integer", "minimum": 0, "default": 30
+        },
+        "read_timeout_base_s": {
+          "description": "F-019 read-flash-to-file base.",
+          "type": "integer", "minimum": 1, "default": 60
+        },
+        "read_timeout_per_mb_s": {
+          "description": "F-019 size-scaled bump per MB.",
+          "type": "integer", "minimum": 0, "default": 10
+        },
+        "swo_max_s": {
+          "description": "VCP-007 tail_swo() bound. Null = unbounded.",
+          "type": ["integer", "null"], "minimum": 1
+        },
+        "diagnose_timeout_s": {
+          "description": "D-002 SWD recovery ladder overall cap (RES-020).",
+          "type": "integer", "minimum": 1, "default": 120
+        },
+        "peek_default_size": {
+          "description": "F-020 default read size when caller does not pass --size.",
+          "type": "integer", "minimum": 1, "default": 64
+        }
+      }
+    },
+    "cubeide": {
+      "description": "CubeIDE headless build runtime defaults.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "_comment": { "type": "string" },
+        "headless_timeout_s": {
+          "description": "build() overall budget.",
+          "type": "integer", "minimum": 1, "default": 600
+        },
+        "protocol_timeout_s": {
+          "description": ".cproject atomic-edit protocol steps (snapshot/parse/modify/validate).",
+          "type": "integer", "minimum": 1, "default": 30
+        },
+        "toolchain_probe_timeout_s": {
+          "description": "arm-none-eabi-gcc --version probe.",
+          "type": "integer", "minimum": 1, "default": 5
+        },
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cproject_backups": {
+              "description": "When to clean up .cproject backup snapshots taken by the protocol.",
+              "type": "string",
+              "enum": ["immediate", "session", "persistent"],
+              "default": "immediate"
+            }
+          }
+        },
+        "workspace_strategy": {
+          "description": "Workspace allocation strategy. v1 supports 'shared' only (TODO(v1+): ephemeral per-project).",
+          "type": "string",
+          "enum": ["shared"],
+          "default": "shared"
+        },
+        "log_dir": {
+          "description": "Directory under which build console captures land; substrate default <repo>/.stm32-substrate-workspace/logs/.",
+          "type": "string"
+        }
+      }
+    },
+    "cubemx": {
+      "description": "CubeMX (STM32CubeMX -q) runtime defaults.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "_comment": { "type": "string" },
+        "long_call_s": {
+          "description": "Running-loop initial budget for generate().",
+          "type": "integer", "minimum": 1, "default": 300
+        },
+        "long_call_extension_s": {
+          "description": "Extension delta when activity detected near deadline (Q9).",
+          "type": "integer", "minimum": 1, "default": 60
+        },
+        "long_call_max_extensions": {
+          "description": "Maximum number of budget extensions per generate() call.",
+          "type": "integer", "minimum": 0, "default": 3
+        },
+        "poll_interval_s": {
+          "description": "Marker / log-mtime poll cadence.",
+          "type": "integer", "minimum": 1, "default": 2
+        },
+        "liveness_threshold_s": {
+          "description": "Log-activity threshold to grant a budget extension (Q9).",
+          "type": "integer", "minimum": 1, "default": 10
+        },
+        "log_path": {
+          "description": "CubeMX's own log path (default ~/.stm32cubemx/STM32CubeMX.log).",
+          "type": "string"
+        },
+        "log_dir": {
+          "description": "Directory under which substrate captures CubeMX stdout/stderr per call.",
+          "type": "string"
+        },
+        "post_exit_grace_s": {
+          "description": "Grace period after subprocess exit while waiting for marker file appearance.",
+          "type": "integer", "minimum": 0, "default": 3
+        }
+      }
+    },
+    "debug": {
+      "description": "ST-LINK gdbserver + arm-none-eabi-gdb runtime defaults.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "_comment": { "type": "string" },
+        "gdb_port": {
+          "description": "Initial GDB port; start_session() tries this first.",
+          "type": "integer", "minimum": 1024, "maximum": 65535, "default": 61234
+        },
+        "gdb_port_fallback_range": {
+          "description": "Fallback ports walked on port-busy.",
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1024, "maximum": 65535 },
+          "default": [61234, 61235, 61236, 61237, 61238, 61239, 61240, 61241, 61242, 61243]
+        },
+        "session_start_timeout_s": {
+          "description": "Overall spawn-gdbserver + spawn-gdb + handshake budget.",
+          "type": "integer", "minimum": 1, "default": 30
+        },
+        "gdbserver_spawn_timeout_s": {
+          "description": "Stderr-handshake budget within session_start_timeout_s; raises port-busy if gdbserver doesn't print 'Waiting for debugger connection on port N...' in time.",
+          "type": "integer", "minimum": 1, "default": 5
+        },
+        "read_timeout_s": {
+          "description": "read_registers() / read_peripheral().",
+          "type": "integer", "minimum": 1, "default": 10
+        },
+        "read_memory_base_s": {
+          "description": "read_memory() base timeout.",
+          "type": "integer", "minimum": 1, "default": 5
+        },
+        "read_memory_per_mb_s": {
+          "description": "read_memory() size-scaled bump per MB.",
+          "type": "integer", "minimum": 0, "default": 5
+        },
+        "breakpoint_wait_timeout_s": {
+          "description": "Default timeout for run_until_breakpoint() when caller doesn't pass one.",
+          "type": "integer", "minimum": 1, "default": 30
+        },
+        "snapshot_timeout_s": {
+          "description": "DIAG-021 snapshot() overall budget.",
+          "type": "integer", "minimum": 1, "default": 60
+        }
+      }
+    },
+    "vcp": {
+      "description": "VCP / serial reader runtime defaults.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "_comment": { "type": "string" },
+        "tail_default_last_n": {
+          "description": "tail() default last_n when caller does not pass one.",
+          "type": "integer", "minimum": 0, "default": 100
+        },
+        "tail_default_timeout_s": {
+          "description": "tail(follow=False) default wall-timeout.",
+          "type": "number", "minimum": 0, "default": 5.0
+        },
+        "send_default_timeout_s": {
+          "description": "send_and_read() default wall-timeout.",
+          "type": "number", "minimum": 0, "default": 2.0
+        },
+        "inter_line_idle_ms": {
+          "description": "Multi-line reply collection: end-of-reply idle threshold in milliseconds.",
+          "type": "integer", "minimum": 0, "default": 100
+        },
+        "reconnect_max_s": {
+          "description": "reconnect() / SB-002 backoff cap.",
+          "type": "number", "minimum": 0, "default": 10.0
+        },
+        "line_buffer_capacity": {
+          "description": "Bounded-queue line cap; drop-oldest on overflow with WARNING log.",
+          "type": "integer", "minimum": 1, "default": 1000
+        },
+        "drain_read_timeout_ms": {
+          "description": "Internal drain-thread blocking read timeout per iteration.",
+          "type": "integer", "minimum": 1, "default": 50
+        }
+      }
+    },
+    "signing": {
+      "description": "STM32_SigningTool_CLI runtime defaults. v1 STM32N6 / MP1 / MP2 only per SC-009.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "_comment": { "type": "string" },
+        "timeout_s": {
+          "description": "sign_binary() subprocess budget.",
+          "type": "integer", "minimum": 1, "default": 30
+        }
+      }
+    },
+    "t3": {
+      "description": "Wave-3a non-compound T3 fix-loop defaults (RES-031). Read by Claude to bound the Claude-in-loop fix workflows (B-021, DBG-008/009, VCP-004/005); no substrate method consumes it — the loops are Claude-orchestrated.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "_comment": { "type": "string" },
+        "max_iterations": {
+          "description": "Max iterations for a T3 Claude-in-loop fix workflow before reporting best-state + the per-iteration log. The no-progress guard (stop when a finding recurs unchanged) catches true spinning earlier; this caps legitimately-progressing multi-step loops (e.g. cascading build errors).",
+          "type": "integer", "minimum": 1, "default": 5
+        }
+      }
+    }
+  }
+}

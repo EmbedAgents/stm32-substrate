@@ -1,0 +1,8 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0
+      -------------------------------------------------------------------
+
+ST-LINK SN  : 066BFF514852898767094734
+ST-LINK FW  : V2J29S7
+
+Error: The ST-Link firmware is too old, please update it using STSW-LINK007.

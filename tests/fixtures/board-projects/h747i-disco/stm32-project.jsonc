@@ -1,0 +1,40 @@
+// stm32-project.jsonc — STM32H747I-DISCO board-recipe-suite descriptor (in-repo).
+//
+// Run:  STM32_BOARD_PROJECT=tests/fixtures/board-projects/h747i-disco \
+//         pytest -m hardware tests/test_board_recipe_suite.py -v
+//
+// Dual-core (Cortex-M7 @ 480 MHz boot core + Cortex-M4 @ 240 MHz). This
+// descriptor targets the CM7 subproject (the boot/primary core, internal
+// flash bank 1 @ 0x08000000). The CubeH7 tree is in-repo (gitignored), so
+// project_path is repo-relative + portable; tools resolve via the repo
+// .claude/ config.
+//
+// board.mcu STM32H747XIHx → STM32H747_CM7.svd (dual-core core-split SVD;
+// CM7 is the primary core). The probe enumerates as "DISCO-H747XI" (not
+// "STM32H747I-DISCO") — that's what firmware.board must match.
+{
+  "$schema": "../../../../src/stm32_substrate/schemas/stm32-project.schema.json",
+  "version": 1,
+  "project_name": "MSC_Standalone_CM7",
+  "board": {
+    "name": "STM32H747I-DISCO",
+    "mcu": "STM32H747XIHx",
+    "interface": "swd"
+  },
+  "firmware": {
+    "flash_address": "0x08000000",
+    "device_family": "STM32H7",
+    "board": "DISCO-H747XI"
+  },
+  "build": {
+    "workspace": "/mnt/data/github-cubemx/.board-workspaces/h747i-disco",
+    "project_path": "../../projects/STM32CubeH7/Projects/STM32H747I-DISCO/Applications/USB_Host/MSC_Standalone/STM32CubeIDE/CM7",
+    "project_name": "MSC_Standalone_CM7",
+    "default_configuration": "Debug",
+    "configurations": ["Debug", "Release"],
+    "artifact": "Debug/MSC_Standalone_CM7.elf"
+  },
+  "debug": {
+    "elf_path": "../../projects/STM32CubeH7/Projects/STM32H747I-DISCO/Applications/USB_Host/MSC_Standalone/STM32CubeIDE/CM7/Debug/MSC_Standalone_CM7.elf"
+  }
+}

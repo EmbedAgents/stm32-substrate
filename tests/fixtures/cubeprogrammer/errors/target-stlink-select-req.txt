@@ -1,0 +1,8 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0
+      -------------------------------------------------------------------
+
+Error: Multiple ST-LINK probes detected. Please select one using sn=<value>.
+        Found probes:
+                066BFF514852898767094734
+                002D003D3438511434343935

@@ -1,0 +1,19 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0                  
+      -------------------------------------------------------------------
+
+ST-LINK SN  : 0671FF323535474B43072710
+ST-LINK FW  : V2J47M34
+Board       : NUCLEO-F429ZI
+Voltage     : 3.23V
+SWD freq    : 4000 KHz
+Connect mode: Normal
+Reset mode  : Software reset
+Device ID   : 0x419
+Revision ID : Rev 3
+Device name : STM32F42xxx/F43xxx
+NVM size  : 2 MBytes
+Device type : MCU
+Device CPU  : Cortex-M4
+BL Version  : 0x91
+

@@ -1,0 +1,11 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0
+      -------------------------------------------------------------------
+
+ST-LINK SN  : 066BFF514852898767094734
+Device name : STM32L47xxx/L48xxx
+
+Reading 32 bytes from address 0x080F0000
+
+0x080F0000 : FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
+0x080F0010 : FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF

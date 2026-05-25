@@ -1,0 +1,15 @@
+      -------------------------------------------------------------------
+                        STM32CubeProgrammer v2.22.0
+      -------------------------------------------------------------------
+
+ST-LINK SN  : 066BFF514852898767094734
+ST-LINK FW  : V3J11M3
+Voltage     : 3.28V
+SWD freq    : 4000 KHz
+Connect mode: Normal
+Reset mode  : Software reset
+
+Error: No STM32 target found! Please check that:
+        - the board is properly connected.
+        - the SWD pins are not disconnected.
+        - the target device is supplied with valid voltage.

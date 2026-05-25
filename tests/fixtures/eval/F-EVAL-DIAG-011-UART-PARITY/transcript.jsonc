@@ -1,0 +1,17 @@
+{
+  "_metadata": {
+    "model": "claude-sonnet-4-6",
+    "cost_usd": 0.07154605,
+    "duration_s": 23.148
+  },
+  "tool_calls": [
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 debug read-peripheral USART2",
+        "description": "Read USART2 peripheral registers (SVD-decoded) to inspect parity configuration"
+      }
+    }
+  ],
+  "final_text": "Here's what the live USART2 registers show for parity and the full frame format:\n\n| Field | Register | Value | Meaning |\n|---|---|---|---|\n| **PCE** (Parity Control Enable) | CR1[10] | **0** | **Parity disabled** |\n| **PS** (Parity Selection) | CR1[9] | 0 | Would be Even if PCE were set |\n| **M0/M1** (Word length) | CR1[12,28] | 0 / 0 | **8 data bits** |\n| **STOP** | CR2[13:12] | 0 | **1 stop bit** |\n| **UE** (USART Enable) | CR1[0] | **0** | **USART not even enabled** |\n\n**Bottom line: parity is off (no parity, 8N1).** Two potential issues to resolve:\n\n1. **Parity mismatch** \u2014 if your host expects even or odd parity, the STM32 will never generate a parity bit and won't flag parity errors. You'll need to set `PCE=1` and `PS` to the correct polarity, and also bump the word length to 9-bit (`M0=1`) to keep 8 data bits + 1 parity bit in the frame.\n\n2. **USART not enabled** (`UE=0`, `TE=0`, `RE=0`) \u2014 USART2 hasn't been turned on at all yet, which means no traffic is flowing in either direction. This should be fixed before any parity mismatch matters.\n\nIf your host is configured for **8N1 (no parity)**, the parity setting itself is correct \u2014 but you still need to enable the peripheral (`UE`, `TE`/`RE`) before communication can happen."
+}
