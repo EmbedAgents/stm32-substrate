@@ -46,6 +46,15 @@ The substrate is family-agnostic: if ST's tools support the chip, Claude can
 drive them against it — from an 8 MHz low-power part up to the latest Cortex-M85
 and NPU-equipped silicon.
 
+## Quick start
+
+1. **Install ST's tools** — the ones you need, from [st.com](https://www.st.com/en/development-tools/stm32-software-development-tools.html): CubeProgrammer, CubeIDE, CubeMX, the ST-LINK GDB server, `arm-none-eabi-gdb`, the Signing Tool. The substrate drives them; it doesn't bundle them.
+2. **Install the substrate** — the `stm32` CLI plus the Claude Code plugin, in one paste (see **Install** below).
+3. **Bring a project** — an existing CubeIDE project, a CubeMX `.ioc`, or just a `.bin`/`.elf` to flash. No project yet? Generate one with `/stm32project`.
+4. **Write `stm32-project.jsonc`** — point the substrate at that project (board, build, ELF, IOC). Claude can scaffold it for you (see **the one per-project step** below).
+5. **Attach your board** — an ST-LINK probe and a NUCLEO/DISCO for anything that flashes, debugs, or reads the serial port.
+6. **Talk** — *"build it and flash my Nucleo."* Claude runs the tools and reports back.
+
 ## Install — 30 seconds
 
 **Requirements:** [Claude Code](https://docs.claude.com/en/docs/claude-code), [Python 3.11+](https://www.python.org/downloads/), [Git](https://git-scm.com/), and [ST's STM32 tools](https://www.st.com/en/development-tools/stm32-software-development-tools.html) — install the ones you need; the substrate drives them, it doesn't bundle them. Linux or Windows (macOS isn't supported yet). An ST-LINK probe and a board for anything that touches hardware.
