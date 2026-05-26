@@ -69,6 +69,49 @@ Then just talk:
 > **You:** build my project and flash it to the Nucleo
 > **Claude:** *(runs `stm32 build` then `stm32 prog flash …`, reports back)*
 
+## The one per-project step you can't skip
+
+**Do this once per project — most commands have nothing to act on until you do.**
+Drop a `stm32-project.jsonc` in your project folder; it tells the substrate your
+board, build, workspace, ELF, and IOC, and every command reads it. Fill it once and
+you stop repeating yourself. Only `version` is strictly required.
+
+```jsonc
+{
+  "version": 1,
+  "project_name": "blinky",
+  "board":    { "name": "NUCLEO-L476RG", "mcu": "STM32L476RG" },
+  "firmware": { "board": "nucleo-l476rg", "flash_address": "0x08000000" },
+  "build": {
+    "project_path": "STM32CubeIDE",
+    "workspace": ".stm32-substrate-workspace",
+    "default_configuration": "Debug",
+    "artifact": "Debug/blinky.elf"
+  },
+  "debug":  { "elf_path": "STM32CubeIDE/Debug/blinky.elf" },
+  "cubemx": { "ioc_path": "blinky.ioc" }
+}
+```
+
+`build.workspace` is the Eclipse workspace CubeIDE uses for headless builds (defaults
+to `<repo>/.stm32-substrate-workspace/` if omitted). Don't want to hand-write it? Ask
+Claude to scaffold one, or run a command in the folder and it'll offer.
+
+### How you tell a command which project or file to use
+
+1. **You name it** — attach a file, or put a path in your request.
+2. **The folder's `stm32-project.jsonc`** — in the folder you name, or the one Claude
+   is running in.
+3. **Otherwise it stops and asks you**, with a template to fill — it never scans and
+   guesses (no "pick the only `.elf`").
+
+A specific ELF or IOC follows the same order: **your explicit arg → the descriptor
+field** (`debug.elf_path`, `cubemx.ioc_path`, `build.artifact`) **→ a loud error**.
+
+*(Vendor-tool paths resolve separately — see Step 2. Device, board, and peripheral
+names in your prompts are illustrative; ground truth is CubeMX's database and the SVD
+files.)*
+
 ## Usage
 
 You mostly just talk, like in Step 1 — *"flash the build to my Nucleo and reset
