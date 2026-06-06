@@ -8,6 +8,10 @@ The user wants to build a CubeIDE project. Map the request to a `stm32 build` in
 
 User input: `$ARGUMENTS`
 
+## CRITICAL — argument shape
+
+The positional slot on `stm32 build` is `<action>` (one of `add-symbol`, `add-lib`, `add-source`, `add-include`, `in-folder`, `named`). **The project path is NOT positional — it MUST be passed via `--project PATH`.** Running `stm32 build /some/path` fails with `error: argument <action>: invalid choice: '/some/path'`. Always use the flag form, or omit the path entirely to let the substrate autodiscover from cwd / descriptor.
+
 ## Subcommand map
 
 The `build` group has one verb + several `add-*` shapes mapping to the B-* prompts. Pick by request shape:
