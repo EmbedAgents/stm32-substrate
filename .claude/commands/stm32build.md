@@ -1,6 +1,6 @@
 ---
 description: STM32CubeIDE headless build — preset, options, .cproject edits
-argument-hint: [path] [--preset fast|size|balanced] [--config NAME] [flags...]
+argument-hint: [--project PATH] [--preset fast|size|balanced] [--config NAME] [flags...]
 allowed-tools: Bash(stm32 build:*), Bash(.venv/bin/stm32 build:*)
 ---
 
@@ -13,8 +13,8 @@ User input: `$ARGUMENTS`
 The `build` group has one verb + several `add-*` shapes mapping to the B-* prompts. Pick by request shape:
 
 **Base build (B-001..B-009):**
-- `stm32 build [PROJECT] [--config NAME] [--clean] [--debug-level {0|1|2|3}] [--opt {O0|O1|O2|O3|Os|Ofast|Og}] [--preset {fast|size|balanced}] [--all-configs]`
-  - No path → autodiscover from cwd / descriptor.
+- `stm32 build [--project PATH] [--config NAME] [--clean] [--debug-level {0|1|2|3}] [--opt {O0|O1|O2|O3|Os|Ofast|Og}] [--preset {fast|size|balanced}] [--all-configs]`
+  - No `--project` → autodiscover from cwd / descriptor.
   - `--preset fast` → `-O3 -ffast-math -funroll-loops -mfpu=...` (FPU via `firmware.device_family`).
   - `--preset size` → `-Os -fdata-sections -ffunction-sections -Wl,--gc-sections`.
   - `--preset balanced` → defaults (no preset).
