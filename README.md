@@ -9,20 +9,55 @@ tools are capable, but they're a lot to learn, they don't talk to each other,
 and none was built to be driven by an AI coding agent.
 
 This plugin changes that. It lets you do STM32 development by talking to Claude
-Code in plain language:
-
-> "Build my project."
-> "Flash it to the board."
-> "Read the RCC clock register."
-> "Why is it crashing?"
-
-Claude calls ST's tools for you and reports back. You stop juggling six separate
-applications and just describe what you want done.
+Code in plain language — *"build my project," "flash it to the board," "why is
+it crashing?"* Claude calls ST's tools for you and reports back. You stop
+juggling six separate applications and just describe what you want done.
 
 **The promise: once it's installed, you don't have to remember anything about
 it.** No flags to memorize, no syntax to keep in your head. The five slash
 commands are there for when you'd rather point at a tool directly — but most of
 the time you just talk.
+
+## Demo
+
+![Claude Code building and flashing an STM32 project from one plain-language request](docs/media/demo.gif)
+
+*Real session, real hardware: a NUCLEO-L476RG (Cortex-M4), built and flashed
+end-to-end from one sentence — first try.*
+
+The same request in text, plus two more shapes of what a session looks like:
+
+**Build & flash:**
+
+> **You:** build my project and flash it to my nucleo
+> **Claude:** *(runs `stm32 build ~/blinky-demo` — resolves the nested CubeIDE
+> project, builds Debug)*
+> Build: 0 errors, 0 warnings — `BLINKY.elf`, ~5.7 KB flash.
+> *(runs `stm32 prog flash …/Debug/BLINKY.elf`)*
+> Flashed in ~0.3 s, address taken from the ELF. The LED should be blinking now.
+
+**Diagnose a crash:**
+
+> **You:** my board keeps crashing — memory bug or interrupt problem?
+> **Claude:** *(runs `stm32 debug read-peripheral SCB`, `read-peripheral NVIC`,
+> `decode-hardfault`, `callstack`)*
+> Neither — every fault register is zero (`CFSR=0`, `HFSR=0`) and no IRQs are
+> enabled yet. You're looking at the *next* boot, not the crash: the MCU was
+> reset mid-fault — most likely a watchdog, or an `NVIC_SystemReset()` inside a
+> fault handler. Let's catch it live: I'll break in the fault handler before the
+> reset fires.
+
+**Read a register:**
+
+> **You:** what's RCC->CR right now?
+> **Claude:** *(runs `stm32 debug read-peripheral RCC` — gdbserver attach, SVD
+> decode, detach)*
+> `CR = 0x00000063`: `MSION=1, MSIRDY=1`, PLL off — the core is on the 4 MHz
+> MSI reset default, which means your clock configuration never ran.
+
+What just happened in all three: the substrate ran ST's own CLIs and captured
+their output; Claude read it and decided the next step. No magic, no parsing of
+vendor prose — the same tools you already trust, driven conversationally.
 
 ## What Claude can do for you
 
