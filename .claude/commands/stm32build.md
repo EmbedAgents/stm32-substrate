@@ -1,6 +1,6 @@
 ---
 description: STM32CubeIDE headless build — preset, options, .cproject edits
-argument-hint: [--project PATH] [--preset fast|size|balanced] [--config NAME] [flags...]
+argument-hint: [PATH] [--preset fast|size|balanced] [--config NAME] [flags...]
 allowed-tools: Bash(stm32 build:*), Bash(.venv/bin/stm32 build:*)
 ---
 
@@ -8,17 +8,16 @@ The user wants to build a CubeIDE project. Map the request to a `stm32 build` in
 
 User input: `$ARGUMENTS`
 
-## CRITICAL — argument shape
-
-The positional slot on `stm32 build` is `<action>` (one of `add-symbol`, `add-lib`, `add-source`, `add-include`, `in-folder`, `named`). **The project path is NOT positional — it MUST be passed via `--project PATH`.** Running `stm32 build /some/path` fails with `error: argument <action>: invalid choice: '/some/path'`. Always use the flag form, or omit the path entirely to let the substrate autodiscover from cwd / descriptor.
-
 ## Subcommand map
 
 The `build` group has one verb + several `add-*` shapes mapping to the B-* prompts. Pick by request shape:
 
 **Base build (B-001..B-009):**
-- `stm32 build [--project PATH] [--config NAME] [--clean] [--debug-level {0|1|2|3}] [--opt {O0|O1|O2|O3|Os|Ofast|Og}] [--preset {fast|size|balanced}] [--all-configs]`
-  - No `--project` → autodiscover from cwd / descriptor.
+- `stm32 build [PATH | --project PATH] [--config NAME] [--clean] [--debug-level {0|1|2|3}] [--opt {O0|O1|O2|O3|Os|Ofast|Og}] [--preset {fast|size|balanced}] [--all-configs]`
+  - No PATH → autodiscover from cwd / descriptor.
+  - PATH may be passed positionally or via `--project`; both work.
+  - PATH must not collide with an action keyword (`add-symbol`, `add-lib`,
+    `add-source`, `add-include`, `in-folder`, `named`).
   - `--preset fast` → `-O3 -ffast-math -funroll-loops -mfpu=...` (FPU via `firmware.device_family`).
   - `--preset size` → `-Os -fdata-sections -ffunction-sections -Wl,--gc-sections`.
   - `--preset balanced` → defaults (no preset).

@@ -6,6 +6,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- `stm32 build` now accepts the project path as a positional argument
+  (`stm32 build /path/to/proj`) in addition to the existing `--project PATH`
+  flag. Matches the convention used by every other `stm32` subcommand
+  (`prog flash FILE`, `debug start [ELF]`, `mx generate [IOC]`) and lines
+  up with how LLM agents and humans naturally invoke CLI tools.
+
 ## [0.1.0] — 2026-05-25
 
 First public release. STM32 development by talking to Claude Code in plain

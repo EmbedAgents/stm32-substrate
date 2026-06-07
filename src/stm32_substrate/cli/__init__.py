@@ -62,6 +62,18 @@ def main(argv: list[str] | None = None) -> int:
     _debug.add_subparser(subparsers)
     _vcp.add_subparser(subparsers)
 
+    if argv is None:
+        argv = sys.argv[1:]
+    # `stm32 build PATH` ergonomics: route a leading non-action positional
+    # into --project before argparse sees the build subtree. The global
+    # flags (--pretty, -v) never consume a value, so the first non-flag
+    # token is always the command.
+    for i, token in enumerate(argv):
+        if not token.startswith("-"):
+            if token == "build":
+                argv = [*argv[: i + 1], *_build.pre_parse_argv(argv[i + 1 :])]
+            break
+
     args = parser.parse_args(argv)
     _configure_logging(args.verbose)
 

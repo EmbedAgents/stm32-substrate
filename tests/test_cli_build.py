@@ -133,6 +133,125 @@ class TestBaseBuild:
 
 
 # ---------------------------------------------------------------------------
+# Positional path routing (`stm32 build PATH` → `--project PATH`)
+# ---------------------------------------------------------------------------
+
+
+class TestPathPositional:
+    def test_no_args_unchanged_autodiscover(
+        self, ensure_cubeide, mock_client: MagicMock, capsys: pytest.CaptureFixture
+    ) -> None:
+        mock_client.build.return_value = _build_result()
+        code, out, err = _run(["build"], capsys)
+        assert code == 0
+        assert mock_client.build.call_args.kwargs["project"] is None
+
+    def test_positional_path_routes_to_project(
+        self, ensure_cubeide, mock_client: MagicMock, capsys: pytest.CaptureFixture
+    ) -> None:
+        mock_client.build.return_value = _build_result()
+        code, out, err = _run(["build", "/path/to/proj"], capsys)
+        assert code == 0
+        mock_client.build.assert_called_once_with(
+            project=Path("/path/to/proj"),
+            configuration=None,
+            clean=False,
+            debug_level=None,
+            optimization=None,
+            preset=None,
+        )
+
+    def test_positional_path_keeps_following_flags(
+        self, ensure_cubeide, mock_client: MagicMock, capsys: pytest.CaptureFixture
+    ) -> None:
+        mock_client.build.return_value = _build_result()
+        _run(["build", "/path", "--config", "Debug"], capsys)
+        kwargs = mock_client.build.call_args.kwargs
+        assert kwargs["project"] == Path("/path")
+        assert kwargs["configuration"] == "Debug"
+
+    def test_project_flag_form_unchanged(
+        self, ensure_cubeide, mock_client: MagicMock, capsys: pytest.CaptureFixture
+    ) -> None:
+        mock_client.build.return_value = _build_result()
+        _run(["build", "--project", "/path"], capsys)
+        assert mock_client.build.call_args.kwargs["project"] == Path("/path")
+
+    def test_action_dispatch_unchanged(
+        self, ensure_cubeide, mock_client: MagicMock, capsys: pytest.CaptureFixture
+    ) -> None:
+        mock_client.build.return_value = _build_result()
+        _run(["build", "add-symbol", "FOO=1"], capsys)
+        kwargs = mock_client.build.call_args.kwargs
+        assert kwargs["add_symbols"] == [("FOO", "1")]
+
+    def test_action_with_own_positional_unchanged(
+        self, ensure_cubeide, mock_client: MagicMock, capsys: pytest.CaptureFixture
+    ) -> None:
+        found = FoundProject(
+            path=Path("/discovered/demo"),
+            name="demo",
+            cproject_path=Path("/discovered/demo/.cproject"),
+        )
+        mock_client.find_project.return_value = found
+        mock_client.build.return_value = _build_result()
+        _run(["build", "in-folder", "/some/dir"], capsys)
+        mock_client.find_project.assert_called_once_with(folder=Path("/some/dir"))
+
+    def test_relative_dot_path(
+        self, ensure_cubeide, mock_client: MagicMock, capsys: pytest.CaptureFixture
+    ) -> None:
+        mock_client.build.return_value = _build_result()
+        _run(["build", "."], capsys)
+        assert mock_client.build.call_args.kwargs["project"] == Path(".")
+
+    def test_global_flag_before_build(
+        self, ensure_cubeide, mock_client: MagicMock, capsys: pytest.CaptureFixture
+    ) -> None:
+        mock_client.build.return_value = _build_result()
+        _run(["--pretty", "build", "/path/to/proj"], capsys)
+        assert mock_client.build.call_args.kwargs["project"] == Path("/path/to/proj")
+
+
+class TestPreParseArgv:
+    """Pure-function contract for ``_build.pre_parse_argv``."""
+
+    def test_empty(self) -> None:
+        from stm32_substrate.cli._build import pre_parse_argv
+
+        assert pre_parse_argv([]) == []
+
+    def test_path_rewritten(self) -> None:
+        from stm32_substrate.cli._build import pre_parse_argv
+
+        assert pre_parse_argv(["/p"]) == ["--project", "/p"]
+
+    def test_path_with_trailing_flags(self) -> None:
+        from stm32_substrate.cli._build import pre_parse_argv
+
+        assert pre_parse_argv(["/p", "--clean"]) == ["--project", "/p", "--clean"]
+
+    def test_flag_first_untouched(self) -> None:
+        from stm32_substrate.cli._build import pre_parse_argv
+
+        assert pre_parse_argv(["--project", "/p"]) == ["--project", "/p"]
+
+    def test_action_untouched(self) -> None:
+        from stm32_substrate.cli._build import pre_parse_argv
+
+        assert pre_parse_argv(["add-symbol", "FOO=1"]) == ["add-symbol", "FOO=1"]
+
+    def test_every_action_keyword_untouched(self) -> None:
+        from stm32_substrate.cli._build import pre_parse_argv
+
+        for action in (
+            "add-symbol", "add-lib", "add-source",
+            "add-include", "in-folder", "named",
+        ):
+            assert pre_parse_argv([action, "x"]) == [action, "x"]
+
+
+# ---------------------------------------------------------------------------
 # Build-level failure
 # ---------------------------------------------------------------------------
 

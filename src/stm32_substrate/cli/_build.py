@@ -41,6 +41,35 @@ from stm32_substrate.errors import SubstrateError
 # ---------------------------------------------------------------------------
 
 
+_BUILD_ACTIONS = frozenset({
+    "add-symbol", "add-lib", "add-source",
+    "add-include", "in-folder", "named",
+})
+
+
+def pre_parse_argv(argv: list[str]) -> list[str]:
+    """Rewrite ``stm32 build PATH ...`` → ``stm32 build --project PATH ...``.
+
+    If the first positional token after ``build`` is not a known action
+    keyword and not a flag, treat it as a project path and route it
+    through ``--project``. Leaves everything else untouched.
+
+    Caveat: a path whose final component literally matches an action
+    keyword (a folder called ``named``, say) dispatches as that action —
+    action names win, matching the pre-existing parser behavior.
+    """
+    # argv at this point starts at the token after "build".
+    if not argv:
+        return argv
+    first = argv[0]
+    if first.startswith("-"):
+        return argv
+    if first in _BUILD_ACTIONS:
+        return argv
+    # Treat as project path.
+    return ["--project", first, *argv[1:]]
+
+
 def add_subparser(subparsers: argparse._SubParsersAction) -> None:
     """Register the ``build`` group on the top-level parser."""
     parser = subparsers.add_parser(
