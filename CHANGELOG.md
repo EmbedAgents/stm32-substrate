@@ -13,6 +13,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   flag. Matches the convention used by every other `stm32` subcommand
   (`prog flash FILE`, `debug start [ELF]`, `mx generate [IOC]`) and lines
   up with how LLM agents and humans naturally invoke CLI tools.
+- An explicit build project path that contains no `.project` file (typically
+  the repo root of an ST-example-shaped tree) now resolves through the
+  descriptor: when `build.project_path` lands strictly under the given path
+  and is itself importable, that project is built (logged at INFO). Any
+  other non-importable path raises a `ConfigurationError` with a hint
+  naming the descriptor-resolved path, instead of handing Eclipse a
+  directory it fails on with `Project: file://… can't be found!`.
 
 ## [0.1.0] — 2026-05-25
 

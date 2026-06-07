@@ -368,16 +368,15 @@ class CubeIDE:
 
     def _resolve_project_path(self, project: Path | None) -> Path:
         if project is not None:
-            return project.resolve()
+            return self._resolve_explicit_project(project)
         descriptor = self.ctx.project
         if descriptor is None:
             raise ConfigurationError(
                 message="no project descriptor found; pass project= explicitly",
                 hint="set build.project_path in stm32-project.jsonc",
             )
-        build_block = getattr(descriptor, "build", None)
-        configured = getattr(build_block, "project_path", None) if build_block else None
-        if not configured:
+        configured = self._descriptor_project_path()
+        if configured is None:
             raise ConfigurationError(
                 message="project= not given and build.project_path is unset",
                 hint=(
@@ -385,12 +384,77 @@ class CubeIDE:
                     "build.project_path in stm32-project.jsonc"
                 ),
             )
-        # Relative paths in the descriptor anchor to the project root
-        # (ctx.cwd), NOT the process CWD. The descriptor is part of the
-        # project tree, so its paths are most naturally read as "relative
-        # to where this descriptor lives". Without this, running pytest
-        # from a different directory than the project root produces a
-        # broken path.
+        return configured
+
+    def _resolve_explicit_project(self, project: Path) -> Path:
+        """Resolve an explicit ``project=`` path to an importable project.
+
+        Eclipse's headless ``-import`` requires a ``.project`` file
+        directly in the imported directory. A path that has one is used
+        as-is. A path that doesn't (typically the repo root of an
+        ST-example-shaped tree, where the Eclipse project nests several
+        levels down) resolves through the descriptor: if
+        ``build.project_path`` lands strictly under the given path and is
+        itself importable, the intent is unambiguous — build that
+        (logged at INFO). Anything else raises loud with a hint
+        (HIL rule: no guessing).
+        """
+        explicit = project.resolve()
+        if (explicit / ".project").is_file():
+            return explicit
+        if not explicit.exists():
+            raise ConfigurationError(
+                message=f"project path {explicit} does not exist",
+                hint="pass the directory that contains the project's .project file",
+            )
+        configured = self._descriptor_project_path()
+        if (
+            configured is not None
+            and configured != explicit
+            and configured.is_relative_to(explicit)
+            and (configured / ".project").is_file()
+        ):
+            self._log.info(
+                "build: %s has no .project; descriptor resolves project to %s",
+                explicit,
+                configured,
+            )
+            return configured
+        if configured is not None:
+            hint = (
+                f"the project descriptor resolves build.project_path to "
+                f"{configured} — omit project= to use it, or pass the "
+                "directory containing the .project file"
+            )
+        else:
+            hint = (
+                "pass the directory that contains the project's .project "
+                "file, or set build.project_path in stm32-project.jsonc "
+                "and omit project="
+            )
+        raise ConfigurationError(
+            message=(
+                f"{explicit} contains no .project — not an importable "
+                "CubeIDE project"
+            ),
+            hint=hint,
+        )
+
+    def _descriptor_project_path(self) -> Path | None:
+        """``build.project_path`` from the descriptor, or ``None``.
+
+        Relative paths in the descriptor anchor to the project root
+        (ctx.cwd), NOT the process CWD. The descriptor is part of the
+        project tree, so its paths are most naturally read as "relative
+        to where this descriptor lives". Without this, running pytest
+        from a different directory than the project root produces a
+        broken path.
+        """
+        descriptor = self.ctx.project
+        build_block = getattr(descriptor, "build", None) if descriptor else None
+        configured = getattr(build_block, "project_path", None) if build_block else None
+        if not configured:
+            return None
         configured_path = Path(configured)
         if not configured_path.is_absolute():
             configured_path = self.ctx.cwd / configured_path

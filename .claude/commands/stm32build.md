@@ -16,6 +16,8 @@ The `build` group has one verb + several `add-*` shapes mapping to the B-* promp
 - `stm32 build [PATH | --project PATH] [--config NAME] [--clean] [--debug-level {0|1|2|3}] [--opt {O0|O1|O2|O3|Os|Ofast|Og}] [--preset {fast|size|balanced}] [--all-configs]`
   - No PATH → autodiscover from cwd / descriptor.
   - PATH may be passed positionally or via `--project`; both work.
+  - PATH may be the repo root: if it has no `.project`, the descriptor's
+    `build.project_path` (when nested under PATH) is built instead.
   - PATH must not collide with an action keyword (`add-symbol`, `add-lib`,
     `add-source`, `add-include`, `in-folder`, `named`).
   - `--preset fast` → `-O3 -ffast-math -funroll-loops -mfpu=...` (FPU via `firmware.device_family`).

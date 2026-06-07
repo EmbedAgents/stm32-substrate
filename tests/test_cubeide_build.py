@@ -7,6 +7,7 @@ exercise the kwargs validation + workspace lifecycle + CProject protocol
 
 from __future__ import annotations
 
+import json
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -293,6 +294,133 @@ class TestHappyBuild:
         )
         # Project path's tail should still be present in the URI.
         assert "demo" in import_arg
+
+
+# ---------------------------------------------------------------------------
+# Explicit path that is not itself an Eclipse project
+# ---------------------------------------------------------------------------
+
+
+def _make_repo_root(
+    tmp_path: Path,
+    *,
+    nested: str = "Projects/BLINKY/STM32CubeIDE",
+    name: str = "blinky",
+    descriptor: bool = True,
+    project_files: bool = True,
+) -> Path:
+    """Author an ST-example-shaped repo: descriptor at the root, the
+    Eclipse project nested several levels down (deeper than
+    find_project's max_depth=2)."""
+    root = tmp_path / "repo"
+    nested_dir = root / nested
+    nested_dir.mkdir(parents=True)
+    if project_files:
+        (nested_dir / ".cproject").write_bytes(_make_cproject_xml())
+        project_xml = ET.Element("projectDescription")
+        ET.SubElement(project_xml, "name").text = name
+        ET.ElementTree(project_xml).write(nested_dir / ".project")
+    if descriptor:
+        (root / "stm32-project.jsonc").write_text(
+            json.dumps({"version": 1, "build": {"project_path": nested}})
+        )
+    return root
+
+
+def _ctx_for(
+    root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> SubstrateContext:
+    cubeide_bin, _ = _make_cubeide_stubs(tmp_path)
+    monkeypatch.setenv("STM32CUBEIDE", str(cubeide_bin))
+    return SubstrateContext.from_environment(project_path=root)
+
+
+class TestExplicitPathResolution:
+    def test_repo_root_resolves_via_descriptor(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """`build(project=<repo-root>)` where the root has no .project but
+        the descriptor's build.project_path nests under it → builds the
+        descriptor-resolved project (logged at INFO), not the root."""
+        import logging
+
+        root = _make_repo_root(tmp_path)
+        client = CubeIDE(_ctx_for(root, tmp_path, monkeypatch))
+        caplog.set_level(logging.INFO, logger="stm32_substrate")
+        with patch(
+            "stm32_substrate.cubeide.headless.run_tool",
+            return_value=_build_run_tool_success(),
+        ) as mocked:
+            result = client.build(project=root)
+        assert result.project_name == "blinky"
+        argv = mocked.call_args[0][1]
+        idx = argv.index("-import")
+        assert argv[idx + 1].endswith("STM32CubeIDE")
+        assert "no .project" in caplog.text
+
+    def test_no_descriptor_raises_with_hint(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from stm32_substrate.errors import ConfigurationError
+
+        root = _make_repo_root(tmp_path, descriptor=False)
+        client = CubeIDE(_ctx_for(root, tmp_path, monkeypatch))
+        with pytest.raises(ConfigurationError, match=r"no \.project"):
+            client.build(project=root)
+
+    def test_descriptor_outside_explicit_path_raises(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Descriptor resolves to a project that is NOT under the explicit
+        path → no silent redirect; raise, hint names the descriptor path."""
+        from stm32_substrate.errors import ConfigurationError
+
+        root = _make_repo_root(tmp_path)
+        unrelated = tmp_path / "unrelated"
+        unrelated.mkdir()
+        client = CubeIDE(_ctx_for(root, tmp_path, monkeypatch))
+        with pytest.raises(ConfigurationError, match=r"no \.project") as excinfo:
+            client.build(project=unrelated)
+        assert "build.project_path" in (excinfo.value.hint or "")
+
+    def test_nonexistent_path_raises(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from stm32_substrate.errors import ConfigurationError
+
+        root = _make_repo_root(tmp_path)
+        client = CubeIDE(_ctx_for(root, tmp_path, monkeypatch))
+        with pytest.raises(ConfigurationError, match="does not exist"):
+            client.build(project=root / "nope")
+
+    def test_descriptor_target_not_importable_raises(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Descriptor nests under the explicit path but its target has no
+        .project either → raise (the descriptor itself is wrong); never
+        hand Eclipse an unimportable directory."""
+        from stm32_substrate.errors import ConfigurationError
+
+        root = _make_repo_root(tmp_path, project_files=False)
+        client = CubeIDE(_ctx_for(root, tmp_path, monkeypatch))
+        with pytest.raises(ConfigurationError, match=r"no \.project"):
+            client.build(project=root)
+
+    def test_explicit_project_dir_unaffected(
+        self, ctx: SubstrateContext, project_dir: Path
+    ) -> None:
+        """A path that IS an importable project builds as before — the
+        descriptor never overrides a valid explicit path."""
+        client = CubeIDE(ctx)
+        with patch(
+            "stm32_substrate.cubeide.headless.run_tool",
+            return_value=_build_run_tool_success(),
+        ):
+            result = client.build(project=project_dir)
+        assert result.project_name == "demo"
 
 
 # ---------------------------------------------------------------------------
