@@ -4,24 +4,7 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Changed
-
-- `stm32 build` now accepts the project path as a positional argument
-  (`stm32 build /path/to/proj`) in addition to the existing `--project PATH`
-  flag. Matches the convention used by every other `stm32` subcommand
-  (`prog flash FILE`, `debug start [ELF]`, `mx generate [IOC]`) and lines
-  up with how LLM agents and humans naturally invoke CLI tools.
-- An explicit build project path that contains no `.project` file (typically
-  the repo root of an ST-example-shaped tree) now resolves through the
-  descriptor: when `build.project_path` lands strictly under the given path
-  and is itself importable, that project is built (logged at INFO). Any
-  other non-importable path raises a `ConfigurationError` with a hint
-  naming the descriptor-resolved path, instead of handing Eclipse a
-  directory it fails on with `Project: file://… can't be found!`.
-
-## [0.1.0] — 2026-05-25
+## [0.1.0] — 2026-06-09
 
 First public release. STM32 development by talking to Claude Code in plain
 language, backed by ST's own toolchain.
@@ -37,6 +20,10 @@ language, backed by ST's own toolchain.
 - **`stm32` CLI** — subcommand groups for terminal use: `stm32 prog …`,
   `stm32 build …`, `stm32 debug …`, `stm32 mx …`, `stm32 vcp …`. Every command
   emits JSON; errors surface as a structured envelope, never a raw traceback.
+  Each subcommand takes its primary target positionally (`prog flash FILE`,
+  `build /path/to/proj`, `debug start [ELF]`, `mx generate [IOC]`), matching
+  how agents and humans naturally invoke CLI tools; `stm32 build` also accepts
+  the project via `--project PATH`.
 - **Five Claude-Code slash commands** — `/stm32prog`, `/stm32build`,
   `/stm32debug`, `/stm32project`, `/stm32agent` — routing natural-language
   intent to the CLI. Each maps 1:1 to a library operation.
@@ -45,7 +32,13 @@ language, backed by ST's own toolchain.
   every destructive operation (mass erase, inferred-address flash, option-byte
   and RDP writes).
 - **Headless build** (STM32CubeIDE) with preset and per-flag `.cproject` edits,
-  atomic edit/rollback, and a "Nothing to build" no-op guard.
+  atomic edit/rollback, and a "Nothing to build" no-op guard. A build path with
+  no `.project` file (typically the repo root of an ST-example-shaped tree)
+  resolves through the descriptor: when `build.project_path` lands strictly
+  under the given path and is itself importable, that project is built (logged
+  at INFO); any other non-importable path raises a `ConfigurationError` whose
+  hint names the descriptor-resolved path, instead of handing Eclipse a
+  directory it fails on with `Project: file://… can't be found!`.
 - **Project generation** (STM32CubeMX) from an IOC to a CubeIDE project, behind
   a bounded sync facade.
 - **Debug recipes** (ST-LINK gdbserver + arm-none-eabi-gdb) — one-shot register,
@@ -61,5 +54,4 @@ language, backed by ST's own toolchain.
   loud with a hint on macOS.
 - Package-bundled JSON Schemas (2020-12) validated at config load.
 
-[Unreleased]: https://github.com/EmbedAgents/stm32-substrate/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/EmbedAgents/stm32-substrate/releases/tag/v0.1.0
