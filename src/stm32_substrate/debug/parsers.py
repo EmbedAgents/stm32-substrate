@@ -1,6 +1,6 @@
 """gdb-MI record parsers.
 
-Per the debug API spec § "parsers.py". Strict grammar per GDB Manual
+Per ``v1/debug-api.md`` § "parsers.py". Strict grammar per GDB Manual
 §27.2: every line is one of:
 
 - Result record: ``<token>^class[,kv-pairs]``
@@ -15,6 +15,7 @@ and feeds lines through here.
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 
@@ -30,6 +31,9 @@ from stm32_substrate.debug.results import (
     ThreadInfo,
     VariableValue,
 )
+from stm32_substrate.errors import GDBError
+
+_log = logging.getLogger("stm32_substrate.debug.parsers")
 
 
 # ---------------------------------------------------------------------------
@@ -57,13 +61,33 @@ def parse_mi_record(
     token_s, sigil, rest = m.group(1), m.group(2), m.group(3)
     token = int(token_s) if token_s else None
 
+    # IMP-12: a truncated/grammar-drifted line must not escape as a raw
+    # stdlib ValueError through every DebugSession method. A result
+    # record we can't parse is fatal for the in-flight command → typed
+    # GDBError. An unparseable async record is skipped like any other
+    # unrecognised shape (logged; the caller keeps consuming).
     if sigil == "^":
-        klass, fields = _split_class_and_fields(rest)
+        try:
+            klass, fields = _split_class_and_fields(rest)
+        except ValueError as ex:
+            raise GDBError(
+                message=f"unparseable gdb-MI result record: {stripped!r}",
+                gdb_marker="protocol-violation",
+                hint=(
+                    "gdb emitted a result record outside the MI grammar "
+                    "substrate parses — possibly truncated output or an "
+                    "MI version drift"
+                ),
+            ) from ex
         return MIResultRecord(token=token, class_=klass, fields=fields)
     if sigil in ("*", "+", "="):
         kind: str
         kind = {"*": "exec", "+": "status", "=": "notify"}[sigil]
-        klass, fields = _split_class_and_fields(rest)
+        try:
+            klass, fields = _split_class_and_fields(rest)
+        except ValueError:
+            _log.warning("skipping unparseable gdb-MI async record: %r", stripped)
+            return None
         return MIAsyncRecord(kind=kind, class_=klass, fields=fields)  # type: ignore[arg-type]
     if sigil in ("~", "@", "&"):
         stream = {"~": "console", "@": "target", "&": "log"}[sigil]
@@ -418,10 +442,37 @@ def parse_evaluate_expression(record: MIResultRecord) -> VariableValue:
 
 
 def parse_stack_list_frames(
-    record: MIResultRecord, threads_record: MIResultRecord | None = None
+    record: MIResultRecord,
+    threads_record: MIResultRecord | None = None,
+    args_record: MIResultRecord | None = None,
 ) -> CallStack:
     """Build a ``CallStack`` from ``-stack-list-frames`` (+ optional
-    ``-thread-info`` for the threads array)."""
+    ``-thread-info`` for the threads array, + optional
+    ``-stack-list-arguments 1`` whose ``stack-args`` payload fills
+    ``StackFrame.args`` for ``callstack(full=True)``)."""
+    # Per-frame arguments from `-stack-list-arguments 1`:
+    # ^done,stack-args=[frame={level="0",args=[{name=...,value=...},...]},...]
+    args_by_level: dict[int, dict[str, str]] = {}
+    if args_record is not None:
+        raw_arg_frames = args_record.fields.get("stack-args") or []
+        for item in raw_arg_frames if isinstance(raw_arg_frames, list) else []:
+            if isinstance(item, dict) and "frame" in item and isinstance(item["frame"], dict):
+                arg_frame = item["frame"]
+            elif isinstance(item, dict):
+                arg_frame = item
+            else:
+                continue
+            try:
+                arg_level = int(arg_frame.get("level", 0) or 0)
+            except (TypeError, ValueError):
+                continue
+            frame_args: dict[str, str] = {}
+            raw_args = arg_frame.get("args") or []
+            for arg in raw_args if isinstance(raw_args, list) else []:
+                if isinstance(arg, dict) and "name" in arg:
+                    frame_args[str(arg["name"])] = str(arg.get("value", ""))
+            args_by_level[arg_level] = frame_args
+
     raw_frames = record.fields.get("stack") or []
     frames: list[StackFrame] = []
     for item in raw_frames if isinstance(raw_frames, list) else []:
@@ -432,13 +483,15 @@ def parse_stack_list_frames(
             frame_raw = item
         else:
             continue
+        level = int(frame_raw.get("level", 0) or 0)
         frames.append(
             StackFrame(
-                level=int(frame_raw.get("level", 0) or 0),
+                level=level,
                 pc=str(frame_raw.get("addr") or ""),
                 function=frame_raw.get("func") if frame_raw.get("func") else None,
                 file=frame_raw.get("file") if frame_raw.get("file") else None,
                 line=int(frame_raw["line"]) if str(frame_raw.get("line", "")).isdigit() else None,
+                args=args_by_level.get(level) if args_record is not None else None,
             )
         )
 
@@ -471,17 +524,48 @@ def parse_stack_list_frames(
 
 
 def parse_memory_read(record: MIResultRecord) -> bytes:
-    """``-data-read-memory-bytes`` yields ``^done,memory=[{begin=...,contents="hex..."}]``."""
+    """``-data-read-memory-bytes`` yields ``^done,memory=[{begin=...,offset=...,contents="hex..."}]``.
+
+    gdb may return *multiple* blocks when the requested range contains an
+    unreadable hole (each block carries an ``offset`` relative to the
+    request start). IMP-14: stitch every block at its declared offset and
+    return the contiguous prefix — keeping only ``memory[0]`` mis-placed
+    later blocks and silently dropped data. Data past the first hole is
+    truncated (a plain ``bytes`` return can't represent gaps); callers see
+    the short read via ``bytes_read``.
+    """
     memory = record.fields.get("memory") or []
-    if not isinstance(memory, list) or not memory:
+    if not isinstance(memory, list):
         return b""
-    block = memory[0]
-    if not isinstance(block, dict):
-        return b""
-    contents = block.get("contents")
-    if not isinstance(contents, str):
-        return b""
-    try:
-        return bytes.fromhex(contents)
-    except ValueError:
-        return b""
+    blocks: list[tuple[int, bytes]] = []
+    for block in memory:
+        if not isinstance(block, dict):
+            continue
+        contents = block.get("contents")
+        if not isinstance(contents, str):
+            continue
+        try:
+            data = bytes.fromhex(contents)
+        except ValueError:
+            continue
+        try:
+            offset = int(str(block.get("offset", "0")), 0)
+        except ValueError:
+            offset = 0
+        blocks.append((offset, data))
+    blocks.sort(key=lambda pair: pair[0])
+    out = bytearray()
+    for offset, data in blocks:
+        if offset > len(out):
+            _log.warning(
+                "memory read has an unreadable hole at request offset "
+                "0x%x; returning the %d contiguous bytes before it",
+                len(out),
+                len(out),
+            )
+            break
+        if offset < len(out):
+            # Overlapping block (shouldn't happen) — keep the new tail.
+            data = data[len(out) - offset :]
+        out.extend(data)
+    return bytes(out)

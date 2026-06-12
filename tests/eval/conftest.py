@@ -59,7 +59,16 @@ class ToolCallMatch:
 
 @dataclass(frozen=True)
 class EvalScenario:
-    """One eval input/output specification."""
+    """One eval input/output specification.
+
+    ``max_turns`` / ``max_budget_usd`` override the LiveDriver defaults
+    per scenario — T3 fix-loops need a bigger envelope than atomics
+    (Phase-4 measured: B-021 succeeds at 21 tool calls / $0.88; the
+    atomic defaults of 15 / $1.00 cap T3 loops mid-flight). ``timeout_s``
+    is the live wall-clock bound on the whole scenario (TST-09 — was a
+    dead knob; enforced via asyncio timeout in live/record mode only,
+    replay ignores it).
+    """
 
     name: str
     user_prompt: str
@@ -67,7 +76,9 @@ class EvalScenario:
     cwd: Path | None = None
     expected_tool_calls: tuple[ToolCallMatch, ...] = ()
     expected_final_text_contains: tuple[str, ...] = ()
-    timeout_s: float = 60.0
+    timeout_s: float = 600.0
+    max_turns: int | None = None
+    max_budget_usd: float | None = None
 
 
 @dataclass(frozen=True)
@@ -140,6 +151,30 @@ class ReplayDriver:
 # ---------------------------------------------------------------------------
 
 
+_STEERING_PREFIX_MAP: tuple[tuple[str, str], ...] = (
+    # Scenario-name prefix -> the slash-command file whose body steers
+    # the live run (TST-10: live runs must measure the SHIPPED steering,
+    # not a harness-private prompt). First match wins.
+    ("F-EVAL-DEBUG", "stm32debug.md"),
+    ("F-EVAL-DIAG", "stm32debug.md"),   # level-(a) recipes + DIAG019/020 T3
+    ("F-EVAL-DBG", "stm32debug.md"),    # DBG008/009 T3 loops
+    ("F-EVAL-PROG", "stm32prog.md"),
+    ("F-EVAL-BUILD", "stm32build.md"),
+    ("F-EVAL-B021", "stm32build.md"),
+    ("F-EVAL-MX", "stm32project.md"),
+    ("F-EVAL-VCP", "stm32agent.md"),    # VCP routes through /stm32agent
+)
+
+
+def _steering_command_file(scenario_name: str) -> str | None:
+    """Resolve the command file that steers a live scenario, or None."""
+    for prefix, filename in _STEERING_PREFIX_MAP:
+        if scenario_name.startswith(prefix):
+            path = Path(__file__).parents[2] / ".claude" / "commands" / filename
+            return str(path) if path.is_file() else None
+    return None
+
+
 class LiveDriver:
     """Live mode: drive Claude through the ``claude-agent-sdk``.
 
@@ -171,6 +206,12 @@ class LiveDriver:
       ``claude`` is logged in on this host).
     - ``STM32_EVAL_MODEL`` (default ``claude-sonnet-4-6``).
     - ``STM32_EVAL_MAX_BUDGET_USD`` (default ``0.50`` — single scenario).
+    - ``STM32_EVAL_SYSTEM_PROMPT_FILE`` — path to a slash-command file
+      (e.g. ``.claude/commands/stm32debug.md``); its body (frontmatter +
+      ``$ARGUMENTS`` line stripped) replaces the hardcoded steering
+      system prompt, so live runs measure the *shipped* command-file
+      steering instead of the harness's own (TST-10; used by the
+      Phase-3 lean-command-file experiment).
     """
 
     def __init__(
@@ -181,21 +222,39 @@ class LiveDriver:
         max_turns: int | None = None,
         record_to: Path | None = None,
     ) -> None:
-        self.model = model or os.environ.get("STM32_EVAL_MODEL", "claude-sonnet-4-6")
+        self.model = model or os.environ.get("STM32_EVAL_MODEL", "claude-fable-5")
+        # Defaults retuned for claude-fable-5 from the Phase-3 pilot
+        # (RES-045): 23 measured scenarios — mean $0.254, max $0.41
+        # against the old 0.50 cap; tool calls median 5, max 10 against
+        # the old 10-turn cap (hit once fatally). 1.00 / 15 give the
+        # observed tails real headroom without unbounding T3 loops.
         self.max_budget_usd = max_budget_usd or float(
-            os.environ.get("STM32_EVAL_MAX_BUDGET_USD", "0.50")
+            os.environ.get("STM32_EVAL_MAX_BUDGET_USD", "1.00")
         )
-        # Atomics finish well under 10 turns; multi-step T3 fix-loops
-        # (gather → analyse → build → flash → verify) need more. Override
-        # via STM32_EVAL_MAX_TURNS for a T3 record run.
         self.max_turns = max_turns if max_turns is not None else int(
-            os.environ.get("STM32_EVAL_MAX_TURNS", "10")
+            os.environ.get("STM32_EVAL_MAX_TURNS", "15")
         )
         self.record_to = record_to
 
     def run(self, scenario: EvalScenario) -> EvalResult:
         import asyncio
-        return asyncio.run(self._run_async(scenario))
+
+        async def _bounded() -> EvalResult:
+            # TST-09: scenario.timeout_s is the live wall-clock bound on
+            # the whole run (was a dead knob). A hung subprocess inside
+            # the nested agent (e.g. an unbounded stream) fails the
+            # scenario here instead of wedging the suite.
+            return await asyncio.wait_for(
+                self._run_async(scenario), timeout=scenario.timeout_s
+            )
+
+        try:
+            return asyncio.run(_bounded())
+        except TimeoutError:
+            pytest.fail(
+                f"{scenario.name}: live run exceeded scenario.timeout_s="
+                f"{scenario.timeout_s}s (TST-09 wall-clock bound)"
+            )
 
     async def _run_async(self, scenario: EvalScenario) -> EvalResult:
         try:
@@ -218,17 +277,47 @@ class LiveDriver:
         observed_duration_ms: float | None = None
         cost_usd: float | None = None
 
-        # Augment subprocess PATH with the user-site Scripts dir so the
-        # `stm32` console-script entry is findable when the substrate
-        # is installed via `pip install -e .` as the user (not
-        # system-wide). Without this, the eval subprocess inherits a
-        # minimal PATH and Claude burns turns hunting for `stm32`.
+        # Make the `stm32` console script findable by the eval
+        # subprocess — and make sure it is THIS interpreter's install.
+        # The venv running pytest goes FIRST: a pipx/user-site shim for
+        # a different checkout (e.g. the public-repo editable install)
+        # must not shadow the mainline under test — Phase-4 live runs
+        # discovered exactly that: ~/.local/bin/stm32 resolved to the
+        # v0.1.0 embedagents tree. User-site stays as a fallback for
+        # `pip install --user` setups.
         import sysconfig
         env_overrides: dict[str, str] = {}
-        user_scripts = sysconfig.get_path("scripts", "nt_user") if sys.platform == "win32" else sysconfig.get_path("scripts", "posix_user")
         current_path = os.environ.get("PATH", "")
-        if user_scripts and user_scripts not in current_path:
-            env_overrides["PATH"] = user_scripts + os.pathsep + current_path
+        venv_scripts = str(Path(sys.executable).parent)
+        user_scripts = sysconfig.get_path("scripts", "nt_user") if sys.platform == "win32" else sysconfig.get_path("scripts", "posix_user")
+        prefix = [p for p in (venv_scripts, user_scripts) if p and p not in current_path]
+        if prefix:
+            env_overrides["PATH"] = os.pathsep.join(prefix) + os.pathsep + current_path
+
+        steer_file = os.environ.get(
+            "STM32_EVAL_SYSTEM_PROMPT_FILE"
+        ) or _steering_command_file(scenario.name)
+        if steer_file:
+            body = Path(steer_file).read_text(encoding="utf-8")
+            if body.startswith("---"):
+                # Strip the slash-command YAML frontmatter block.
+                body = body.split("---", 2)[2]
+            body = body.replace("User input: `$ARGUMENTS`", "").strip()
+            system_prompt = (
+                "You have access to the STM32 substrate's `stm32` CLI on "
+                "PATH; invoke it via Bash.\n\n" + body
+            )
+        else:
+            # Fallback for scenarios with no command-file mapping (e.g.
+            # the scaffold self-test).
+            system_prompt = (
+                "You have access to the STM32 substrate's `stm32` CLI on PATH. "
+                "Use Bash to invoke it: `stm32 prog ...` (flash / erase / reset "
+                "/ raw memory), `stm32 build`, `stm32 debug ...` (sessions, "
+                "register & peripheral inspection, fault decode), `stm32 vcp "
+                "...` (serial). Prefer one bash call with the most specific "
+                "subcommand for the user's intent."
+            )
 
         options = ClaudeAgentOptions(
             allowed_tools=list(scenario.allowed_tools),
@@ -236,24 +325,12 @@ class LiveDriver:
             model=self.model,
             permission_mode="bypassPermissions",
             setting_sources=["project"],
-            max_budget_usd=self.max_budget_usd,
-            max_turns=self.max_turns,
+            # Per-scenario envelope overrides beat the driver defaults
+            # (T3 loops need 25 turns / ~$2; atomics keep 15 / $1).
+            max_budget_usd=scenario.max_budget_usd or self.max_budget_usd,
+            max_turns=scenario.max_turns or self.max_turns,
             env=env_overrides,
-            system_prompt=(
-                "You have access to the STM32 substrate's `stm32` CLI on PATH. "
-                "Use Bash to invoke it: `stm32 prog ...` (flash / erase / reset "
-                "/ raw memory), `stm32 build`, `stm32 debug ...` (sessions, "
-                "register & peripheral inspection, fault decode), `stm32 vcp "
-                "...` (serial). Prefer one bash call with the most specific "
-                "subcommand for the user's intent. To inspect on-target "
-                "peripheral or register STATE — clock tree (RCC), peripheral "
-                "clock-enable, GPIO mode/AF, NVIC, watchdog, UART config, DMA, "
-                "DBGMCU, etc. — use `stm32 debug read-peripheral <NAME>`: it "
-                "halts the target and returns the SVD-decoded fields, so you "
-                "read named bits instead of hand-decoding raw addresses. Use "
-                "`stm32 prog read-memory` only for raw memory at an explicit "
-                "address (e.g. a vector-table slot)."
-            ),
+            system_prompt=system_prompt,
         )
 
         start = time.monotonic()
@@ -278,6 +355,17 @@ class LiveDriver:
             tool_calls=tuple(tool_calls),
             final_text="\n".join(final_text_parts),
             duration_s=duration_s,
+        )
+
+        # One metrics line per live scenario (stdout; run pytest with -s
+        # to stream). Feeds the budget-knob retune (Phase-3 #3 / Phase-4
+        # pilot): measured cost + tool-call count + wall clock per
+        # scenario on the actual model.
+        print(
+            f"[eval-live] {scenario.name}: model={self.model} "
+            f"cost_usd={cost_usd} tool_calls={len(tool_calls)} "
+            f"duration_s={duration_s:.1f}",
+            flush=True,
         )
 
         if self.record_to is not None:

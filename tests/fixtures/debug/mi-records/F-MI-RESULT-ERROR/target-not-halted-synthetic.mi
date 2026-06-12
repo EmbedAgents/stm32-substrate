@@ -1,0 +1,3 @@
+# SYNTHETIC — gdb queues sync commands while running; shape per GDB manual
+# captured 2026-06-11, arm-none-eabi-gdb MI3, NUCLEO-L476RG, BLINKY.elf
+31^error,msg="Cannot execute this command while the selected thread is running."

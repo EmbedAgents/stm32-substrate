@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/EmbedAgents/stm32-substrate/schemas/stm32-project.schema.json",
   "title": "STM32 substrate — per-project descriptor",
-  "description": "Per-project descriptor stm32-project.jsonc. One per project folder. Loaded by SubstrateContext.from_environment() and validated against this schema at load time.",
+  "description": "Per-project descriptor stm32-project.jsonc. One per project folder (SC-002). Loaded by SubstrateContext.from_environment() and validated against this schema at load time (M-016). Fields cross-reference the per-tool API specs' Schema additions sections.",
   "type": "object",
   "additionalProperties": false,
   "required": ["version"],

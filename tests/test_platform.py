@@ -92,6 +92,63 @@ class TestIsLockHeld:
             terminate_process(holder.pid, grace_s=1.0)
             holder.wait(timeout=2)
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="POSIX record locks")
+    def test_posix_record_lock_held_returns_true(self, tmp_path: Path) -> None:
+        """IMP-07: Java NIO FileLock (the CubeIDE GUI's workspace lock)
+        maps to POSIX record locks on Linux — an independent namespace
+        from flock. The flock-only probe never saw it, so the GUI-held
+        pre-check was dead and cleanup could delete a live workspace's
+        metadata."""
+        lock_path = tmp_path / ".lock"
+        lock_path.touch()  # Eclipse's .lock is zero-byte
+        script = f"""
+import fcntl, time, pathlib
+f = pathlib.Path({str(lock_path)!r}).open('a+')
+fcntl.lockf(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+print("LOCKED", flush=True)
+time.sleep(10)
+"""
+        holder = subprocess.Popen(
+            [sys.executable, "-c", script], stdout=subprocess.PIPE, text=True
+        )
+        try:
+            assert holder.stdout is not None
+            assert holder.stdout.readline().strip() == "LOCKED"
+            assert is_lock_held(lock_path) is True
+        finally:
+            terminate_process(holder.pid, grace_s=1.0)
+            holder.wait(timeout=2)
+        _wait_until(lambda: not is_lock_held(lock_path), timeout=2.0)
+
+
+class TestTerminateProcessTree:
+    def test_kills_grandchild(self) -> None:
+        """IMP-16/IMP-08: signalling only the direct child orphans the
+        JVM grandchild that does the real work. The tree kill must take
+        the whole group."""
+        from stm32_substrate.platform import terminate_process_tree
+
+        script = (
+            "import subprocess, sys, time\n"
+            "p = subprocess.Popen([sys.executable, '-c', "
+            "'import time; time.sleep(30)'])\n"
+            "print(p.pid, flush=True)\n"
+            "p.wait()\n"
+        )
+        leader = subprocess.Popen(
+            [sys.executable, "-c", script],
+            stdout=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
+        )
+        assert leader.stdout is not None
+        grandchild_pid = int(leader.stdout.readline().strip())
+        assert process_alive(grandchild_pid)
+
+        terminate_process_tree(leader.pid, grace_s=0.5)
+        leader.wait(timeout=3)
+        _wait_until(lambda: not process_alive(grandchild_pid), timeout=3.0)
+
 
 # ---------------------------------------------------------------------------
 # process

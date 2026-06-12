@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import io
 import subprocess
+import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -128,6 +130,69 @@ class TestSendMi:
         assert result.fields["value"] == "42"
         # Stdin contains the token-tagged command.
         assert "1-data-evaluate-expression x\n" in proc.stdin_text
+
+    # IMP-02: ^error must raise, never flow into the domain parsers as a
+    # successful-but-empty record.
+    def test_error_record_raises_command_error(
+        self, ctx: SubstrateContext
+    ) -> None:
+        proc = FakeProc(
+            stdout_lines=[
+                '1^error,msg="Cannot access memory at address 0xdeadbee0"\n',
+                "(gdb)\n",
+            ]
+        )
+        client = GDBClient(proc=proc, ctx=ctx)  # type: ignore[arg-type]
+        with pytest.raises(GDBError) as ei:
+            client.send_mi("-data-read-memory-bytes 0xdeadbee0 4")
+        assert ei.value.gdb_marker == "command-error"
+        assert "Cannot access memory" in ei.value.message
+
+    def test_error_record_returned_when_opted_out(
+        self, ctx: SubstrateContext
+    ) -> None:
+        proc = FakeProc(
+            stdout_lines=['1^error,msg="nope"\n', "(gdb)\n"]
+        )
+        client = GDBClient(proc=proc, ctx=ctx)  # type: ignore[arg-type]
+        result = client.send_mi("-bad-command", raise_on_error=False)
+        assert result.class_ == "error"
+        assert result.fields["msg"] == "nope"
+
+    def test_read_variable_unknown_symbol_raises(
+        self, ctx: SubstrateContext, tmp_path: Path
+    ) -> None:
+        """End-to-end pin of the ledger symptom: read_variable('typo')
+        used to return an empty VariableValue instead of an error."""
+        from stm32_substrate.debug.session import DebugSession
+
+        proc = FakeProc(
+            stdout_lines=[
+                '1^error,msg="No symbol \\"typo\\" in current context."\n',
+                "(gdb)\n",
+            ]
+        )
+        client = GDBClient(proc=proc, ctx=ctx)  # type: ignore[arg-type]
+
+        class _FakeServer:
+            pid = 11111
+            port = 61234
+
+            def close(self, *, grace_s: float = 3.0) -> int | None:
+                return 0
+
+        elf = tmp_path / "demo.elf"
+        elf.write_bytes(b"")
+        session = DebugSession(
+            ctx=ctx,
+            gdbserver=_FakeServer(),  # type: ignore[arg-type]
+            gdb=client,
+            elf_path=elf,
+        )
+        with pytest.raises(GDBError) as ei:
+            session.read_variable("typo")
+        assert ei.value.gdb_marker == "command-error"
+        assert "No symbol" in ei.value.message
 
     def test_skips_irrelevant_records_until_token_match(
         self, ctx: SubstrateContext
@@ -275,7 +340,49 @@ class TestSessionLoss:
             client.send_mi("-noop")
 
 
+class _BlockingStdout:
+    """A live-but-silent pipe: ``readline()`` blocks until released,
+    then returns EOF. Models a gdb that never answers — the case the
+    old blocking-readline design could not test (or survive)."""
+
+    def __init__(self) -> None:
+        self._gate = threading.Event()
+
+    def readline(self) -> str:
+        self._gate.wait(timeout=10.0)  # safety cap for the test run
+        return ""
+
+    def release(self) -> None:
+        self._gate.set()
+
+
 class TestTimeout:
+    # A-011: these deadlines were dead code — _read_line ignored them
+    # and blocked forever in readline() on a silent gdb.
+    def test_wait_for_stopped_times_out_on_silent_gdb(
+        self, ctx: SubstrateContext
+    ) -> None:
+        proc = FakeProc()
+        proc.stdout = _BlockingStdout()  # type: ignore[assignment]
+        client = GDBClient(proc=proc, ctx=ctx)  # type: ignore[arg-type]
+        t0 = time.monotonic()
+        result = client.wait_for_stopped(timeout_s=0.3)
+        elapsed = time.monotonic() - t0
+        proc.stdout.release()
+        assert result is None  # run_until_breakpoint maps this to halt_reason="timeout"
+        assert elapsed < 5.0  # previously: hung forever
+
+    def test_send_mi_times_out_on_silent_gdb(
+        self, ctx: SubstrateContext
+    ) -> None:
+        proc = FakeProc()
+        proc.stdout = _BlockingStdout()  # type: ignore[assignment]
+        client = GDBClient(proc=proc, ctx=ctx)  # type: ignore[arg-type]
+        with pytest.raises(GDBError) as excinfo:
+            client.send_mi("-noop", timeout_s=0.3)
+        proc.stdout.release()
+        assert excinfo.value.gdb_marker == "command-timeout"
+
     def test_command_timeout_raises(self, ctx: SubstrateContext) -> None:
         # Clock advances past deadline on first iteration.
         clock_values = iter([0.0, 100.0, 100.0])
@@ -335,7 +442,8 @@ class TestSpawnGdb:
 
         proc = FakeProc(
             stdout_lines=[
-                '1^connected\n',
+                '1^done\n',  # -gdb-set mi-async on (RES-041)
+                '2^connected\n',
             ]
         )
 
@@ -347,6 +455,12 @@ class TestSpawnGdb:
         )
         assert isinstance(client, GDBClient)
         assert "-target-select extended-remote localhost:61234" in proc.stdin_text
+        # mi-async is enabled BEFORE the connect — in sync mode gdb stops
+        # reading MI input while the target runs, so -exec-interrupt
+        # (halt / breakpoint-timeout recovery) was never processed.
+        async_pos = proc.stdin_text.index("-gdb-set mi-async on")
+        connect_pos = proc.stdin_text.index("-target-select")
+        assert async_pos < connect_pos
 
     def test_connect_error_raises(
         self, ctx: SubstrateContext, tmp_path: Path
@@ -356,7 +470,8 @@ class TestSpawnGdb:
 
         proc = FakeProc(
             stdout_lines=[
-                '1^error,msg="connection refused"\n',
+                '1^done\n',  # -gdb-set mi-async on (RES-041)
+                '2^error,msg="connection refused"\n',
             ]
         )
 
@@ -366,3 +481,62 @@ class TestSpawnGdb:
         with pytest.raises(GDBError) as excinfo:
             spawn_gdb(ctx=ctx, elf_path=elf, gdb_port=61234, _spawn=fake_spawn)
         assert excinfo.value.gdb_marker == "remote-connection-closed"
+
+
+# ---------------------------------------------------------------------------
+# IMP-11 — spawn_gdb must not leak arm-gdb on connect failure
+# ---------------------------------------------------------------------------
+
+
+class TestSpawnGdbLeaks:
+    def test_session_lost_during_connect_closes_gdb(
+        self, ctx: SubstrateContext, tmp_path: Path
+    ) -> None:
+        elf = tmp_path / "demo.elf"
+        elf.write_text("")
+        # Immediate EOF on stdout → send_mi raises GDBSessionLost (not a
+        # clean ^error) — the spawned process must still be torn down.
+        proc = FakeProc(stdout_lines=[])
+        with pytest.raises(GDBSessionLost):
+            spawn_gdb(
+                ctx=ctx,
+                elf_path=elf,
+                gdb_port=61234,
+                _spawn=lambda *a, **k: proc,
+            )
+        assert proc._exited is True
+
+
+# ---------------------------------------------------------------------------
+# IMP-15 — MI argument quoting
+# ---------------------------------------------------------------------------
+
+
+class TestMiQuote:
+    def test_plain_string_wrapped(self) -> None:
+        from stm32_substrate.debug.gdb import mi_quote
+
+        assert mi_quote("main") == '"main"'
+
+    def test_newline_injection_neutralised(self) -> None:
+        from stm32_substrate.debug.gdb import mi_quote
+
+        quoted = mi_quote("x\n-exec-run")
+        assert "\n" not in quoted
+        assert quoted == '"x\\n-exec-run"'
+
+    def test_quotes_and_backslashes_escaped(self) -> None:
+        from stm32_substrate.debug.gdb import mi_quote
+
+        assert mi_quote('a"b\\c') == '"a\\"b\\\\c"'
+
+    def test_send_console_keeps_injected_newline_inert(
+        self, ctx: SubstrateContext
+    ) -> None:
+        proc = FakeProc(stdout_lines=["1^done\n"])
+        client = GDBClient(proc=proc, ctx=ctx)
+        client.send_console("monitor reset\nhalt", timeout_s=1.0)
+        # Exactly one MI line written; the newline travels escaped.
+        written = proc.stdin_text
+        assert written.count("\n") == 1
+        assert '\\n' in written

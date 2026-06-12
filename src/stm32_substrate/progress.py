@@ -1,6 +1,6 @@
 """Progress streaming primitives.
 
-Per the API conventions § "Progress streaming — ``on_progress``
+Per ``v1/api-conventions.md`` § "Progress streaming — ``on_progress``
 callback". Plain callback shape; no async / observable.
 
 Long-running ops (``read_flash_to_file``, ``tail_swo``, CubeMX generate,

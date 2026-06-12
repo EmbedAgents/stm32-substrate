@@ -1,6 +1,6 @@
 """Internal serial reader.
 
-Per the VCP API spec § "reader.py — internal serial reader". Wraps a
+Per ``v1/vcp-api.md`` § "reader.py — internal serial reader". Wraps a
 ``pyserial.Serial`` object behind:
 
 - A daemon drain thread (pyserial reads are blocking — one thread per
@@ -98,6 +98,10 @@ class _VcpReader:
         self._encoding_warned = False
         self._drops_since_warn = 0
         self._open = False
+        # IMP-17: set when the drain thread dies on a read error so
+        # is_alive() stops trusting a zombie reader whose port path
+        # still exists.
+        self._drain_failed = False
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -107,6 +111,7 @@ class _VcpReader:
         if self._open:
             return
         self._serial = self._open_serial()
+        self._drain_failed = False
         self._stop.clear()
         self._thread = threading.Thread(
             target=self._drain,
@@ -142,14 +147,24 @@ class _VcpReader:
     def is_alive(self) -> bool:
         """Cheap port-validity check.
 
-        Linux v1: ``os.path.exists(port)`` covers the USB-yank case. On
-        Windows v2, pyserial's port-disappearance semantics differ; the
-        TODO marker in the v1 spec applies.
+        - A drain thread that died on a read error marks the reader dead
+          (IMP-17) — the dominant signal on both OSes.
+        - POSIX device-node ports (``/dev/ttyACMx``) additionally check
+          the path, covering the USB-yank case. Windows ``COMx`` names
+          are not filesystem paths (``os.path.exists('COM10')`` is False
+          for a healthy port — IMP-18), so the path probe only applies
+          to path-shaped port names.
         """
         if not self._open or self._serial is None:
             return False
-        # The port path going away (USB unplug) is the dominant stale case.
-        if not os.path.exists(self.port):
+        if self._drain_failed:
+            return False
+        # The port path going away (USB unplug) is the dominant stale
+        # case on Linux; only meaningful when the port IS a path. Bare
+        # Windows COM names carry no separator; path-shaped ports on
+        # either OS (/dev/ttyACMx, C:\...\pipe) do.
+        looks_like_path = "/" in self.port or "\\" in self.port
+        if looks_like_path and not os.path.exists(self.port):
             return False
         # ``Serial.is_open`` flips False after pyserial sees its own IOError.
         return bool(getattr(self._serial, "is_open", True))
@@ -242,12 +257,17 @@ class _VcpReader:
         Snapshot mode (``follow=False``): yields up to ``last_n`` buffered
         lines, waiting up to ``timeout_s`` for that many to accumulate.
 
-        Follow mode (``follow=True``): yields forever as new lines arrive,
-        until the consumer breaks out. ``last_n`` lets the caller see the
-        recent backlog before the live tail; ``timeout_s`` is ignored.
+        Follow mode (``follow=True``): yields as new lines arrive.
+        ``last_n`` lets the caller see the recent backlog before the
+        live tail. With ``timeout_s=None`` the stream runs until the
+        consumer breaks out (Ctrl-C at the CLI); an explicit
+        ``timeout_s`` bounds the whole stream by wall clock and returns
+        cleanly at the deadline (RES-046 — previously the value was
+        silently discarded, leaving agent callers no way to bound the
+        stream).
         """
         if follow:
-            yield from self._stream_follow(last_n=last_n)
+            yield from self._stream_follow(last_n=last_n, timeout_s=timeout_s)
             return
         yield from self._stream_snapshot(last_n=last_n, timeout_s=timeout_s)
 
@@ -261,33 +281,36 @@ class _VcpReader:
 
         Returns ``(lines, timeout_hit)``. ``timeout_hit=True`` iff the
         wall-clock budget expired without observing any reply line.
+
+        The wall clock bounds the WHOLE collection (A-016): firmware
+        emitting lines faster than the idle gap previously kept the idle
+        slice alive unboundedly — a HIL no-long-waits violation.
         """
         start = time.monotonic()
         idle_s = inter_line_idle_ms / 1000.0
         collected: list[str] = []
-        last_line_ts: float | None = None
 
+        deadline = start + timeout_s
+        line = self._pop_one(timeout_s=timeout_s)
+        if line is None:
+            return ((), True)
+        collected.append(line)
+        # Idle slice — ends on the first inter-line gap OR when the wall
+        # budget runs out, whichever comes first.
         while True:
-            elapsed = time.monotonic() - start
-            if elapsed >= timeout_s:
-                break
-            wait = timeout_s - elapsed
-            line = self._pop_one(timeout_s=wait)
-            if line is None:
-                if not collected:
-                    return ((), True)
-                break
-            collected.append(line)
-            last_line_ts = time.monotonic()
-            # idle slice
-            while True:
-                follow = self._pop_one(timeout_s=idle_s)
-                if follow is None:
-                    return (tuple(collected), False)
-                collected.append(follow)
-                last_line_ts = time.monotonic()
-
-        return (tuple(collected), False if collected else True)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                self._log.warning(
+                    "send_and_read reply still streaming at the %.1fs "
+                    "wall budget; returning the %d lines collected",
+                    timeout_s,
+                    len(collected),
+                )
+                return (tuple(collected), False)
+            follow = self._pop_one(timeout_s=min(idle_s, remaining))
+            if follow is None:
+                return (tuple(collected), False)
+            collected.append(follow)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -336,7 +359,16 @@ class _VcpReader:
             try:
                 chunk = ser.read(256)
             except Exception as ex:
-                self._log.debug("drain read error: %s", ex)
+                # IMP-17: the reader is now a zombie — flag it so
+                # is_alive() reports dead (SB-002 reconnects on the next
+                # call) and say so loudly, not at DEBUG.
+                self._drain_failed = True
+                self._log.warning(
+                    "VCP drain thread died on read error (port=%s): %s — "
+                    "reader marked stale; next call reconnects",
+                    self.port,
+                    ex,
+                )
                 self._line_event.set()
                 return
             if not chunk:
@@ -408,16 +440,29 @@ class _VcpReader:
             yield line
             emitted += 1
 
-    def _stream_follow(self, *, last_n: int | None) -> Iterator[str]:
+    def _stream_follow(
+        self, *, last_n: int | None, timeout_s: float | None = None
+    ) -> Iterator[str]:
+        deadline = (
+            time.monotonic() + timeout_s if timeout_s is not None else None
+        )
         if last_n:
+            # IMP-19: snapshot AND clear under one lock acquisition —
+            # clearing after the yield loop dropped lines that arrived
+            # while the backlog was being yielded.
             with self._lock:
-                snapshot = list(self._buffer)[-last_n:]
-            for line in snapshot:
-                yield line
-            with self._lock:
+                backlog = list(self._buffer)
                 self._buffer.clear()
+            for line in backlog[-last_n:]:
+                yield line
         while not self._stop.is_set():
-            line = self._pop_one(timeout_s=0.25)
+            wait = 0.25
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return
+                wait = min(wait, remaining)
+            line = self._pop_one(timeout_s=wait)
             if line is None:
                 continue
             yield line

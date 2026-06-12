@@ -1,6 +1,6 @@
 """``stm32 build`` CLI subcommand group — cubeide-side operations.
 
-Maps to the CubeIDE API spec § "CLI subcommand surface". The base
+Maps to ``v1/cubeide-api.md`` § "CLI subcommand surface". The base
 ``stm32 build`` accepts all simple flags (project / config / clean /
 debug-level / opt / preset / all-configs); action sub-subcommands
 (``add-symbol`` / ``add-lib`` / ``add-source`` / ``add-include``) handle

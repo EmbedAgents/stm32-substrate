@@ -1,6 +1,6 @@
 """VCP result dataclasses.
 
-Per the VCP API spec § "Result types". Frozen + JSON-friendly via the
+Per ``v1/vcp-api.md`` § "Result types". Frozen + JSON-friendly via the
 shared ``cli/_serialize.py`` reducer.
 
 Note: ``VCP.tail()`` has ``success_signal=stream`` — it returns
@@ -73,7 +73,7 @@ class ReconnectResult:
 
 @dataclass(frozen=True)
 class RequestResponse:
-    """VCP-002 result. Shape per the success_signal conventions."""
+    """VCP-002 result. Shape per api-conventions.md success_signal table."""
 
     sent_line: str
     reply_lines: tuple[str, ...]

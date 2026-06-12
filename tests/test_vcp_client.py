@@ -398,3 +398,55 @@ class TestCollision:
         assert ctx.session_state.active_vcp_reader is None
         # Second close is harmless.
         client.close()
+
+
+# ---------------------------------------------------------------------------
+# A-017 — VCP-003 reconnect from a fresh process honors max_wait_s
+# ---------------------------------------------------------------------------
+
+
+class TestReconnectFreshProcess:
+    """Every one-shot CLI invocation (RES-026) is a fresh process: the
+    reader-None path must poll for re-enumeration like the live-reader
+    path, not raise on the first empty scan."""
+
+    def test_polls_enumeration_until_probe_returns(
+        self,
+        ctx: SubstrateContext,
+        port_path: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import stm32_substrate.vcp.client as client_mod
+
+        cand = VCPPortCandidate(
+            port=port_path, vid=0x0483, pid=0x374B, serial_number="ABC"
+        )
+        calls = {"n": 0}
+
+        def _fake(*, probe_sn=None):
+            calls["n"] += 1
+            # Board mid-reset: empty for the first two scans.
+            return [cand] if calls["n"] > 2 else []
+
+        monkeypatch.setattr(client_mod, "discover_vcp_ports", _fake)
+        factory, _holder = _reader_factory_capture()
+        vcp = VCP(ctx, _reader_factory=factory)
+        result = vcp.reconnect(max_wait_s=5.0)
+        assert result.port == port_path
+        assert result.status == "reconnected"
+        assert calls["n"] > 2  # it actually retried
+
+    def test_raises_reconnect_timeout_when_budget_expires(
+        self,
+        ctx: SubstrateContext,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from stm32_substrate.errors import VCPError
+
+        _patch_discover(monkeypatch, [])
+        vcp = VCP(ctx)
+        start = time.monotonic()
+        with pytest.raises(VCPError) as excinfo:
+            vcp.reconnect(max_wait_s=0.3)
+        assert excinfo.value.vcp_marker == "reconnect-timeout"
+        assert time.monotonic() - start < 2.0

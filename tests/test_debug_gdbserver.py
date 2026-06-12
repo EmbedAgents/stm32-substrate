@@ -12,6 +12,8 @@ field which lands on the fake stdout stream."""
 from __future__ import annotations
 
 import subprocess
+import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -343,6 +345,42 @@ class TestSpawnErrors:
                 _sleep=lambda _s: None,
             )
         assert excinfo.value.gdb_marker == "command-timeout"
+
+    def test_handshake_times_out_on_silent_live_gdbserver(
+        self, ctx: SubstrateContext, tmp_path: Path
+    ) -> None:
+        """IMP-13: a live-but-silent gdbserver (pipe open, nothing
+        written) used to hang start_session forever — the blocking
+        readline() made the handshake deadline dead code. Real clock,
+        real timeout."""
+
+        class _BlockingStream:
+            def __init__(self) -> None:
+                self._gate = threading.Event()
+
+            def readline(self) -> str:
+                self._gate.wait(timeout=10.0)
+                return ""
+
+            def release(self) -> None:
+                self._gate.set()
+
+        fake = FakePopen()
+        fake.stdout = _BlockingStream()  # type: ignore[assignment]
+
+        t0 = time.monotonic()
+        with pytest.raises(GDBError) as excinfo:
+            spawn_gdbserver(
+                ctx=ctx,
+                options=_options(tmp_path),
+                handshake_timeout_s=0.3,
+                _spawn=lambda *a, **k: fake,
+            )
+        elapsed = time.monotonic() - t0
+        fake.stdout.release()
+        assert excinfo.value.gdb_marker == "command-timeout"
+        assert elapsed < 5.0  # previously: hung forever
+        assert fake._terminate_called is True
 
     def test_early_exit_classified(
         self, ctx: SubstrateContext, tmp_path: Path

@@ -5,7 +5,7 @@ records. Implements prompts VCP-001 (tail), VCP-002 (send_and_read),
 VCP-003 (reconnect), plus SB-001 (auto-attach) and SB-002 (auto-reconnect)
 as internal substrate defaults.
 
-See the VCP API spec for the full method signatures, descriptor fields,
+See ``v1/vcp-api.md`` for the full method signatures, descriptor fields,
 multi-probe resolution flow, and CLI subcommand mapping.
 """
 

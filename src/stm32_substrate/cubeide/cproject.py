@@ -1,6 +1,6 @@
 """``.cproject`` atomic-edit protocol — ``CProjectEditor``.
 
-Per the CubeIDE API spec § "Settings-modification protocol". Internal
+Per ``v1/cubeide-api.md`` § "Settings-modification protocol". Internal
 helper; not part of the public cubeide surface. ``CubeIDE.build()`` uses
 it to materialise all settings edits in one snapshot → parse → modify →
 validate-XML → write cycle.
@@ -423,8 +423,8 @@ class CProjectEditor:
                 # values as "<superClass>.value.<token>" with the full ST
                 # prefix; preset tables write "...value.<token>" and we
                 # splice the matched option's actual superClass in here.
-                # Handles preset table-format drift vs. the real ST
-                # superClass names emitted by CubeIDE.
+                # See plan-windows.md F.6 follow-up + RES on presets.py
+                # table format drift.
                 opt_super = option.get("superClass", "")
                 expanded = (
                     opt_super + value[3:] if value.startswith("...") else value

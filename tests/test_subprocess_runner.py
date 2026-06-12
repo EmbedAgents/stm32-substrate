@@ -119,6 +119,42 @@ class TestTimeout:
         assert err.code == "timeout"
         assert "timed out" in err.message
 
+    def test_timeout_kills_grandchildren(
+        self, ctx: SubstrateContext, python_bin: Path, tmp_path: Path
+    ) -> None:
+        """IMP-16: the timeout kill must take the whole process tree —
+        signalling only the direct child orphaned JVM grandchildren of
+        the vendor bootstrap launchers."""
+        import time as _time
+
+        from stm32_substrate.platform import process_alive
+
+        pidfile = tmp_path / "grandchild.pid"
+        # The pidfile lands via write-then-rename so the kill can never
+        # expose a created-but-empty file; timeout_s must cover two CPython
+        # startups + the rename on a cold CI runner before the kill fires.
+        spawner = (
+            "import os, subprocess, sys, pathlib\n"
+            "p = subprocess.Popen([sys.executable, '-c', "
+            "'import time; time.sleep(30)'])\n"
+            f"tmp = pathlib.Path({str(pidfile)!r} + '.tmp')\n"
+            "tmp.write_text(str(p.pid))\n"
+            f"os.replace(tmp, pathlib.Path({str(pidfile)!r}))\n"
+            "p.wait()\n"
+        )
+        with pytest.raises(ToolError):
+            run_tool(python_bin, ["-c", spawner], ctx=ctx, timeout_s=3.0)
+
+        assert pidfile.is_file(), (
+            "spawner was killed before it recorded the grandchild pid — "
+            "timeout_s does not cover process startup on this machine"
+        )
+        grandchild_pid = int(pidfile.read_text().strip())
+        deadline = _time.monotonic() + 3.0
+        while _time.monotonic() < deadline and process_alive(grandchild_pid):
+            _time.sleep(0.05)
+        assert not process_alive(grandchild_pid)
+
 
 class TestLogPath:
     def test_log_path_captures_both_streams(

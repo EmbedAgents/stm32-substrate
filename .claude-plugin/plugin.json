@@ -2,9 +2,9 @@
   "name": "stm32-substrate",
   "displayName": "STM32 Substrate",
   "description": "STM32 development by talking to Claude — wraps ST's vendor tools (CubeMX, CubeIDE, CubeProgrammer, ST-LINK gdbserver, Signing Tool) plus a USB serial reader, exposed as five slash commands and the `stm32` CLI they drive.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
-    "name": "EmbedAgents",
+    "name": "anup das",
     "email": "akd.jls@gmail.com"
   },
   "homepage": "https://github.com/EmbedAgents/stm32-substrate",

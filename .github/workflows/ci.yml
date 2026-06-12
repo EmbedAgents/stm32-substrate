@@ -11,6 +11,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Least-privilege token: nothing here writes to the repo (SEC-06).
+permissions:
+  contents: read
+
 jobs:
   unit:
     name: unit (${{ matrix.os }}, py${{ matrix.python }})
@@ -21,9 +25,10 @@ jobs:
         python: ["3.11", "3.12"]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v6
+      # Third-party actions pinned by commit SHA, not floating tag (SEC-06).
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: ${{ matrix.python }}
           cache: pip
@@ -44,6 +49,53 @@ jobs:
       # STM32 vendor CLIs installed (CubeProgrammer / CubeIDE / CubeMX /
       # CubeCLT) which GitHub-hosted runners don't have. Automating
       # those installs (download URLs, EULA click-through) is its own
-      # workstream, deferred for now.
+      # workstream tracked as a deferred RES per plan-windows.md F.5.2.
       - name: Run unit tests
         run: pytest -v
+
+      # Replay-mode eval tier (TST-08): deterministic, no API key, no
+      # vendor CLIs - replays the recorded transcripts against the
+      # scenario assertions in under a second.
+      - name: Run eval replay
+        run: pytest -m eval
+
+  package:
+    name: package (build + check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.12"
+
+      # Packaging leg (ARC-13): the editable install above masks packaging
+      # breaks - build the real artifacts and check their contents.
+      - name: Build sdist + wheel
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+
+      - name: Check artifacts
+        run: |
+          python -m twine check dist/*
+          # Wheel must bundle the schemas (SC-006) and must not ship tests.
+          python - <<'EOF'
+          import glob, sys, zipfile
+          wheel = glob.glob("dist/*.whl")[0]
+          names = zipfile.ZipFile(wheel).namelist()
+          schemas = [n for n in names if n.endswith(".schema.json")]
+          assert len(schemas) >= 3, f"schemas missing from wheel: {schemas}"
+          leaked = [n for n in names if n.startswith("tests/")]
+          assert not leaked, f"tests leaked into wheel: {leaked[:5]}"
+          print(f"wheel OK: {len(names)} files, {len(schemas)} schemas")
+          EOF
+          # sdist must not ship the test tree (SEC-08).
+          python - <<'EOF'
+          import glob, tarfile
+          sdist = glob.glob("dist/*.tar.gz")[0]
+          names = tarfile.open(sdist).getnames()
+          leaked = [n for n in names if "/tests/" in n]
+          assert not leaked, f"tests leaked into sdist: {leaked[:5]}"
+          print(f"sdist OK: {len(names)} files")
+          EOF

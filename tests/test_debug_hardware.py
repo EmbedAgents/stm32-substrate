@@ -10,7 +10,7 @@ tests/fixtures/projects/F-PROJ-NUCLEO-L476RG-BLINKY/Projects/NUCLEO-L476RG/Examp
 before invoking these tests; ELF-dependent tests skip cleanly when
 the artifact is missing.
 
-What's covered:
+What's covered (per plan-windows.md F.6 + next-actions):
 
   - TestStartSession: start_session(elf_path=..., halt=True) ->
     session.target_halted=True; SessionHandle carries valid pids +
@@ -282,6 +282,60 @@ class TestDecodeHardfault:
         pc = snap.registers.values["pc"]
         assert _FLASH_BASE <= pc < _FLASH_END, (
             f"snapshot pc=0x{pc:08x} not in L476 flash range"
+        )
+
+
+# ---------------------------------------------------------------------------
+# TestGdbPathFaultRegisters — A-014: the FAULTED-target leg of DIAG-001
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.hardware
+class TestGdbPathFaultRegisters:
+    """A-014 — DIAG-001 gdb path against the FAULTING fixture.
+
+    The healthy-target CFSR==0 assertion above is necessary but not
+    sufficient: a recipe that always reset before reading would ALSO see
+    CFSR==0 (the A-003 vacuity). This test is the positive control — the
+    UDF #0 firmware faults at boot, and only an attach WITHOUT reset
+    (``attach_running`` + halt in place, the A-003 semantics) can observe
+    the sticky fault registers.
+    """
+
+    def test_attach_no_reset_reads_sticky_fault_state(
+        self, l476rg_ctx, faulting_firmware_flashed
+    ) -> None:
+        debug = Debug(l476rg_ctx)
+        with debug.attach_running(
+            elf_path=faulting_firmware_flashed
+        ) as session:
+            # Halt in place — a reset here would clear CFSR/HFSR and
+            # reproduce the exact bug this test exists to catch.
+            session.halt()
+            snap = session.snapshot(include_peripherals=["SCB"])
+        scb = next(
+            d for d in snap.peripheral_dumps if d.peripheral == "SCB"
+        )
+        cfsr = scb.registers["CFSR"].raw_value
+        hfsr = scb.registers["HFSR"].raw_value
+        # UDF #0 raises UsageFault.UNDEFINSTR (CFSR bit 16); UsageFault
+        # is disabled at reset so it escalates to HardFault → HFSR.FORCED
+        # (bit 30). Armv7-M B3.2.15/B3.2.16.
+        assert cfsr & (1 << 16), (
+            f"CFSR.UNDEFINSTR not set on the faulted target: 0x{cfsr:08x} "
+            "(did the attach reset the core?)"
+        )
+        assert hfsr & (1 << 30), (
+            f"HFSR.FORCED not set on the faulted target: 0x{hfsr:08x}"
+        )
+        # The SVD field decode agrees with the raw bits.
+        undefinstr = scb.registers["CFSR"].fields.get("UNDEFINSTR")
+        assert undefinstr is not None and undefinstr.raw_value == 1
+        # And the live PC sits in HardFault_Handler's infinite loop —
+        # i.e. flash, not a reset vector default.
+        pc = snap.registers.values["pc"]
+        assert _FLASH_BASE <= pc < _FLASH_END, (
+            f"pc=0x{pc:08x} not in flash; unexpected target state"
         )
 
 

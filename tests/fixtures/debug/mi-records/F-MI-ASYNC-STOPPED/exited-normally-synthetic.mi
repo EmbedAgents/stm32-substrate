@@ -1,0 +1,3 @@
+# SYNTHETIC — bare-metal targets never exit; shape per GDB manual §27.6
+# captured 2026-06-11, arm-none-eabi-gdb MI3, NUCLEO-L476RG, BLINKY.elf
+*stopped,reason="exited-normally"

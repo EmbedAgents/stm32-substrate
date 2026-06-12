@@ -1,6 +1,6 @@
 """CubeIDE-specific result dataclasses.
 
-Per the CubeIDE API spec § "Result types". Every shape is
+Per ``v1/cubeide-api.md`` § "Result types". Every shape is
 ``@dataclass(frozen=True)`` to match ADR-006.
 
 Substrate captures, doesn't interpret (ADR-004): ``BuildResult`` carries

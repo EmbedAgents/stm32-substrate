@@ -4,7 +4,8 @@
 // Tests parametrize over these via tests/conftest.py helpers
 // (projects_for_role / etc).
 //
-// Fields follow the F-PROJ-<board>-<role> taxonomy (RES-019).
+// See plan-test.md § "Manifest schema" for field semantics; RES-019 for
+// the F-PROJ-<board>-<role> taxonomy.
 //
 // Conventions:
 //   - `id` is canonical "F-PROJ-<board>-<role>" (logical identifier).

@@ -38,6 +38,7 @@ from stm32_substrate.errors import (
     ToolError,
     UserAbortedError,
 )
+from stm32_substrate.resolution import coerce_path
 from stm32_substrate.subprocess_runner import run_tool
 from stm32_substrate.cubeprogrammer.results import (
     BannerResult,
@@ -67,6 +68,21 @@ if TYPE_CHECKING:
 
 # Address regex per SC-003: hex literal with 0x prefix.
 _ADDRESS_RE = re.compile(r"^0x[0-9A-Fa-f]+$")
+
+# ST image-header magic (UM2543): STM32_SigningTool_CLI prepends a header
+# whose first four bytes are ASCII "STM2" across all header versions
+# (1 / 2 / 2.x). Used by flash_signed_pair(sign_unsigned=True) to decide
+# which inputs still need the F-013 signing pass.
+_ST_IMAGE_HEADER_MAGIC = b"STM2"
+
+
+def _has_signed_header(path: Path) -> bool:
+    """``True`` when ``path`` starts with the ST image-header magic."""
+    try:
+        with path.open("rb") as fh:
+            return fh.read(4) == _ST_IMAGE_HEADER_MAGIC
+    except OSError:
+        return False
 
 
 def _file_size_or_zero(path: Path) -> int:
@@ -178,7 +194,7 @@ class CubeProgrammer:
     def _require_cli(self) -> Path:
         """Return the validated CLI path or raise the loud ConfigurationError.
 
-        Per the CubeProgrammer API spec § "Substrate-shared errors raised
+        Per ``v1/cubeprogrammer-api.md`` § "Substrate-shared errors raised
         by this module".
         """
         if self._cli is None:
@@ -227,10 +243,28 @@ class CubeProgrammer:
         try:
             result = run_tool(cli, args, ctx=self.ctx, timeout_s=timeout_s)
         except ToolError as ex:
-            stderr = ex.tool_output or ""
-            exit_code = ex.code if isinstance(ex.code, int) else -1
-            raise parsers.parse_error(stderr, exit_code) from ex
+            raise self._translate_tool_error(ex) from ex
         return result.stdout
+
+    @staticmethod
+    def _translate_tool_error(ex: ToolError) -> CubeProgrammerError:
+        """Map a runner ``ToolError`` onto a typed ``CubeProgrammerError``.
+
+        IMP-03: a runner timeout carries ``code="timeout"`` plus a real
+        message + hint — mapping it through ``parse_error`` rendered the
+        misleading "exited with code -1" and dropped the hint.
+        """
+        if ex.code == "timeout":
+            return CubeProgrammerError(
+                message=ex.message,
+                code="timeout",
+                tool_output=ex.tool_output,
+                hint=ex.hint,
+                recoverable=False,
+            )
+        stderr = ex.tool_output or ""
+        exit_code = ex.code if isinstance(ex.code, int) else -1
+        return parsers.parse_error(stderr, exit_code)
 
     def _raw_connect(
         self,
@@ -395,11 +429,14 @@ class CubeProgrammer:
         """
         cli = self._require_cli()
         timeout_s = self._timeout_s("connect_timeout_s", 30.0)
-        # Use raise_on_nonzero=False so an empty probe list (which the CLI
-        # may emit with exit_code=0 OR non-zero depending on version)
-        # always parses to ``[]`` rather than raising a misleading
-        # CubeProgrammerError. Real CLI failures still surface via the
-        # explicit exit-code check below.
+        # raise_on_nonzero=False keeps the runner from raising so the
+        # exit-code policy lives here. NOTE (IMP-28, re-deferred): the
+        # check below raises on ANY nonzero exit — including a
+        # version-variant 'no probes detected' nonzero report, which
+        # would ideally return []. Distinguishing that case safely
+        # needs a captured real banner fixture for the nonzero-empty
+        # variant; a lenient parse-anything fallback would mask real
+        # failures as empty lists.
         try:
             result = run_tool(
                 cli, ["-l"], ctx=self.ctx, timeout_s=timeout_s, raise_on_nonzero=False
@@ -407,9 +444,7 @@ class CubeProgrammer:
         except ToolError as ex:
             # ToolError here means the runner saw a hard problem
             # (timeout, subprocess kill). Translate to typed error.
-            stderr = ex.tool_output or ""
-            exit_code = ex.code if isinstance(ex.code, int) else -1
-            raise parsers.parse_error(stderr, exit_code) from ex
+            raise self._translate_tool_error(ex) from ex
 
         if result.exit_code != 0:
             stderr = result.stderr or result.stdout
@@ -541,7 +576,7 @@ class CubeProgrammer:
     ) -> None:
         """Enforce the HIL destructive-op gate (HARD RULE 1).
 
-        Per the behavior spec § destructive ops, every
+        Per ``expected-behaviors-v2.md`` § destructive ops, every
         irreversible substrate operation (erase / option-byte / RDP)
         requires explicit consent. ``confirm_destructive`` is a ``bool``
         (programmatic callers) or a callable ``(targets) -> bool`` (the
@@ -647,7 +682,9 @@ class CubeProgrammer:
         sess = self._active_debug_session()
         via_gdb = sess is not None
         if sess is not None:
-            sess.send_monitor("halt")
+            # MI-level halt (-exec-interrupt) rather than `monitor halt`:
+            # keeps gdb's own target-state machine in sync (RES-041).
+            sess.halt()
         else:
             args: list[str] = ["-c", "port=swd"] + self._sn_args() + ["-halt"]
             timeout_s = self._timeout_s("atomic_timeout_s", 30.0)
@@ -666,12 +703,14 @@ class CubeProgrammer:
         """F-018 — ``-run``; routes through active gdb session when present.
 
         Same ``prior_state="unknown"`` caveat as ``halt()``. The gdb-side
-        command is ``continue`` (mapped from ``-run`` on the CLI side).
+        path is MI ``-exec-continue`` via ``session.resume()`` — ST-LINK
+        gdbserver has no resume-flavored Rcmd (``monitor continue`` /
+        ``go`` / ``resume`` all ^error, bench-verified v7.13.0; RES-041).
         """
         sess = self._active_debug_session()
         via_gdb = sess is not None
         if sess is not None:
-            sess.send_monitor("continue")
+            sess.resume()
         else:
             args: list[str] = ["-c", "port=swd"] + self._sn_args() + ["-run"]
             timeout_s = self._timeout_s("atomic_timeout_s", 30.0)
@@ -726,6 +765,7 @@ class CubeProgrammer:
         self._validate_address(address)
         if size <= 0:
             raise ValueError(f"read_flash_to_file size must be positive; got {size}")
+        output_path = coerce_path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         args: list[str] = (
             ["-c", "port=swd"]
@@ -871,6 +911,29 @@ class CubeProgrammer:
         timeout_s = self._timeout_s("atomic_timeout_s", 30.0)
         self._invoke(args, timeout_s=timeout_s)
 
+        # IMP-05: RDP level 2 permanently disables the debug port — the
+        # read-back reconnect is guaranteed to fail, telling the user the
+        # *irreversible* write failed when it succeeded. Skip it and say
+        # why in the confirmation instead.
+        if "RDP" in pairs and _is_rdp_level_2(pairs["RDP"]):
+            self._log.info(
+                "write_option_bytes wrote RDP level 2; skipping OB "
+                "read-back (debug port is now permanently locked)"
+            )
+            return Confirmation(
+                operation="write_option_bytes",
+                data={
+                    "pairs_written": dict(pairs),
+                    "observed_after": None,
+                    "read_back_skipped": (
+                        "RDP level 2 locks the debug port; a verification "
+                        "reconnect cannot succeed"
+                    ),
+                    "requires_power_cycle": False,  # TODO: per-family detection
+                    "destructive_ops_confirmed": list(pairs.keys()),
+                },
+            )
+
         observed_after = self.read_option_bytes()
         self._log.info(
             "write_option_bytes wrote %d field(s); RDP level now %s",
@@ -907,6 +970,7 @@ class CubeProgrammer:
         CLI (per spec) and the address regex. Raises ``ValueError`` on
         either violation.
         """
+        path = coerce_path(path)
         if path.suffix.lower() != ".bin":
             raise ValueError(
                 f"flash_bin requires a .bin file; got {path.name!r}"
@@ -948,6 +1012,7 @@ class CubeProgrammer:
         constructs a ``FlashConfirmation`` from the path size + measured
         duration.
         """
+        path = coerce_path(path)  # str|Path tolerated (IMP-22)
         if address is not None:
             self._validate_address(address)
         args: list[str] = ["-c", "port=swd"] + self._sn_args() + ["-d", str(path)]
@@ -1070,17 +1135,49 @@ class CubeProgrammer:
         bootloader_address: str | None = None,
         application_address: str | None = None,
         sign_unsigned: bool = False,
+        signing_header_version: str | None = None,
+        bootloader_image_type: str = "fsbl",
+        application_image_type: str = "ssbl",
+        bootloader_entry_point: str | None = None,
+        application_entry_point: str | None = None,
+        signing_no_key: bool = False,
     ) -> PairFlashResult:
         """F-009 — signed variant of ``flash_pair``.
 
-        No family pre-check (RES-018). ``sign_unsigned=True`` routes each
-        leg through the ``signing`` module before flashing; that path
-        is TODO until C2 lands — substrate raises ``NotImplementedError``.
-        Same partial-completion semantics as ``flash_pair``.
+        No family pre-check (RES-018). ``sign_unsigned=True`` checks each
+        input for the ST image-header magic and routes unsigned ones
+        through ``SigningTool.sign_binary`` (F-013) first, flashing the
+        signed output (RES-039 — the former "until C2 lands" gate was
+        stale; C2 shipped 2026-05-14). Signing parameters come from the
+        caller per the F-009 contract: ``signing_header_version`` is
+        required when an unsigned input is present; each leg's flash
+        address doubles as its signing ``load_address``; image types
+        default to the fsbl/ssbl pair convention; entry points are
+        forwarded (``sign_binary`` enforces RES-020's fsbl/ssbl
+        entry-point requirement); ``signing_no_key=True`` forwards
+        ``no_key`` to ``sign_binary`` (``-nk`` dev-mode signing — without
+        it, keyed hv≥2 signing requires provisioned key material and the
+        SigningTool CLI rejects the run). Same partial-completion
+        semantics as ``flash_pair``.
         """
         if sign_unsigned:
-            raise NotImplementedError(
-                "sign_unsigned=True is not yet wired to the signing module"
+            bootloader_path = self._sign_if_unsigned(
+                bootloader_path,
+                leg="bootloader",
+                address=bootloader_address,
+                image_type=bootloader_image_type,
+                entry_point=bootloader_entry_point,
+                header_version=signing_header_version,
+                no_key=signing_no_key,
+            )
+            application_path = self._sign_if_unsigned(
+                application_path,
+                leg="application",
+                address=application_address,
+                image_type=application_image_type,
+                entry_point=application_entry_point,
+                header_version=signing_header_version,
+                no_key=signing_no_key,
             )
         boot_result = self.flash_signed(bootloader_path, address=bootloader_address)
         try:
@@ -1098,6 +1195,60 @@ class CubeProgrammer:
         return PairFlashResult(
             bootloader=boot_result, application=app_result, both_succeeded=True
         )
+
+    def _sign_if_unsigned(
+        self,
+        path: Path,
+        *,
+        leg: str,
+        address: str | None,
+        image_type: str,
+        entry_point: str | None,
+        header_version: str | None,
+        no_key: bool = False,
+    ) -> Path:
+        """Return ``path`` if it already carries the ST image header;
+        otherwise sign it (F-013) and return the signed output path."""
+        path = coerce_path(path)
+        if _has_signed_header(path):
+            self._log.info(
+                "flash_signed_pair: %s %s already carries the ST image "
+                "header; not re-signing",
+                leg,
+                path.name,
+            )
+            return path
+        if header_version is None:
+            raise ValueError(
+                f"{leg} input {path.name!r} is unsigned; sign_unsigned=True "
+                "requires signing_header_version= (see SigningTool."
+                "sign_binary / UM2543 §2.1)"
+            )
+        if address is None:
+            raise ValueError(
+                f"{leg} input {path.name!r} is unsigned; its flash address "
+                f"kwarg is required (it doubles as the signing load_address)"
+            )
+        from stm32_substrate.signing import SigningTool
+
+        firmware = getattr(self.ctx.project, "firmware", None)
+        device_family = getattr(firmware, "device_family", None)
+        result = SigningTool(self.ctx).sign_binary(
+            path,
+            load_address=address,
+            image_type=image_type,  # type: ignore[arg-type]
+            header_version=header_version,  # type: ignore[arg-type]
+            entry_point=entry_point,
+            no_key=no_key,
+            device_family=str(device_family) if device_family else None,
+        )
+        self._log.info(
+            "flash_signed_pair: signed %s %s -> %s",
+            leg,
+            path.name,
+            result.output_path.name,
+        )
+        return result.output_path
 
     def flash_external(
         self,
@@ -1124,6 +1275,7 @@ class CubeProgrammer:
         path. The picked loader's basename is recorded in
         ``FlashConfirmation.loader_used``.
         """
+        path = coerce_path(path)
         self._validate_address(address)
         cli = self._require_cli()
         loader = self._resolve_external_loader(
@@ -1231,8 +1383,11 @@ class CubeProgrammer:
     ) -> FlashConfirmation:
         """CP-001 — extension-based router.
 
-        - ``.elf`` / ``.hex`` → ``flash_file`` (address optional; CLI
-          uses load addresses from the file format).
+        - ``.elf`` / ``.hex`` / ``.axf`` / ``.s19`` / ``.srec`` →
+          ``flash_file`` (address embedded in the file format; explicit
+          ``address`` optional). Per F-003 / expected-behaviors — the
+          router used to reject ``.axf``/``.s19``/``.srec`` with a hint
+          misdirecting to ``flash_data`` (A-006).
         - ``.bin`` with explicit ``address`` → ``flash_bin``.
         - ``.bin`` without ``address`` → ``flash_bin_no_address`` (calls
           ``on_confirm`` with the inferred address).
@@ -1242,8 +1397,9 @@ class CubeProgrammer:
         ``route_used`` on the result records which path fired so callers
         + logs can trace router behaviour.
         """
+        path = coerce_path(path)
         ext = path.suffix.lower()
-        if ext in (".elf", ".hex"):
+        if ext in (".elf", ".hex", ".axf", ".s19", ".srec"):
             result = self.flash_file(path, address=address)
             return replace(result, route_used="flash_file")
         if ext == ".bin":
@@ -1254,7 +1410,9 @@ class CubeProgrammer:
             return replace(result, route_used="flash_bin")
         raise ValueError(
             f"download_image cannot infer route from extension {ext!r}; "
-            "use flash_data(path, address) for non-firmware payloads"
+            "supported firmware extensions are .elf .hex .axf .s19 .srec "
+            ".bin (UM2237 §3.2.3) — use flash_data(path, address) for "
+            "non-firmware payloads"
         )
 
     # ------------------------------------------------------------------
@@ -1400,7 +1558,10 @@ class CubeProgrammer:
             [str(cli), *args],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            # Merge stderr into the line stream (IMP-25: a separate
+            # never-read PIPE blocks the child once it fills) so CLI
+            # error lines reach the failure check below (IMP-04).
+            stderr=subprocess.STDOUT,
             text=True,
             encoding="utf-8",
             errors="replace",
@@ -1408,6 +1569,7 @@ class CubeProgrammer:
             bufsize=1,  # line-buffered
         )
         start = time.monotonic()
+        error_lines: list[str] = []
         try:
             assert proc.stdout is not None
             for raw_line in proc.stdout:
@@ -1416,11 +1578,24 @@ class CubeProgrammer:
                         "tail_swo SWV overflow: %s", raw_line.strip()
                     )
                     continue
+                if raw_line.strip().startswith("Error:"):
+                    error_lines.append(raw_line.strip())
+                    continue
                 record = parsers.parse_itm_line(
                     raw_line, timestamp_s=time.monotonic() - start
                 )
                 if record is not None:
                     yield record
+            # IMP-04: natural EOF means the CLI exited on its own (a
+            # consumer break never reaches here — GeneratorExit unwinds
+            # from the yield). A nonzero exit must raise, not silently
+            # present an empty/truncated stream as a healthy capture.
+            try:
+                exit_code: int | None = proc.wait(timeout=2.0)
+            except subprocess.TimeoutExpired:
+                exit_code = None
+            if exit_code is not None and exit_code != 0:
+                raise parsers.parse_error("\n".join(error_lines), exit_code)
         finally:
             self._terminate_swo(proc)
             self._log.info(

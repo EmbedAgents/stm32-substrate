@@ -154,8 +154,8 @@ class TestVcpEchoLoopback:
 def vcp_reset(l476rg_ctx):
     """VCP client whose board is reset first so the VCP-ECHO firmware is
     responsive even when a prior test left it wedged — the long-line
-    overrun test (VCP-006) is known to wedge the polled-loop firmware,
-    and tail/reconnect run after it. Reset +
+    overrun test (VCP-006) is known to wedge the polled-loop firmware
+    (plan-test.md Tier 6 #20), and tail/reconnect run after it. Reset +
     settle re-establishes the echo, per the documented pre-suite-reset
     workaround."""
     CubeProgrammer(l476rg_ctx).reset()

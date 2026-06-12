@@ -1,6 +1,6 @@
 """``ST-LINK_gdbserver`` subprocess lifecycle.
 
-Spawn → port handshake → run → terminate. Per the debug API spec
+Spawn → port handshake → run → terminate. Per ``v1/debug-api.md``
 § "gdbserver.py". Pattern-matches the gdbserver's "Waiting for debugger
 connection on port N..." stderr line to confirm the listener is up;
 substrate then hands the port to ``arm-none-eabi-gdb`` over the
@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, TYPE_CHECKING, Sequence
 
+from stm32_substrate.debug.pipereader import PipeLineReader
 from stm32_substrate.errors import GDBError
 
 if TYPE_CHECKING:
@@ -73,11 +74,16 @@ class GDBServerProcess:
         *,
         proc: subprocess.Popen,
         port: int,
+        reader: PipeLineReader | None = None,
     ) -> None:
         self._proc = proc
         self.pid = proc.pid
         self.port = port
         self._closed = False
+        # Keep the handshake's drain thread alive for the process
+        # lifetime: it keeps emptying the merged-output pipe so a chatty
+        # gdbserver can't fill the OS pipe buffer and stall.
+        self._reader = reader
 
     def close(self, *, grace_s: float = 3.0) -> int | None:
         """SIGTERM → grace → SIGKILL. Returns the final exit code (or
@@ -170,21 +176,22 @@ def spawn_gdbserver(
         ) from ex
 
     # Read the merged stream line-by-line until we see the listener-
-    # ready pattern, an error pattern, or the subprocess exits.
+    # ready pattern, an error pattern, or the subprocess exits. The
+    # stream is drained on a daemon thread (PipeLineReader) — a bare
+    # readline() here blocked forever on a live-but-silent gdbserver,
+    # making the handshake deadline dead code (IMP-13).
     deadline = _now() + handshake_timeout_s
     output_buffer: list[str] = []
     bound_port: int | None = None
 
     assert proc.stdout is not None
+    reader = PipeLineReader(proc.stdout, name=f"gdbserver-{proc.pid}")
+    stream_eof = False
     while _now() < deadline:
         if proc.poll() is not None:
             # Subprocess exited before announcing — drain remaining
             # output to inspect the error message.
-            try:
-                remaining = proc.stdout.read() or ""
-            except (OSError, ValueError):
-                remaining = ""
-            output_buffer.append(remaining)
+            output_buffer.append(_drain_remaining(reader))
             joined = "".join(output_buffer)
             marker = _classify_stderr(joined)
             raise GDBError(
@@ -199,9 +206,18 @@ def spawn_gdbserver(
                 recoverable=marker == "port-busy",
             )
 
-        line = proc.stdout.readline()
-        if not line:
+        if stream_eof:
+            # Stream closed but the process is still alive (per the
+            # poll above) — keep waiting for exit or the deadline.
             _sleep(0.05)
+            continue
+        try:
+            line = reader.read_line(timeout_s=0.05)
+        except (EOFError, OSError, ValueError):
+            stream_eof = True
+            continue
+        if not line:
+            _sleep(0.0)  # quantum elapsed inside read_line
             continue
         output_buffer.append(line)
 
@@ -222,7 +238,7 @@ def spawn_gdbserver(
             log.info(
                 "gdbserver pid=%s listening on port %s", proc.pid, bound_port
             )
-            return GDBServerProcess(proc=proc, port=bound_port)
+            return GDBServerProcess(proc=proc, port=bound_port, reader=reader)
 
         # Watch for early-error patterns even while the subprocess is
         # still running — some gdbserver builds emit the error then hang
@@ -272,7 +288,7 @@ def spawn_gdbserver(
 
 
 def _build_argv(bin_path: Path, options: GDBServerOptions) -> list[str]:
-    """Per the debug API spec § "Argv (Linux, v1)"."""
+    """Per ``v1/debug-api.md`` § "Argv (Linux, v1)"."""
     argv: list[str] = [
         str(bin_path),
         "-d",
@@ -296,6 +312,22 @@ def _build_argv(bin_path: Path, options: GDBServerOptions) -> list[str]:
     if options.stlink_serial:
         argv.extend(["-i", options.stlink_serial])
     return argv
+
+
+def _drain_remaining(reader: PipeLineReader, *, max_wait_s: float = 1.0) -> str:
+    """Collect whatever the exited process left on its pipe."""
+    parts: list[str] = []
+    waited = 0.0
+    while waited < max_wait_s:
+        try:
+            line = reader.read_line(timeout_s=0.05)
+        except (EOFError, OSError, ValueError):
+            break
+        if line is None:
+            waited += 0.05
+            continue
+        parts.append(line)
+    return "".join(parts)
 
 
 def _classify_stderr(text: str) -> str | None:

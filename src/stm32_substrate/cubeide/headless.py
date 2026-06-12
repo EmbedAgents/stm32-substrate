@@ -1,6 +1,6 @@
 """Headless build script resolution + invocation.
 
-Per the CubeIDE API spec § "Headless build invocation". Single shared
+Per ``v1/cubeide-api.md`` § "Headless build invocation". Single shared
 entry point — ``CubeIDE.build()`` is responsible for assembling the
 ``HeadlessInvocation`` shape and then routing through here.
 

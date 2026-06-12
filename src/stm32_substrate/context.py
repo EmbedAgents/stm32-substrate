@@ -3,7 +3,7 @@
 Implements ``SubstrateContext.from_environment()`` per M-016 and the
 resolution conventions R-002 / R-003 / R-004. Bad configs raise
 ``ConfigurationError`` with the loud-error fields documented in
-the API conventions § "Configuration validation".
+``v1/api-conventions.md`` § "Configuration validation".
 
 Public surface:
 
@@ -419,13 +419,24 @@ def _load_project(project_path: Path | None, cwd: Path) -> ProjectDescriptor | N
 def _find_project(project_path: Path | None, cwd: Path) -> Path | None:
     if project_path is not None:
         p = project_path.resolve()
+        # IMP-21: an explicit path that doesn't exist is a caller typo,
+        # not a "no descriptor" situation — raise rather than silently
+        # proceeding descriptor-less against a phantom cwd. A directory
+        # WITHOUT a descriptor stays valid (it anchors ctx.cwd; the
+        # descriptor itself is optional).
+        if not p.exists():
+            raise ConfigurationError(
+                message=f"project_path does not exist: {project_path}",
+                schema_name="stm32-project.schema.json",
+                hint=(
+                    "fix the path passed to "
+                    "SubstrateContext.from_environment(project_path=...)"
+                ),
+            )
         if p.is_file():
             return p
-        if p.is_dir():
-            cand = p / "stm32-project.jsonc"
-            if cand.is_file():
-                return cand
-        return None
+        cand = p / "stm32-project.jsonc"
+        return cand if cand.is_file() else None
     cand = cwd / "stm32-project.jsonc"
     return cand if cand.is_file() else None
 
@@ -461,7 +472,18 @@ def _find_runtime_defaults(
 ) -> Path | None:
     if defaults_config_path is not None:
         p = defaults_config_path.resolve()
-        return p if p.is_file() else None
+        # IMP-21: a typo'd explicit override silently produced built-in
+        # defaults with no signal — raise instead.
+        if not p.is_file():
+            raise ConfigurationError(
+                message=f"defaults_config_path does not exist: {defaults_config_path}",
+                schema_name="stm32-runtime-defaults.schema.json",
+                hint=(
+                    "fix the explicit path, or drop the argument to use "
+                    "the stm32-runtime-defaults.jsonc search walk"
+                ),
+            )
+        return p
     for parent in (cwd, *cwd.parents):
         cand = parent / "stm32-runtime-defaults.jsonc"
         if cand.is_file():
@@ -500,7 +522,17 @@ def _find_tools_local(
 ) -> Path | None:
     if tools_config_path is not None:
         p = tools_config_path.resolve()
-        return p if p.is_file() else None
+        # IMP-21: same loud-error contract as the defaults override.
+        if not p.is_file():
+            raise ConfigurationError(
+                message=f"tools_config_path does not exist: {tools_config_path}",
+                schema_name="stm32-tools.local.schema.json",
+                hint=(
+                    "fix the explicit path, or drop the argument to use "
+                    "the .claude/stm32-tools.local.jsonc search walk"
+                ),
+            )
+        return p
     for parent in (cwd, *cwd.parents):
         for rel in (".claude/stm32-tools.local.jsonc", "stm32-tools.local.jsonc"):
             cand = parent / rel
@@ -541,6 +573,19 @@ def _resolve_one_tool(tool_def: dict[str, Any]) -> Path | None:
             p = Path(env_value)
             if p.exists():
                 return p
+            # IMP-20: a SET env var is an explicit pin. Falling through
+            # to candidates/PATH would silently run a different binary
+            # than the one the user pinned — raise loud instead.
+            raise ConfigurationError(
+                message=(
+                    f"env var {env_var} is set but points at a "
+                    f"nonexistent path: {env_value!r}"
+                ),
+                hint=(
+                    f"fix or unset {env_var}; substrate refuses to fall "
+                    "back to PATH when an explicit pin is broken"
+                ),
+            )
 
     # Configured candidates — per-OS lookup keyed by sys.platform per ADR-007.
     # Schema keys are "linux" / "windows" / "darwin"; macOS is gated by

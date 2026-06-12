@@ -1,6 +1,6 @@
 """Async-completion running-loop for ``CubeMX.generate()``.
 
-Per the CubeMX API spec § "Running-loop algorithm". Substrate spawns
+Per ``v1/cubemx-api.md`` § "Running-loop algorithm". Substrate spawns
 ``STM32CubeMX -q <script>`` and observes three external signals — the
 marker file (``<output>/.cproject``), CubeMX's own log mtime, and the
 subprocess exit — to decide success / failure. No log content is
@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
 from stm32_substrate.cubemx.results import CubeMXResult, ProgressEvent
+from stm32_substrate.platform import terminate_process_tree
 
 if TYPE_CHECKING:
     from stm32_substrate.context import SubstrateContext
@@ -194,7 +195,15 @@ def run_cubemx(
                 grace_deadline = _now() + policy.post_exit_grace_s
                 grace_extensions = 0
                 while True:
-                    if expected_marker.is_file():
+                    # Same predicate as the main loop: appearance or mtime
+                    # advance. A bare is_file() here is trivially true on a
+                    # regen (stale marker from the prior generation) and
+                    # would report success for a failed regeneration.
+                    if _marker_appeared(
+                        expected_marker,
+                        marker_existed=marker_existed,
+                        pre_mtime=pre_marker_mtime,
+                    ):
                         success = True
                         break
                     if policy.cubemx_log_path.is_file():
@@ -304,25 +313,23 @@ def _marker_appeared(
 
 
 def _terminate_proc(proc: subprocess.Popen) -> None:
-    """SIGTERM → 0.5s grace → SIGKILL. Idempotent if already exited."""
+    """Tree-kill with grace. Idempotent if already exited.
+
+    Routed through ``platform.terminate_process_tree``: STM32CubeMX is a
+    launcher whose JVM child does the actual generation — signalling
+    only the launcher PID orphaned the JVM on every timeout /
+    terminate-after-marker path, and it kept writing the output tree
+    after the result was reported (IMP-08).
+    """
     if proc.poll() is not None:
         return
+    terminate_process_tree(proc.pid, grace_s=0.5)
     try:
-        proc.terminate()
-        try:
-            proc.wait(timeout=0.5)
-            return
-        except subprocess.TimeoutExpired:
-            pass
-        proc.kill()
-        try:
-            proc.wait(timeout=0.5)
-        except subprocess.TimeoutExpired:
-            logging.getLogger("stm32_substrate.cubemx.runner").warning(
-                "cubemx subprocess pid=%s did not die after SIGKILL", proc.pid
-            )
-    except ProcessLookupError:
-        return
+        proc.wait(timeout=0.5)  # reap
+    except subprocess.TimeoutExpired:
+        logging.getLogger("stm32_substrate.cubemx.runner").warning(
+            "cubemx subprocess pid=%s did not die after tree kill", proc.pid
+        )
 
 
 def _write_script(text: str, output_dir: Path | None) -> Path:

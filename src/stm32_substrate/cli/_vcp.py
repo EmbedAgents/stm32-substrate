@@ -1,6 +1,6 @@
 """``stm32 vcp`` CLI subcommand group.
 
-Per the VCP API spec § "CLI subcommand surface". Four subcommands:
+Per ``v1/vcp-api.md`` § "CLI subcommand surface". Four subcommands:
 
 - ``vcp tail [--port] [--baud] [--last-n] [--follow] [--timeout]`` — VCP-001.
 - ``vcp send LINE [--port] [--baud] [--terminator] [--timeout] [--inter-line-idle-ms] [--echo-filter]`` — VCP-002.
@@ -15,6 +15,7 @@ terminal use.
 from __future__ import annotations
 
 import argparse
+import codecs
 import sys
 
 from stm32_substrate.cli._serialize import (
@@ -51,13 +52,17 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> None:
     p.add_argument(
         "--follow",
         action="store_true",
-        help="stream forever (Ctrl-C to stop); else snapshot N lines and exit",
+        help="stream live lines (Ctrl-C to stop); else snapshot N lines and exit",
     )
     p.add_argument(
         "--timeout",
         type=float,
         default=None,
-        help="snapshot mode: max seconds to wait for --last-n lines",
+        help=(
+            "snapshot: max seconds to wait for --last-n lines; with "
+            "--follow: wall-clock bound on the stream (omit to stream "
+            "until Ctrl-C)"
+        ),
     )
     p.set_defaults(vcp_fn=_cmd_tail)
 
@@ -150,12 +155,25 @@ def _cmd_tail(args: argparse.Namespace, client: VCP) -> int:
     return 0
 
 
+def _decode_terminator(value: str | None) -> str | None:
+    r"""Decode shell-typed backslash escapes (``"\r\n"`` -> CRLF).
+
+    The help text tells users to pass ``"\r\n"``, but the shell delivers
+    four literal characters - undecoded they went onto the wire and
+    broke reply splitting (A-018). Real control characters (e.g. from
+    ``$'\r\n'``) pass through unchanged.
+    """
+    if value is None:
+        return None
+    return codecs.decode(value, "unicode_escape")
+
+
 def _cmd_send(args: argparse.Namespace, client: VCP) -> int:
     result = client.send_and_read(
         args.line,
         port=args.port,
         baud=args.baud,
-        terminator=args.terminator,
+        terminator=_decode_terminator(args.terminator),
         timeout_s=args.timeout,
         inter_line_idle_ms=args.inter_line_idle_ms,
         echo_filter=args.echo_filter,

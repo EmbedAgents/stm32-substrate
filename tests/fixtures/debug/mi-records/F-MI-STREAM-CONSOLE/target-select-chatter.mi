@@ -1,0 +1,4 @@
+# -target-select extended-remote localhost:<port>
+# captured 2026-06-11, arm-none-eabi-gdb MI3, NUCLEO-L476RG, BLINKY.elf
+~"Reset_Handler () at ../Example/Startup/startup_stm32l476rgtx.s:62\n"
+~"62\t  ldr   sp, =_estack    /* Set stack pointer */\n"

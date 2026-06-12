@@ -1,6 +1,6 @@
 """``arm-none-eabi-gdb`` MI3 client wrapper.
 
-Per the debug API spec § "gdb.py — MI3 client wrapper". One outstanding
+Per ``v1/debug-api.md`` § "gdb.py — MI3 client wrapper". One outstanding
 command at a time; async records (``*running`` / ``*stopped`` / etc.)
 queued for later consumption by ``wait_for_stopped``.
 
@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Callable, TYPE_CHECKING
 
 from stm32_substrate.debug.parsers import parse_mi_record
+from stm32_substrate.debug.pipereader import PipeLineReader
 from stm32_substrate.debug.results import (
     MIAsyncRecord,
     MIResultRecord,
@@ -61,6 +62,13 @@ class GDBClient:
         self._stream_buffer: list[MIStreamRecord] = []
         self._closed = False
         self.pid = proc.pid
+        assert proc.stdout is not None
+        # A-011: stdout is drained on a daemon thread so every read can
+        # honor its deadline — a bare readline() blocks forever on a
+        # silent gdb (never-hit breakpoint) and made timeouts dead code.
+        self._reader = PipeLineReader(
+            proc.stdout, name=f"gdb-stdout-{proc.pid}"
+        )
 
     # ------------------------------------------------------------------
     # send_mi — one outstanding command at a time
@@ -71,6 +79,7 @@ class GDBClient:
         command: str,
         *,
         timeout_s: float | None = None,
+        raise_on_error: bool = True,
     ) -> MIResultRecord:
         """Write ``<token><command>`` then read until ``^class`` with
         matching token. Returns the result record.
@@ -82,6 +91,11 @@ class GDBClient:
         ``send_console`` can see what gdb emitted.
 
         Raises:
+          - ``GDBError(gdb_marker="command-error")`` if gdb answers
+            ``^error`` (unreadable address, unknown symbol, bad
+            breakpoint location, ...). Pass ``raise_on_error=False`` to
+            receive the error record instead and classify it yourself
+            (``spawn_gdb`` does this for its connect-specific message).
           - ``GDBError(gdb_marker="command-timeout")`` if ``timeout_s``
             elapses; substrate sends ``-exec-interrupt`` to recover.
           - ``GDBSessionLost`` if gdb exits or its stdout closes.
@@ -113,6 +127,22 @@ class GDBClient:
             if record is None:
                 continue
             if isinstance(record, MIResultRecord) and record.token == token:
+                if raise_on_error and record.class_ == "error":
+                    # IMP-02: a ^error result must never flow into the
+                    # domain parsers — they default missing fields and
+                    # would render the failure as an empty-but-successful
+                    # read (empty memory dump, empty variable value).
+                    raise GDBError(
+                        message=(
+                            f"gdb command {command!r} failed: "
+                            f"{record.fields.get('msg', '(no msg field)')}"
+                        ),
+                        gdb_marker="command-error",
+                        hint=(
+                            "gdb rejected the command — check the "
+                            "address/symbol/location argument"
+                        ),
+                    )
                 return record
             self._classify_other_record(record)
 
@@ -136,9 +166,9 @@ class GDBClient:
         # Drain any pre-existing stream records so this call's output
         # is the only thing in the buffer.
         self._stream_buffer.clear()
-        escaped = command.replace("\\", "\\\\").replace('"', '\\"')
         self.send_mi(
-            f'-interpreter-exec console "{escaped}"', timeout_s=timeout_s
+            f"-interpreter-exec console {mi_quote(command)}",
+            timeout_s=timeout_s,
         )
         out = [rec.text for rec in self._stream_buffer if rec.stream in ("console", "target")]
         self._stream_buffer.clear()
@@ -232,25 +262,28 @@ class GDBClient:
                 gdb_marker="remote-connection-closed",
             ) from ex
 
+    # Poll quantum for the queue-backed reader: short enough that the
+    # caller's deadline check stays responsive, long enough to not spin.
+    _READ_POLL_S = 0.05
+
     def _read_line(self, *, deadline: float | None) -> str | None:
         """Read one line from gdb stdout. Returns the line on success,
-        ``None`` when there's nothing immediately available (caller loops
-        and re-checks the deadline). Raises ``GDBSessionLost`` on EOF."""
+        ``None`` when nothing arrived within the poll quantum (caller
+        loops and re-checks the deadline). Raises ``GDBSessionLost`` on
+        EOF or a broken pipe."""
         try:
-            assert self._proc.stdout is not None
-            line = self._proc.stdout.readline()
+            line = self._reader.read_line(timeout_s=self._READ_POLL_S)
+        except EOFError:
+            raise GDBSessionLost(
+                message="gdb stdout closed unexpectedly",
+                gdb_marker="remote-connection-closed",
+                gdb_exit_code=self._proc.poll(),
+            ) from None
         except (OSError, ValueError) as ex:
             raise GDBSessionLost(
                 message=f"gdb stdout read failed: {ex}",
                 gdb_marker="remote-connection-closed",
             ) from ex
-        if line == "" or line is None:
-            # EOF.
-            raise GDBSessionLost(
-                message="gdb stdout closed unexpectedly",
-                gdb_marker="remote-connection-closed",
-                gdb_exit_code=self._proc.poll(),
-            )
         return line
 
     def _classify_other_record(
@@ -277,6 +310,30 @@ class GDBClient:
 
 
 # ---------------------------------------------------------------------------
+# MI argument quoting
+# ---------------------------------------------------------------------------
+
+
+def mi_quote(arg: str) -> str:
+    """Render ``arg`` as a gdb-MI c-string argument.
+
+    MI commands are line-oriented: an unescaped newline in an
+    interpolated argument injects a second out-of-band command, and a
+    bare space splits one argument into two (IMP-15). Quoting as a
+    c-string with ``\\n`` / ``\\r`` / ``\\"`` / ``\\\\`` escapes makes
+    user-supplied breakpoint locations, expressions, and monitor
+    commands inert.
+    """
+    escaped = (
+        arg.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+    )
+    return f'"{escaped}"'
+
+
+# ---------------------------------------------------------------------------
 # Spawn helper
 # ---------------------------------------------------------------------------
 
@@ -286,13 +343,16 @@ def spawn_gdb(
     ctx: "SubstrateContext",
     elf_path: Path,
     gdb_port: int,
+    connect_timeout_s: float = 10.0,
     _spawn: Callable[..., subprocess.Popen] = subprocess.Popen,
 ) -> GDBClient:
     """Spawn ``arm-none-eabi-gdb --interpreter=mi3 --quiet <elf>`` and
     connect it to the gdbserver at ``localhost:<gdb_port>``.
 
     Returns a ``GDBClient`` after the initial ``-target-select extended-remote``
-    completes successfully.
+    completes successfully. ``connect_timeout_s`` bounds that connect —
+    ``Debug.start_session`` passes the remaining slice of its
+    ``debug.session_start_timeout_s`` budget.
     """
     log = ctx.logger.getChild("debug.gdb")
     gdb_bin = ctx.tools.arm_gdb
@@ -335,10 +395,27 @@ def spawn_gdb(
     client = GDBClient(proc=proc, ctx=ctx)
     # Connect to gdbserver. extended-remote keeps the session alive on
     # detach (DBG-003-style attach) without restarting the subprocess.
-    result = client.send_mi(
-        f"-target-select extended-remote localhost:{gdb_port}",
-        timeout_s=10.0,
-    )
+    # raise_on_error=False: the connect failure gets its own
+    # remote-connection-closed classification below.
+    # IMP-11: any failure past this point (send_mi raising
+    # GDBSessionLost / command-timeout, not just a clean ^error) must
+    # tear the just-spawned arm-gdb down, or it leaks and keeps the
+    # gdbserver pipeline alive.
+    try:
+        # mi-async on, BEFORE the target connect (bench-verified, RES-041):
+        # in sync MI mode gdb stops reading stdin while the target runs,
+        # so -exec-interrupt (session.halt(), run_until_breakpoint's
+        # timeout recovery) would never even be processed — the command
+        # sat unread until the target happened to stop on its own.
+        client.send_mi("-gdb-set mi-async on", timeout_s=5.0)
+        result = client.send_mi(
+            f"-target-select extended-remote localhost:{gdb_port}",
+            timeout_s=connect_timeout_s,
+            raise_on_error=False,
+        )
+    except BaseException:
+        client.close()
+        raise
     if result.class_ == "error":
         client.close()
         raise GDBError(

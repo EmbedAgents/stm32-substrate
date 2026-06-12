@@ -1,17 +1,10 @@
 {
   "_metadata": {
-    "model": "claude-sonnet-4-6",
-    "cost_usd": 0.056198599999999994,
-    "duration_s": 18.069
+    "model": "claude-fable-5",
+    "cost_usd": 0.09936999999999999,
+    "duration_s": 13.463
   },
   "tool_calls": [
-    {
-      "name": "Skill",
-      "args": {
-        "skill": "stm32debug",
-        "args": "SVD lookup STM32L476RG"
-      }
-    },
     {
       "name": "Bash",
       "args": {
@@ -20,5 +13,5 @@
       }
     }
   ],
-  "final_text": "The SVD file for the **STM32L476RG** was found via the **CubeIDE** source (highest-priority in the chain):\n\n```\nC:\\ST\\STM32CubeIDE_2.1.1\\STM32CubeIDE\\plugins\\\n  com.st.stm32cube.ide.mcu.productdb.debug_2.2.400.202601091600\\\n  resources\\cmsis\\STMicroelectronics_CMSIS_SVD\\\n  STM32L476.svd\n```\n\nNote that the SVD filename is `STM32L476.svd` \u2014 it covers the whole L476 family, not just the RG density variant. This file is what `stm32 debug read-peripheral` and `stm32 debug snapshot` use internally when targeting that device."
+  "final_text": "The SVD for the STM32L476RG resolves to:\n\n```\n/opt/st/stm32cubeide_2.1.1/plugins/com.st.stm32cube.ide.mcu.productdb.debug_2.2.400.202601091600/resources/cmsis/STMicroelectronics_CMSIS_SVD/STM32L476.svd\n```\n\nIt comes from the CubeIDE-bundled CMSIS SVD catalog (configured sources: `cubeide`, `stm32cubeclt`) \u2014 note the file is the family-level `STM32L476.svd`, which covers the RG variant."
 }

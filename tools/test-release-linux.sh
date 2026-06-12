@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# test-release-linux.sh — validate the published stm32-substrate v0.1.0 release on
-# Linux, no hardware. Bash mirror of tools/test-release-windows.ps1.
+# test-release-linux.sh — validate a published stm32-substrate release on Linux,
+# no hardware. Bash mirror of tools/test-release-windows.ps1.
 #
 #   Tier 1 — published install (as a brand-new user would experience it):
-#       fresh venv, `pip install git+https://…EmbedAgents…`, verify the `stm32`
-#       console script + version, verify the bundled JSON schemas load.
+#       fresh venv, `pip install git+https://…EmbedAgents…` (pinned to
+#       RELEASE_TAG when given), verify the `stm32` console script + version,
+#       verify the bundled JSON schemas load.
 #   Tier 2 — this checkout:
 #       editable `.[dev]` install in a second venv, run the unit suite,
 #       `claude plugin validate --strict`.
@@ -13,15 +14,30 @@
 # interactive bit (the five /stm32* commands registering in a live Claude session)
 # and the ST-tools/board end-to-end (Tier 3) can't be automated; printed at the end.
 #
-# Env knobs: REPO_URL, WORKDIR, KEEP_WORKDIR=1.
-#   Usage:  tools/test-release-linux.sh   (run from a clone)
+# Env knobs: REPO_URL, RELEASE_TAG, WORKDIR, KEEP_WORKDIR=1.
+#   RELEASE_TAG (e.g. v0.1.1): Tier 1 installs git+REPO_URL@RELEASE_TAG and asserts
+#   `stm32 --version` matches the tag (minus the leading v). Unset: Tier 1 installs
+#   the default branch and the expected version is read from this checkout's
+#   pyproject.toml (dev-run mode).
+#   Usage:  RELEASE_TAG=v0.1.1 tools/test-release-linux.sh
+#           (run from a checkout of that tag, so Tier 2 tests the same code)
 
 REPO_URL="${REPO_URL:-https://github.com/EmbedAgents/stm32-substrate.git}"
+RELEASE_TAG="${RELEASE_TAG:-}"
 WORKDIR="${WORKDIR:-$(mktemp -d -t stm32-release-test.XXXXXX)}"
 KEEP_WORKDIR="${KEEP_WORKDIR:-0}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# What to install in Tier 1, and which version string `stm32 --version` must show.
+if [ -n "$RELEASE_TAG" ]; then
+    PIP_SPEC="git+${REPO_URL}@${RELEASE_TAG}"
+    EXPECTED_VER="${RELEASE_TAG#v}"
+else
+    PIP_SPEC="git+${REPO_URL}"
+    EXPECTED_VER="$(sed -n 's/^version *= *"\([^"]*\)".*/\1/p' "$REPO_ROOT/pyproject.toml" 2>/dev/null | head -n1)"
+fi
 SEP=$'\x1f'   # row field separator unlikely to appear in details
 
 if [ -t 1 ]; then GRN=$'\e[32m'; RED=$'\e[31m'; YEL=$'\e[33m'; CYN=$'\e[36m'; GRY=$'\e[90m'; RST=$'\e[0m'
@@ -61,7 +77,7 @@ command -v claude >/dev/null 2>&1 && HAS_CLAUDE=1 || HAS_CLAUDE=0
 mkdir -p "$WORKDIR"
 
 # --- Tier 1: published install ----------------------------------------------
-section "Tier 1 - published install (git+https)"
+section "Tier 1 - published install (git+https${RELEASE_TAG:+, tag $RELEASE_TAG})"
 if [ "$HAS_GIT" != "1" ]; then
     skip "Tier 1 (all)" "git required for a git+https install"
 else
@@ -73,11 +89,18 @@ else
     else
         record "create install venv" 1
         "$T1PY" -m pip install -q --upgrade pip >/dev/null 2>&1
-        if "$T1PY" -m pip install -q "git+$REPO_URL" >"$WORKDIR/pip1.log" 2>&1; then
-            record "pip install git+$REPO_URL" 1
+        if "$T1PY" -m pip install -q "$PIP_SPEC" >"$WORKDIR/pip1.log" 2>&1; then
+            record "pip install $PIP_SPEC" 1
             VER="$("$T1/bin/stm32" --version 2>&1)"
-            case "$VER" in *0.1.0*) record "stm32 --version = 0.1.0" 1 "$VER";;
-                           *)       record "stm32 --version = 0.1.0" 0 "$VER";; esac
+            if [ -n "$EXPECTED_VER" ]; then
+                case "$VER" in *"$EXPECTED_VER"*) record "stm32 --version = $EXPECTED_VER" 1 "$VER";;
+                               *)                 record "stm32 --version = $EXPECTED_VER" 0 "$VER";; esac
+            else
+                # No tag given and no readable pyproject — at least require the
+                # console script to run and print something version-shaped.
+                case "$VER" in *[0-9].[0-9]*) record "stm32 --version runs" 1 "$VER";;
+                               *)             record "stm32 --version runs" 0 "$VER";; esac
+            fi
             cat >"$WORKDIR/schema_check.py" <<'PY'
 import json, importlib.resources as r
 p = r.files("stm32_substrate.schemas").joinpath("stm32-project.schema.json")
@@ -89,7 +112,7 @@ PY
             case "$OUT" in *SCHEMA_OK*) record "bundled schemas load" 1;;
                            *)           record "bundled schemas load" 0 "$OUT";; esac
         else
-            record "pip install git+$REPO_URL" 0 "$(tail -n3 "$WORKDIR/pip1.log" | tr '\n' ' ')"
+            record "pip install $PIP_SPEC" 0 "$(tail -n3 "$WORKDIR/pip1.log" | tr '\n' ' ')"
         fi
     fi
 fi

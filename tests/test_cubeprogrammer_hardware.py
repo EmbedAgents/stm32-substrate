@@ -4,7 +4,7 @@ These run against an attached ST-LINK + (where required) an attached
 NUCLEO-L476RG. Excluded from the default ``pytest`` run; invoke with
 ``pytest -m smoke_with_probe`` or ``pytest -m hardware``.
 
-What's covered:
+What's covered (per the bench-smoke reconciliation in `plan-windows.md`):
 
   - Probe discovery: list_probes (smoke_with_probe — works without a board).
   - Banner / discovery: connect, ping_swd, cores, board_name,
@@ -387,110 +387,9 @@ class TestFlashPair:
 # canonical L476 firmware. BLINKY's source stays untouched throughout.
 
 
-_FAULTING_PROJECT = Path(
-    "Projects/NUCLEO-L476RG/Examples/PWR/FAULTING"
-)
-
-
-_FAULTING_MAIN_C = """\
-/* substrate-test FAULTING firmware: executes the UDF #0 instruction
- * (Permanently Undefined) which is guaranteed to raise a UsageFault on
- * Cortex-M4; UsageFault escalates to HardFault when not enabled (it's
- * disabled by default on reset). The fault state (CFSR, HFSR, BFSR)
- * is sticky in SCB registers and survives the HOTPLUG-mode connect
- * that analyze_hardfault performs.
- *
- * Defines the RTCHandle / UARTHandle symbols that the project's
- * stm32l4xx_it.c references — these stubs satisfy the linker even
- * though they're never initialised (main() faults before reaching
- * any IRQ-handler code path). */
-#include "stm32l4xx_hal.h"
-
-void SystemClock_Config(void);
-void Error_Handler(void);
-
-RTC_HandleTypeDef RTCHandle;
-UART_HandleTypeDef UARTHandle;
-
-int main(void) {
-    HAL_Init();
-    SystemClock_Config();
-    /* Guaranteed fault: UDF #0 is Permanently Undefined Instruction
-     * per Armv7-M B5.6.21 — always raises a UsageFault. */
-    __asm volatile ("udf #0");
-    while (1) {}
-}
-
-void SystemClock_Config(void) {}
-void Error_Handler(void) { while (1) {} }
-"""
-
-
-@pytest.fixture
-def faulting_firmware_flashed(l476rg_ctx, blinky_elf: Path):
-    """Write the canonical UDF #0 main.c into the FAULTING sub-project,
-    build it, flash + hard-reset → target faults shortly after reset
-    and HardFault_Handler loops. Teardown re-flashes BLINKY so
-    downstream tests find the canonical L476 firmware.
-
-    The FAULTING source is gitignored user-provides; this fixture
-    injects the canonical broken content idempotently at test entry.
-    BLINKY's source is never touched.
-
-    Yields the flashed FAULTING.elf path."""
-    from stm32_substrate.cubeide import CubeIDE
-
-    proj_root = (l476rg_ctx.cwd / _FAULTING_PROJECT).resolve()
-    main_c = proj_root / "Src" / "main.c"
-    cubeide_dir = proj_root / "STM32CubeIDE"
-    if not (proj_root.is_dir() and main_c.is_file() and cubeide_dir.is_dir()):
-        pytest.skip(
-            f"FAULTING project not populated at {proj_root}; "
-            "user-provides per RES-019."
-        )
-
-    # Workspace nuke (cleanup_stale_project still leaves Eclipse's
-    # binary tree state in place per backlog #19; the auto-retry handles
-    # it now but a fresh workspace avoids the retry round-trip).
-    workspace = Path(l476rg_ctx.project.build.workspace)
-    if not workspace.is_absolute():
-        workspace = l476rg_ctx.cwd / workspace
-
-    import shutil as _sh
-    import time as _t
-
-    try:
-        if workspace.exists():
-            _sh.rmtree(workspace, ignore_errors=True)
-        main_c.write_text(_FAULTING_MAIN_C, encoding="utf-8", newline="\n")
-        build_result = CubeIDE(l476rg_ctx).build(
-            project=cubeide_dir, clean=True
-        )
-        if not build_result.success:
-            pytest.skip(
-                f"FAULTING firmware build failed (exit={build_result.exit_code}); "
-                f"check {build_result.log_path}. Tail: "
-                f"{build_result.console_output[-500:]}"
-            )
-        faulty_elf = build_result.artifact_path
-        assert faulty_elf is not None and faulty_elf.is_file()
-        # Flash + hard-reset so the new firmware actually starts running.
-        cp = CubeProgrammer(l476rg_ctx)
-        cp.flash_file(faulty_elf)
-        cp.reset(hard=True)
-        # Settle so HAL_Init → udf → HardFault_Handler executes.
-        _t.sleep(2.0)
-        yield faulty_elf
-    finally:
-        # Re-flash BLINKY so downstream tests (test_debug_hardware /
-        # test_cubeprogrammer_hardware.TestMemoryReads / etc.) see a
-        # valid firmware on the L476 instead of the faulting one.
-        # Best-effort: failures swallowed so they don't mask the
-        # original test's outcome.
-        try:
-            CubeProgrammer(l476rg_ctx).flash_file(blinky_elf)
-        except Exception:
-            pass
+# The FAULTING constants + faulting_firmware_flashed fixture live in
+# tests/conftest.py — shared with test_debug_hardware.py (A-014: the
+# gdb-path fault test reads the same sticky-fault state).
 
 
 @pytest.mark.hardware

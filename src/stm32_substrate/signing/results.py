@@ -1,6 +1,6 @@
 """``SigningResult`` — F-013 success result.
 
-Per the signing API spec § "Result type". Substrate captures, doesn't
+Per ``v1/signing-api.md`` § "Result type". Substrate captures, doesn't
 interpret (ADR-004): ``log_path`` carries the verbatim
 ``STM32_SigningTool_CLI`` stdout + stderr; callers / Claude read the
 raw text for trouble-shooting.

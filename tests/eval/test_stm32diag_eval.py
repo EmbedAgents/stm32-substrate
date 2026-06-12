@@ -212,8 +212,12 @@ DIAG_SPECS: tuple[DiagSpec, ...] = (
         diag_id="DIAG-013",
         slug="DMA-ARMED",
         prompt="Is DMA configured and armed for SPI1 RX?",
+        # Fable consistently answers from the SPI side: SPI1.CR2.RXDMAEN is
+        # the request-side gate, so when it reads 0 (stock firmware) the
+        # DMA1 channel registers are moot and never read. Accept either the
+        # DMA1-side or the SPI1-side read-peripheral route.
         verb_re=r"read-peripheral",
-        arg_re=r"\bDMA1\b",
+        arg_re=r"\b(?:DMA1|SPI1)\b",
         cue="DMA",
     ),
     DiagSpec(

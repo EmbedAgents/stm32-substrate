@@ -1,6 +1,6 @@
 """``stm32 mx`` CLI subcommand group — cubemx-side operations.
 
-Per the CubeMX API spec § "CLI subcommand surface". Only one
+Per ``v1/cubemx-api.md`` § "CLI subcommand surface". Only one
 subcommand: ``mx generate``. Output is the ``CubeMXResult`` JSON;
 ``success=False`` exits 0 (failure is a result for caller scripts,
 not a substrate error), and ``CubeMXError`` / ``ConfigurationError``

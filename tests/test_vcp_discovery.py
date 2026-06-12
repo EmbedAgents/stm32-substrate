@@ -1,6 +1,6 @@
 """Discovery / filtering rules for ``discover_vcp_ports``.
 
-Per the VCP API spec § "discovery.py — VCP port discovery": pure filter
+Per ``v1/vcp-api.md`` § "discovery.py — VCP port discovery": pure filter
 over pyserial's ``list_ports.comports()`` keyed on ST-LINK USB IDs. Tests
 inject a fake ``_comports`` callable so no real pyserial enumeration runs.
 """

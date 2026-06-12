@@ -276,18 +276,175 @@ class TestFlashSignedPair:
         assert result.bootloader is not None and result.bootloader.signed is True
         assert result.application is not None and result.application.signed is True
 
-    def test_sign_unsigned_true_raises_not_implemented(
+    # A-005: the "until C2 lands" NotImplementedError gate was stale —
+    # C2 (signing) shipped 2026-05-14. sign_unsigned now wires through
+    # SigningTool per the F-009 contract.
+
+    def test_sign_unsigned_skips_already_signed_inputs(
+        self,
+        ctx: SubstrateContext,
+        tmp_path: Path,
+    ) -> None:
+        """Inputs that already carry the ST image-header magic ('STM2',
+        UM2543) are flashed as-is — no re-signing."""
+        boot = tmp_path / "boot-trusted.bin"
+        boot.write_bytes(b"STM2" + b"\x00" * 508)
+        app = tmp_path / "app-trusted.bin"
+        app.write_bytes(b"STM2" + b"\x00" * 508)
+        client = CubeProgrammer(ctx)
+        with patch(
+            "stm32_substrate.cubeprogrammer.client.run_tool",
+            return_value=_success(),
+        ), patch(
+            "stm32_substrate.signing.client.SigningTool.sign_binary"
+        ) as sign_mock:
+            result = client.flash_signed_pair(
+                boot,
+                app,
+                bootloader_address="0x70000000",
+                application_address="0x70010000",
+                sign_unsigned=True,
+                signing_header_version="2.3",
+            )
+        sign_mock.assert_not_called()
+        assert result.both_succeeded is True
+
+    def test_sign_unsigned_signs_unsigned_input_and_flashes_output(
+        self,
+        ctx: SubstrateContext,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from stm32_substrate.signing.results import SigningResult
+
+        boot = tmp_path / "boot.bin"  # unsigned — no STM2 magic
+        boot.write_bytes(b"\x00" * 512)
+        app = tmp_path / "app-trusted.bin"
+        app.write_bytes(b"STM2" + b"\x00" * 508)
+        signed_out = tmp_path / "boot-trusted.bin"
+        signed_out.write_bytes(b"STM2" + b"\x00" * 1020)
+
+        def fake_sign(self_, input_path, **kwargs):
+            assert kwargs["load_address"] == "0x70000000"
+            assert kwargs["image_type"] == "fsbl"
+            assert kwargs["header_version"] == "2.3"
+            assert kwargs["entry_point"] == "0x70000400"
+            return SigningResult(
+                input_path=input_path,
+                output_path=signed_out,
+                bytes_in=512,
+                bytes_out=1024,
+                load_address="0x70000000",
+                entry_point="0x70000400",
+                image_type="fsbl",
+                header_version="2.3",
+                option_flags=None,
+                no_auth_flag=False,
+                align_applied=True,
+                device_family=None,
+                duration_s=0.1,
+                log_path=tmp_path / "sign.log",
+            )
+
+        monkeypatch.setattr(
+            "stm32_substrate.signing.client.SigningTool.sign_binary", fake_sign
+        )
+        flashed: list[str] = []
+
+        def record_run_tool(binary, args, **kwargs):
+            flashed.append(" ".join(args))
+            return _success()
+
+        client = CubeProgrammer(ctx)
+        with patch(
+            "stm32_substrate.cubeprogrammer.client.run_tool",
+            side_effect=record_run_tool,
+        ):
+            result = client.flash_signed_pair(
+                boot,
+                app,
+                bootloader_address="0x70000000",
+                application_address="0x70010000",
+                sign_unsigned=True,
+                signing_header_version="2.3",
+                bootloader_entry_point="0x70000400",
+            )
+        assert result.both_succeeded is True
+        # The SIGNED output went to the flash leg, not the raw input.
+        assert any(str(signed_out) in argv for argv in flashed)
+        assert not any(str(boot) in argv for argv in flashed)
+
+    def test_sign_unsigned_forwards_signing_no_key(
+        self,
+        ctx: SubstrateContext,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """``signing_no_key=True`` reaches ``sign_binary`` as ``no_key=True``.
+
+        Phase-3 N6 bench finding: without the forward, sign_unsigned was
+        unreachable on a keyless bench — SigningTool rejects keyed hv>=2
+        signing ("Header v2.3 accepts 8 public keys")."""
+        from stm32_substrate.signing.results import SigningResult
+
+        boot = tmp_path / "boot.bin"  # unsigned — no STM2 magic
+        boot.write_bytes(b"\x00" * 512)
+        app = tmp_path / "app-trusted.bin"
+        app.write_bytes(b"STM2" + b"\x00" * 508)
+        signed_out = tmp_path / "boot-trusted.bin"
+        signed_out.write_bytes(b"STM2" + b"\x00" * 1020)
+        seen_no_key: list[bool] = []
+
+        def fake_sign(self_, input_path, **kwargs):
+            seen_no_key.append(kwargs["no_key"])
+            return SigningResult(
+                input_path=input_path,
+                output_path=signed_out,
+                bytes_in=512,
+                bytes_out=1024,
+                load_address=kwargs["load_address"],
+                entry_point=kwargs["entry_point"],
+                image_type=kwargs["image_type"],
+                header_version=kwargs["header_version"],
+                option_flags=None,
+                no_auth_flag=kwargs["no_key"],
+                align_applied=True,
+                device_family=None,
+                duration_s=0.1,
+                log_path=tmp_path / "sign.log",
+            )
+
+        monkeypatch.setattr(
+            "stm32_substrate.signing.client.SigningTool.sign_binary", fake_sign
+        )
+        client = CubeProgrammer(ctx)
+        with patch(
+            "stm32_substrate.cubeprogrammer.client.run_tool",
+            return_value=_success(),
+        ):
+            result = client.flash_signed_pair(
+                boot,
+                app,
+                bootloader_address="0x70000000",
+                application_address="0x70010000",
+                sign_unsigned=True,
+                signing_header_version="2.3",
+                bootloader_entry_point="0x70000400",
+                signing_no_key=True,
+            )
+        assert result.both_succeeded is True
+        assert seen_no_key == [True]  # one unsigned leg, no_key forwarded
+
+    def test_sign_unsigned_without_header_version_raises(
         self,
         ctx: SubstrateContext,
         bin_file: Path,
         tmp_path: Path,
     ) -> None:
-        """sign_unsigned=True wires to the signing module (C2). Until
-        C2 lands, substrate raises NotImplementedError loudly."""
         app_file = tmp_path / "app.bin"
         app_file.write_bytes(b"\x00" * 512)
         client = CubeProgrammer(ctx)
-        with pytest.raises(NotImplementedError, match="signing module"):
+        with pytest.raises(ValueError, match="signing_header_version"):
             client.flash_signed_pair(
                 bin_file,
                 app_file,
@@ -358,6 +515,23 @@ class TestDownloadImage:
         client = CubeProgrammer(ctx)
         with pytest.raises(ValueError, match="cannot infer route"):
             client.download_image(weird, address="0x08000000")
+
+    @pytest.mark.parametrize("ext", [".axf", ".s19", ".srec"])
+    def test_address_embedded_formats_route_like_elf(
+        self, ctx: SubstrateContext, tmp_path: Path, ext: str
+    ) -> None:
+        """A-006: the router rejected .axf/.s19/.srec with a hint
+        misdirecting to flash_data; F-003 / expected-behaviors route
+        them like .elf (address embedded in the file format)."""
+        fw = tmp_path / f"firmware{ext}"
+        fw.write_bytes(b"\x00" * 128)
+        client = CubeProgrammer(ctx)
+        with patch(
+            "stm32_substrate.cubeprogrammer.client.run_tool",
+            return_value=_success(),
+        ):
+            result = client.download_image(fw)
+        assert result.route_used == "flash_file"
 
     def test_extension_case_insensitive(
         self, ctx: SubstrateContext, tmp_path: Path

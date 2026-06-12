@@ -162,6 +162,20 @@ class TestSend:
         assert call.kwargs["inter_line_idle_ms"] == 200
         assert call.kwargs["echo_filter"] is True
 
+    def test_terminator_backslash_escapes_decoded(
+        self, mock_vcp: MagicMock, capsys: pytest.CaptureFixture
+    ) -> None:
+        """A-018: the shell delivers --terminator "\\r\\n" as four
+        literal characters; they must decode to real CRLF before
+        reaching the wire (undecoded they broke reply splitting)."""
+        mock_vcp.send_and_read.return_value = self._result()
+        _run(
+            ["vcp", "send", "hi", "--terminator", "\\r\\n"],  # literal backslashes
+            capsys,
+        )
+        call = mock_vcp.send_and_read.call_args
+        assert call.kwargs["terminator"] == "\r\n"  # real CR LF
+
 
 # ---------------------------------------------------------------------------
 # reconnect

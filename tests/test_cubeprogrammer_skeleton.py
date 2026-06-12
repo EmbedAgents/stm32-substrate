@@ -275,7 +275,7 @@ class TestEveryPublicMethodRaises:
 
 class TestPublicSurfaceCount:
     """Spec contract: 31 public methods on CubeProgrammer (per
-    the CubeProgrammer API spec § "Public methods"). The doc summary says
+    v1/cubeprogrammer-api.md § "Public methods"). The doc summary says
     "~30 prompts" / "~28 methods" — the actual exact count below the
     summary tables is 31. Lock it down so regressions surface."""
 

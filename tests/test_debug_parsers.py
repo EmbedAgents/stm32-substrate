@@ -314,6 +314,38 @@ class TestStackListFrames:
         assert cs.frames[0].line == 42
         assert cs.frames[1].function == "_start"
 
+    def test_full_merges_args_by_level(self) -> None:
+        """A-004: callstack(full=True) used to substitute the frames
+        command with -stack-list-arguments, whose stack-args key the
+        parser never read — frames came back empty."""
+        stack = parse_mi_record(
+            '^done,stack=['
+            'frame={level="0",addr="0x08001000",func="main",file="main.c",line="42"},'
+            'frame={level="1",addr="0x08000800",func="_start"}'
+            ']'
+        )
+        args = parse_mi_record(
+            '^done,stack-args=['
+            'frame={level="0",args=[{name="argc",value="1"},{name="argv",value="0x20001000"}]},'
+            'frame={level="1",args=[]}'
+            ']'
+        )
+        assert isinstance(stack, MIResultRecord)
+        assert isinstance(args, MIResultRecord)
+        cs = parse_stack_list_frames(stack, args_record=args)
+        assert len(cs.frames) == 2  # frames survive — never empty
+        assert cs.frames[0].function == "main"
+        assert cs.frames[0].args == {"argc": "1", "argv": "0x20001000"}
+        assert cs.frames[1].args == {}  # full requested, frame has no args
+
+    def test_without_args_record_args_stay_none(self) -> None:
+        stack = parse_mi_record(
+            '^done,stack=[frame={level="0",addr="0x100",func="main"}]'
+        )
+        assert isinstance(stack, MIResultRecord)
+        cs = parse_stack_list_frames(stack)
+        assert cs.frames[0].args is None
+
     def test_with_threads(self) -> None:
         stack = parse_mi_record(
             '^done,stack=[frame={level="0",addr="0x100",func="main"}]'
@@ -357,3 +389,58 @@ class TestMemoryRead:
         r = parse_mi_record('^done')
         assert isinstance(r, MIResultRecord)
         assert parse_memory_read(r) == b""
+
+
+# ---------------------------------------------------------------------------
+# IMP-12 — typed errors on grammar drift / truncation
+# ---------------------------------------------------------------------------
+
+
+class TestParseMiRecordHardening:
+    def test_truncated_result_record_raises_typed_gdb_error(self) -> None:
+        from stm32_substrate.errors import GDBError
+
+        with pytest.raises(GDBError) as excinfo:
+            parse_mi_record('^done,memory=[{begin="0x0"')
+        assert excinfo.value.gdb_marker == "protocol-violation"
+
+    def test_truncated_async_record_skipped_not_raised(self) -> None:
+        # An unparseable async record is dropped like any unrecognised
+        # shape — the in-flight command must not die for it.
+        assert parse_mi_record('*stopped,frame={addr="0x1"') is None
+
+
+# ---------------------------------------------------------------------------
+# IMP-14 — multi-block -data-read-memory-bytes results
+# ---------------------------------------------------------------------------
+
+
+class TestParseMemoryReadMultiBlock:
+    def test_contiguous_blocks_stitched_in_order(self) -> None:
+        rec = parse_mi_record(
+            '^done,memory=['
+            '{begin="0x20000000",offset="0x0",end="0x20000004",contents="aabbccdd"},'
+            '{begin="0x20000004",offset="0x4",end="0x20000008",contents="11223344"}'
+            ']'
+        )
+        assert parse_memory_read(rec) == bytes.fromhex("aabbccdd11223344")
+
+    def test_out_of_order_blocks_sorted_by_offset(self) -> None:
+        rec = parse_mi_record(
+            '^done,memory=['
+            '{begin="0x20000004",offset="0x4",end="0x20000008",contents="11223344"},'
+            '{begin="0x20000000",offset="0x0",end="0x20000004",contents="aabbccdd"}'
+            ']'
+        )
+        assert parse_memory_read(rec) == bytes.fromhex("aabbccdd11223344")
+
+    def test_unreadable_hole_truncates_to_contiguous_prefix(self) -> None:
+        # Block at offset 0x8 leaves a 4-byte hole — data past the hole
+        # must not be silently glued to the wrong address.
+        rec = parse_mi_record(
+            '^done,memory=['
+            '{begin="0x20000000",offset="0x0",end="0x20000004",contents="aabbccdd"},'
+            '{begin="0x20000008",offset="0x8",end="0x2000000c",contents="11223344"}'
+            ']'
+        )
+        assert parse_memory_read(rec) == bytes.fromhex("aabbccdd")

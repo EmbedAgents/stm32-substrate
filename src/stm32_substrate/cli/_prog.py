@@ -1,11 +1,8 @@
 """``stm32 prog`` CLI subcommand group — cubeprogrammer-side operations.
 
-Maps 1:1 to the CubeProgrammer API spec § "CLI subcommand surface". Every
+Maps 1:1 to ``v1/cubeprogrammer-api.md`` § "CLI subcommand surface". Every
 handler runs against a fresh ``CubeProgrammer`` constructed from
 ``SubstrateContext.from_environment()`` and emits JSON on stdout.
-
-``svd`` subcommand is deliberately absent — ``svd_for_attached`` is
-blocked on ``ctx.svd_db`` (C4 debug module) per RES-020.
 
 Exit-code conventions:
 
@@ -121,8 +118,11 @@ def _register_subcommands(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser("cores", help="D-007 — primary / secondary cores")
     p.set_defaults(prog_fn=_cmd_cores)
 
-    # NOTE: ``svd`` subcommand is intentionally absent — D-008 blocked
-    # on ctx.svd_db (C4 debug module).
+    p = sub.add_parser(
+        "svd",
+        help="D-008 — SVD file for the attached device (banner + svd_db lookup)",
+    )
+    p.set_defaults(prog_fn=_cmd_svd)
 
     p = sub.add_parser(
         "read-ob", help="D-009 — read option bytes via ``-ob displ``"
@@ -233,8 +233,33 @@ def _register_subcommands(sub: argparse._SubParsersAction) -> None:
         "--sign-unsigned",
         action="store_true",
         help=(
-            "with --signed, route unsigned inputs through SigningTool first "
-            "(currently raises NotImplementedError until C2)"
+            "with --signed, sign inputs that lack the ST image header via "
+            "SigningTool first (needs --header-version; entry points for "
+            "fsbl/ssbl)"
+        ),
+    )
+    p.add_argument(
+        "--header-version",
+        default=None,
+        help="signing header version for --sign-unsigned (1|2|2.1|2.2|2.3)",
+    )
+    p.add_argument(
+        "--boot-entry-point",
+        default=None,
+        help="bootloader entry point for --sign-unsigned (fsbl needs one)",
+    )
+    p.add_argument(
+        "--app-entry-point",
+        default=None,
+        help="application entry point for --sign-unsigned (ssbl needs one)",
+    )
+    p.add_argument(
+        "--no-key",
+        action="store_true",
+        help=(
+            "with --sign-unsigned, disable authentication (-nk) for the "
+            "signing legs; dev-only (keyed hv>=2 signing needs provisioned "
+            "key material)"
         ),
     )
     p.set_defaults(prog_fn=_cmd_flash_pair)
@@ -391,6 +416,12 @@ def _cmd_ping_swd(
     return result, 0 if result.value else 1
 
 
+def _cmd_svd(
+    args: argparse.Namespace, client: CubeProgrammer
+) -> tuple[Any, int]:
+    return client.svd_for_attached(), 0
+
+
 def _cmd_cores(
     args: argparse.Namespace, client: CubeProgrammer
 ) -> tuple[Any, int]:
@@ -493,6 +524,10 @@ def _cmd_flash_pair(
                 bootloader_address=args.boot_address,
                 application_address=args.app_address,
                 sign_unsigned=args.sign_unsigned,
+                signing_header_version=args.header_version,
+                bootloader_entry_point=args.boot_entry_point,
+                application_entry_point=args.app_entry_point,
+                signing_no_key=args.no_key,
             ),
             0,
         )

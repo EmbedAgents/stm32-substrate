@@ -1,6 +1,6 @@
 """SVD lookup + parsing — 3-path priority (CubeIDE → CubeProgrammer → CLT).
 
-Per the debug API spec § "svd.py — SVD lookup (3-path priority)".
+Per ``v1/debug-api.md`` § "svd.py — SVD lookup (3-path priority)".
 Substrate's decoded register values align with what a developer sees in
 CubeIDE's GUI debugger because CubeIDE is the highest-priority source.
 

@@ -16,6 +16,10 @@ Public surface:
   Linux this is SIGTERM → SIGKILL; on Windows there is no SIGTERM
   equivalent so the grace window is a natural-exit wait followed by
   ``TerminateProcess``.
+- ``terminate_process_tree(pid, grace_s=)`` — same ladder applied to the
+  whole process tree (Linux: ``killpg`` on the ``start_new_session``
+  group; Windows: ``taskkill /T``). For vendor bootstrap launchers whose
+  JVM child does the real work.
 """
 
 from __future__ import annotations
@@ -27,6 +31,7 @@ from stm32_substrate.platform.locking import (
 from stm32_substrate.platform.process import (
     process_alive,
     terminate_process,
+    terminate_process_tree,
 )
 
 __all__ = [
@@ -34,4 +39,5 @@ __all__ = [
     "is_lock_held",
     "process_alive",
     "terminate_process",
+    "terminate_process_tree",
 ]

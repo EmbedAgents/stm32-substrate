@@ -160,7 +160,7 @@ class TestIrreversibilityGate:
         with patch(
             "stm32_substrate.cubeprogrammer.client.run_tool",
             side_effect=[_ok(), _ok(_ob("stm32l4-rdp2.txt"))],
-        ):
+        ) as run:
             result = client.write_option_bytes(
                 {"RDP": 0xCC},
                 confirm_destructive=True,
@@ -168,6 +168,15 @@ class TestIrreversibilityGate:
             )
         assert isinstance(result, Confirmation)
         assert result.operation == "write_option_bytes"
+        # IMP-05: RDP level 2 permanently locks the debug port — the
+        # verification reconnect is guaranteed to fail and previously
+        # reported the SUCCESSFUL irreversible write as a failure. The
+        # read-back is skipped (single CLI call) and the confirmation
+        # says why.
+        assert run.call_count == 1
+        assert result.data["observed_after"] is None
+        assert "read_back_skipped" in result.data
+        assert result.data["pairs_written"] == {"RDP": 0xCC}
 
     def test_rdp_level_1_does_not_trip_irreversibility(
         self, ctx: SubstrateContext

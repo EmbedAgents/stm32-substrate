@@ -481,3 +481,61 @@ class TestTailSwoFixtureIntegration:
         assert len(records) == 4
         warnings = [r for r in caplog.records if r.levelname == "WARNING"]
         assert warnings
+
+
+# ---------------------------------------------------------------------------
+# IMP-04 — SWV start failure must raise, not yield an empty stream
+# ---------------------------------------------------------------------------
+
+
+class TestTailSwoFailure:
+    def test_cli_error_exit_raises_instead_of_empty_stream(
+        self, ctx: SubstrateContext
+    ) -> None:
+        from stm32_substrate.errors import CubeProgrammerError
+
+        client = CubeProgrammer(ctx)
+        fake = _make_fake_popen(
+            [
+                "      -------------------------------------------------------------------\n",
+                "                       STM32CubeProgrammer v2.22.0\n",
+                "      -------------------------------------------------------------------\n",
+                "Error: No debug probe detected.\n",
+            ]
+        )
+        fake.wait = MagicMock(return_value=1)
+        with patch(
+            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            return_value=fake,
+        ):
+            with pytest.raises(CubeProgrammerError) as excinfo:
+                list(client.tail_swo(freq_mhz=80.0))
+        # The CLI's Error: line reaches the message, not the void.
+        assert "No debug probe detected" in (
+            excinfo.value.message + (excinfo.value.tool_output or "")
+        )
+
+    def test_clean_exit_after_records_does_not_raise(
+        self, ctx: SubstrateContext
+    ) -> None:
+        client = CubeProgrammer(ctx)
+        fake = _make_fake_popen(["[port 0] hello\n"])
+        fake.wait = MagicMock(return_value=0)
+        with patch(
+            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            return_value=fake,
+        ):
+            records = list(client.tail_swo(freq_mhz=80.0))
+        assert len(records) == 1
+
+    def test_stderr_merged_into_stdout(self, ctx: SubstrateContext) -> None:
+        # IMP-25 rider: a separate never-drained stderr PIPE can block
+        # the child once the OS buffer fills.
+        client = CubeProgrammer(ctx)
+        fake = _make_fake_popen([])
+        with patch(
+            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            return_value=fake,
+        ) as popen:
+            list(client.tail_swo(freq_mhz=80.0))
+        assert popen.call_args.kwargs["stderr"] == subprocess.STDOUT

@@ -5,7 +5,7 @@ signing per ADR-002 §M1), ``build`` (cubeide), ``mx`` (cubemx), ``debug``
 (gdbserver + arm-gdb), ``vcp`` (USB virtual COM) — and routes parsed args
 to each group's ``dispatch``.
 
-Per the API conventions § "Logging and progress streaming", the
+Per ``v1/api-conventions.md`` § "Logging and progress streaming", the
 library does NOT configure logging handlers — the CLI does. ``main()``
 installs a stderr handler with a structured-field formatter, scoped to
 the ``stm32_substrate`` root logger.

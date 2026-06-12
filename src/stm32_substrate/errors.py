@@ -1,6 +1,6 @@
 """Substrate-wide error hierarchy.
 
-Mirrors the API conventions § "Error class hierarchy". The shapes here
+Mirrors ``v1/api-conventions.md`` § "Error class hierarchy". The shapes here
 are stable; per-tool fields (markers, error codes, mode) get populated by the
 matching tool wrapper. Result dataclasses live in each tool's ``_results.py``;
 this module only carries exceptions.
@@ -30,7 +30,7 @@ types in other modules use ``frozen=True``.
 
 ``CubeProgrammerError.error_code`` is typed ``int | None`` here to avoid a
 circular import with ``stm32_substrate.cubeprogrammer.codes`` (which owns the
-``CubeProgrammerErrorCode`` IntEnum per the CubeProgrammer API spec). The
+``CubeProgrammerErrorCode`` IntEnum per ``v1/cubeprogrammer-api.md``). The
 cubeprogrammer wrapper performs the enum wrap when surfacing the error to
 callers.
 """
@@ -45,7 +45,7 @@ from pathlib import Path
 class SubstrateError(Exception):
     """Base for every substrate-raised exception.
 
-    Fields per the API conventions § "Common fields on every
+    Fields per ``v1/api-conventions.md`` § "Common fields on every
     ``SubstrateError``".
     """
 
@@ -64,7 +64,8 @@ class ConfigurationError(SubstrateError):
     """Config file missing, malformed, or schema-invalid.
 
     Raised by ``SubstrateContext.from_environment()`` per M-016. The extra
-    fields drive the loud-error format documented in the API conventions.
+    fields drive the loud-error format documented in api-conventions.md
+    § "Loud error format".
     """
 
     schema_name: str | None = None
@@ -199,7 +200,7 @@ class SVDLookupError(GDBError):
 class VCPError(ToolError):
     """USB virtual COM port / pyserial failure.
 
-    Canonical markers per the VCP API spec:
+    Canonical markers per ``v1/vcp-api.md``:
     ``no-vcp-enumerated`` / ``ambiguous-probe`` / ``port-in-use`` /
     ``reader-already-active`` / ``reconnect-timeout``.
     """

@@ -330,6 +330,86 @@ class TestReadRegisters:
 
 
 # ---------------------------------------------------------------------------
+# A-003 — recipe reset semantics
+# ---------------------------------------------------------------------------
+
+
+class TestRecipeResetSemantics:
+    """A-003: read recipes must attach WITHOUT reset (halt=False →
+    gdbserver -g) and halt in place — a reset wipes the sticky fault
+    registers and returns peripherals to power-on defaults, so
+    DIAG-001 always saw a clean fault state and DIAG-002..017 read
+    reset-default peripheral state."""
+
+    READ_RECIPES = (
+        ["debug", "read-registers"],
+        ["debug", "read-peripheral", "RCC"],
+        ["debug", "read-memory", "--address", "0x20000000", "--size", "16"],
+        ["debug", "callstack"],
+        ["debug", "snapshot"],
+        ["debug", "decode-hardfault"],
+    )
+
+    def test_read_recipes_attach_without_reset(
+        self, ensure_cli_on_path, mock_debug: MagicMock,
+        capsys: pytest.CaptureFixture,
+    ) -> None:
+        mock_debug._session.snapshot.return_value = DebugSnapshot(
+            registers=mock_debug._session.read_registers.return_value,
+            callstack=mock_debug._session.callstack.return_value,
+            threads=(),
+            disasm_around_pc="",
+            peripheral_dumps=(),
+            capture_time="2026-05-21T00:00:00Z",
+            session=mock_debug._session.session_handle.return_value,
+        )
+        for argv in self.READ_RECIPES:
+            mock_debug._instance.start_session.reset_mock()
+            code, _, _ = _run(argv, capsys)
+            assert code == 0, argv
+            kwargs = mock_debug._instance.start_session.call_args.kwargs
+            assert kwargs["halt"] is False, argv
+
+    def test_read_recipe_halts_running_target_in_place(
+        self, ensure_cli_on_path, mock_debug: MagicMock,
+        capsys: pytest.CaptureFixture,
+    ) -> None:
+        mock_debug._session.target_halted = False
+        code, _, _ = _run(["debug", "read-registers"], capsys)
+        assert code == 0
+        # Halted via session.halt() (in place) — never via monitor reset.
+        mock_debug._session.halt.assert_called_once_with()
+
+    def test_check_variable_keeps_reset_semantics(
+        self, ensure_cli_on_path, mock_debug: MagicMock,
+        capsys: pytest.CaptureFixture,
+    ) -> None:
+        # DBG-004 runs the program from the top through the breakpoint —
+        # reset is required so the bp is armed before execution passes it.
+        code, _, _ = _run(
+            ["debug", "check-variable", "--at", "main",
+             "--var", "x", "--expected", "0"],
+            capsys,
+        )
+        assert code == 0
+        kwargs = mock_debug._instance.start_session.call_args.kwargs
+        assert kwargs["halt"] is True
+
+    def test_check_register_keeps_reset_semantics(
+        self, ensure_cli_on_path, mock_debug: MagicMock,
+        capsys: pytest.CaptureFixture,
+    ) -> None:
+        code, _, _ = _run(
+            ["debug", "check-register", "--at", "main",
+             "--reg", "r0", "--expected", "0"],
+            capsys,
+        )
+        assert code == 0
+        kwargs = mock_debug._instance.start_session.call_args.kwargs
+        assert kwargs["halt"] is True
+
+
+# ---------------------------------------------------------------------------
 # `read-peripheral` (DBG-007)
 # ---------------------------------------------------------------------------
 

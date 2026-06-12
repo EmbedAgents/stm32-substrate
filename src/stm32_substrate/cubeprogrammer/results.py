@@ -2,7 +2,7 @@
 
 Every type is ``@dataclass(frozen=True)`` per ADR-006 convention. Field
 names match the ``success_signal.fields`` taxonomy in
-the behavior spec (P-024); they are part of the API contract.
+``expected-behaviors-v2.md`` (P-024); they are part of the API contract.
 
 Many dataclasses default to ``None`` / empty collections to reflect the
 post-cubemx-scope-cut reality (RES-020): without a DeviceDB the substrate
@@ -279,7 +279,7 @@ class Confirmation:
     """Generic shape for ops not yet promoted to typed subclasses.
 
     ``data`` carries the per-op payload documented in
-    the CubeProgrammer API spec § "Generic-``Confirmation.data`` shapes":
+    ``v1/cubeprogrammer-api.md`` § "Generic-``Confirmation.data`` shapes":
 
     - ``halt`` — ``{"halted", "prior_state", "via_gdb"}``
     - ``resume`` — ``{"running", "prior_state", "via_gdb"}``

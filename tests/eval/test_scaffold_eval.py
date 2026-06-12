@@ -133,10 +133,12 @@ class TestEvalScaffoldLiveDriver:
     ) -> None:
         monkeypatch.delenv("STM32_EVAL_MODEL", raising=False)
         monkeypatch.delenv("STM32_EVAL_MAX_BUDGET_USD", raising=False)
+        monkeypatch.delenv("STM32_EVAL_MAX_TURNS", raising=False)
         driver = LiveDriver()
-        assert driver.model == "claude-sonnet-4-6"
-        assert driver.max_budget_usd == 0.50
-        assert driver.max_turns == 10
+        # Defaults retuned for claude-fable-5 (RES-045 Phase-3 pilot).
+        assert driver.model == "claude-fable-5"
+        assert driver.max_budget_usd == 1.00
+        assert driver.max_turns == 15
         assert driver.record_to is None
 
     def test_live_driver_construct_honors_env_overrides(
@@ -147,6 +149,19 @@ class TestEvalScaffoldLiveDriver:
         driver = LiveDriver()
         assert driver.model == "claude-opus-4-7"
         assert driver.max_budget_usd == 2.50
+
+    def test_steering_command_file_prefix_map(self) -> None:
+        """Live steering resolves to the SHIPPED command file by scenario
+        prefix (TST-10); unmapped prefixes fall back to None."""
+        from tests.eval.conftest import _steering_command_file
+
+        debug = _steering_command_file("F-EVAL-DEBUG-START")
+        assert debug is not None and debug.endswith("stm32debug.md")
+        diag = _steering_command_file("F-EVAL-DIAG-002-WATCHDOG")
+        assert diag is not None and diag.endswith("stm32debug.md")
+        vcp = _steering_command_file("F-EVAL-VCP005-RAISE-BAUD")
+        assert vcp is not None and vcp.endswith("stm32agent.md")
+        assert _steering_command_file("F-EVAL-SCAFFOLD-SMOKE") is None
 
     def test_live_driver_skips_when_sdk_missing(
         self, monkeypatch: pytest.MonkeyPatch

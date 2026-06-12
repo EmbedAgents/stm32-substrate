@@ -71,15 +71,34 @@ def _linux_lock(path: Path) -> Iterator[None]:
 
 
 def _linux_is_held(path: Path) -> bool:
+    """Probe BOTH Linux lock namespaces (IMP-07).
+
+    ``flock`` and POSIX record locks (``fcntl``/``lockf``) are
+    independent on Linux. The substrate's own locks are ``flock``; the
+    CubeIDE GUI's workspace ``.metadata/.lock`` is held by Java NIO
+    ``FileLock``, which maps to POSIX record locks — a flock-only probe
+    never saw it, so the GUI-held pre-check was dead and cleanup could
+    delete a live workspace's metadata.
+    """
     if not path.exists():
         return False
     fd = path.open("a+")
     try:
+        # Namespace 1: flock (another substrate process).
         try:
             fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             return True
         fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
+        # Namespace 2: POSIX record locks (Java NIO FileLock — the GUI).
+        # Probe-only: this process holds no record locks on the file, so
+        # the acquire/release pair cannot drop anything we own.
+        try:
+            fcntl.lockf(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (BlockingIOError, PermissionError):
+            # EAGAIN / EACCES — both mean "another process holds it".
+            return True
+        fcntl.lockf(fd.fileno(), fcntl.LOCK_UN)
         return False
     finally:
         fd.close()
@@ -122,9 +141,21 @@ def _windows_lock(path: Path) -> Iterator[None]:
 
 
 def _windows_is_held(path: Path) -> bool:
-    if not path.exists() or path.stat().st_size == 0:
+    """Probe without the zero-byte short-circuit (IMP-07).
+
+    Eclipse's workspace ``.metadata/.lock`` is a ZERO-byte file that the
+    GUI's Java ``FileLock`` (LockFileEx) holds a region of — region
+    locks extend beyond EOF on Windows, so a zero-byte file can
+    absolutely be held. The old ``st_size == 0 → False`` short-circuit
+    made the GUI-held pre-check always pass.
+    """
+    if not path.exists():
         return False
-    fd = path.open("r+b")
+    try:
+        fd = path.open("r+b")
+    except OSError:
+        # Holder opened it with no sharing — locked by definition.
+        return True
     try:
         fd.seek(0)
         try:

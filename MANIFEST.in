@@ -3,3 +3,12 @@ include README.md
 include CHANGELOG.md
 recursive-include src/stm32_substrate/schemas *.schema.json
 include src/stm32_substrate/py.typed
+
+# sdist is package source + metadata only (SEC-08): no test tree, no
+# repo plumbing — the wheel was always clean; this aligns the sdist.
+prune tests
+prune tools
+prune docs
+prune .claude
+prune .claude-plugin
+prune .github

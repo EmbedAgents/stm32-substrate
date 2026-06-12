@@ -1,0 +1,3 @@
+# -data-evaluate-expression "*(unsigned int (*)[4])0x20000000"
+# captured 2026-06-11, arm-none-eabi-gdb MI3, NUCLEO-L476RG, BLINKY.elf
+15^done,value="{80000000, 15, 1, 0}"

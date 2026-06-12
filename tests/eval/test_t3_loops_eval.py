@@ -2,7 +2,7 @@
 
 Seven T3 prompts ship in Pass 1 (ADR-003) and route across three slash
 commands — but they share the **T3 Claude-in-loop fix discipline**
-(the T3 fix-discipline prelude), so they live together here:
+(expected-behaviors-v2.md prelude), so they live together here:
 
     B-021    /stm32build    build-fix loop, then confirm on-target (killer)
     DBG-008  /stm32debug    stack overflow → bump stack → retry
@@ -87,6 +87,8 @@ B021_BUILD_FIX = EvalScenario(
     user_prompt="The build's broken — get it compiling, then flash it and prove it runs.",
     allowed_tools=("Bash", "Edit", "Read"),
     cwd=PROJECT_CWD,
+    max_turns=25,          # T3 fix-loop envelope (Phase-4 measured: B-021 = 21 calls)
+    max_budget_usd=2.0,    # T3 loops exceed the $1 atomic cap (VCP-005 hit it)
     expected_tool_calls=(
         # The build is intrinsic to the loop and reliably goes through
         # the `stm32 build` CLI verb (B-001/B-002).
@@ -105,6 +107,8 @@ DBG008_STACK_OVERFLOW = EvalScenario(
     user_prompt="I think we're blowing the stack — check for an overflow, and if you find one, bump the stack and retry.",
     allowed_tools=("Bash", "Edit", "Read"),
     cwd=PROJECT_CWD,
+    max_turns=25,          # T3 fix-loop envelope (Phase-4 measured: B-021 = 21 calls)
+    max_budget_usd=2.0,    # T3 loops exceed the $1 atomic cap (VCP-005 hit it)
     expected_tool_calls=(
         # Gather may be a recipe-CLI debug read OR a Python DebugSession
         # heredoc (RES-026). Accept either; the `stm32 build` rebuild leg
@@ -129,6 +133,8 @@ DBG009_MALLOC_FAILURE = EvalScenario(
     user_prompt="We're running out of heap — check whether malloc is failing, and grow the heap until allocations succeed.",
     allowed_tools=("Bash", "Edit", "Read"),
     cwd=PROJECT_CWD,
+    max_turns=25,          # T3 fix-loop envelope (Phase-4 measured: B-021 = 21 calls)
+    max_budget_usd=2.0,    # T3 loops exceed the $1 atomic cap (VCP-005 hit it)
     expected_tool_calls=(
         ToolCallMatch(
             name="Bash",
@@ -152,6 +158,8 @@ DIAG019_CLASSIFY_CRASH = EvalScenario(
     user_prompt="The firmware crashed. With the debug session available, classify it — is this memory corruption or an interrupt problem?",
     allowed_tools=("Bash", "Read"),
     cwd=PROJECT_CWD,
+    max_turns=25,          # T3 fix-loop envelope (Phase-4 measured: B-021 = 21 calls)
+    max_budget_usd=2.0,    # T3 loops exceed the $1 atomic cap (VCP-005 hit it)
     expected_tool_calls=(
         # Read-only gather: the evidence bundle comes from the
         # decode-hardfault + snapshot recipe CLIs (concrete verbs).
@@ -175,6 +183,8 @@ DIAG020_CACHE_CORRUPTION = EvalScenario(
     user_prompt="My DMA buffer is reading stale data — I think it's a cache coherency bug. Debug it.",
     allowed_tools=("Bash", "Read"),
     cwd=PROJECT_CWD,
+    max_turns=25,          # T3 fix-loop envelope (Phase-4 measured: B-021 = 21 calls)
+    max_budget_usd=2.0,    # T3 loops exceed the $1 atomic cap (VCP-005 hit it)
     expected_tool_calls=(
         # On the L476 (Cortex-M4) the gather is the core/cache check —
         # either `stm32 prog cores` (D-007 family) or a debug
@@ -199,6 +209,8 @@ VCP004_GARBAGE_OUTPUT = EvalScenario(
     user_prompt="The serial terminal is spitting garbage — read the device's UART config and fix the mismatch so it's readable.",
     allowed_tools=("Bash", "Edit", "Read"),
     cwd=PROJECT_CWD,
+    max_turns=25,          # T3 fix-loop envelope (Phase-4 measured: B-021 = 21 calls)
+    max_budget_usd=2.0,    # T3 loops exceed the $1 atomic cap (VCP-005 hit it)
     expected_tool_calls=(
         # Step 1 reads the device-side USART config live via the
         # read-peripheral recipe — a concrete, reliable verb.
@@ -219,9 +231,20 @@ VCP004_GARBAGE_OUTPUT = EvalScenario(
 
 VCP005_RAISE_BAUD = EvalScenario(
     name="F-EVAL-VCP005-RAISE-BAUD",
+    # Phase-4 live-run disposition (2026-06-12, 2 attempts): the loop
+    # converges correctly — run 1 settled at 460800 after bench-proving
+    # 921600 dead on the on-board ST-LINK V2-1 VCP bridge (VCP-004 then
+    # verified echo at 460800 live) — but "fastest baud both ends
+    # support" requires empirically probing the bridge ceiling
+    # (raise → rebuild → reflash → verify → back off), which exceeds
+    # the 25-turn/$2 envelope. Keep the hand-authored stub for replay;
+    # a live record needs either a known-ceiling prompt or a bigger
+    # envelope.
     user_prompt="Serial is too slow — crank it up to the fastest baud both ends support, then make sure it still works.",
     allowed_tools=("Bash", "Edit", "Read"),
     cwd=PROJECT_CWD,
+    max_turns=25,          # T3 fix-loop envelope (Phase-4 measured: B-021 = 21 calls)
+    max_budget_usd=2.0,    # T3 loops exceed the $1 atomic cap (VCP-005 hit it)
     expected_tool_calls=(
         # The device-side baud change rebuilds firmware (`stm32 build`)
         # and/or the host reader is reopened (`stm32 vcp`). Accept either.

@@ -1,6 +1,6 @@
 """Build-preset tables + family→FPU lookup for ``CubeIDE.build()``.
 
-Per the CubeIDE API spec § "Preset definitions" and the MR-1 closure
+Per ``v1/cubeide-api.md`` § "Preset definitions" and the MR-1 closure
 ("Family → FPU table" — RES-020). The tables encode the multi-option
 edits each preset applies to ``.cproject``; ``FAMILY_FPU_TABLE`` is the
 substrate-side mapping from ``ctx.project.firmware.device_family`` to

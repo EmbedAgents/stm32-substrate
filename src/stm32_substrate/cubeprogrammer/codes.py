@@ -4,7 +4,7 @@ Mirrors UM2576 Appendix A. ``parse_error()`` (in ``parsers.py``) maps
 stderr patterns + the subprocess exit code onto these enum members.
 
 ``is_recoverable(code)`` returns the boolean from the recoverability
-matrix documented in the CubeProgrammer API spec — used to drive
+matrix documented in ``v1/cubeprogrammer-api.md`` — used to drive
 ``CubeProgrammerError.recoverable`` and to decide whether the D-002
 ladder should attempt a recovery walk.
 """
@@ -50,7 +50,7 @@ _RECOVERABLE: frozenset[CubeProgrammerErrorCode] = frozenset(
 def is_recoverable(code: CubeProgrammerErrorCode | int | None) -> bool:
     """Return ``True`` iff the D-002 ladder may help recover from ``code``.
 
-    Per the CubeProgrammer API spec § "Recoverability matrix":
+    Per ``v1/cubeprogrammer-api.md`` § "Recoverability matrix":
 
     - Unmapped codes (``None``, or an int we don't recognise) → ``False``
       (substrate doesn't know the recovery semantics).

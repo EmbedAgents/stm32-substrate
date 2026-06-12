@@ -1,6 +1,6 @@
 """``VCP`` public class.
 
-Per the VCP API spec § "Public methods". Four methods — ``tail`` /
+Per ``v1/vcp-api.md`` § "Public methods". Four methods — ``tail`` /
 ``send_and_read`` / ``reconnect`` / ``close`` — over a lazy-attached
 ``_VcpReader``. Implements:
 
@@ -87,11 +87,14 @@ class VCP:
             if last_n is not None
             else _vcp_default(self.ctx, "tail_default_last_n", 100)
         )
-        effective_timeout = (
-            timeout_s
-            if timeout_s is not None
-            else _vcp_default(self.ctx, "tail_default_timeout_s", 5.0)
-        )
+        # Follow mode: the snapshot default must NOT apply — a bare
+        # --follow streams until the consumer stops it; only an EXPLICIT
+        # timeout bounds the stream (RES-046).
+        effective_timeout = timeout_s
+        if not follow and timeout_s is None:
+            effective_timeout = _vcp_default(
+                self.ctx, "tail_default_timeout_s", 5.0
+            )
         yield from reader.read_lines(
             last_n=effective_last_n,
             follow=follow,
@@ -180,9 +183,39 @@ class VCP:
         """VCP-003 — explicit force-reconnect on top of SB-002."""
         reader = self.ctx.session_state.active_vcp_reader
         if reader is None:
-            # No prior reader to recycle — attach lazily, treat as a same-port
-            # "reconnect" from a virtual prior state.
-            attached = self._ensure_reader(port=port)
+            # No prior reader to recycle — attach lazily, treating it as
+            # a "reconnect" from a virtual prior state. A-017: the wait
+            # budget applies here too — a fresh process (every one-shot
+            # CLI invocation per RES-026) reconnecting around a board
+            # reset must poll for re-enumeration up to max_wait_s, not
+            # raise on the first empty scan.
+            cap = (
+                max_wait_s
+                if max_wait_s is not None
+                else float(_vcp_default(self.ctx, "reconnect_max_s", 10.0))
+            )
+            start = time.monotonic()
+            deadline = start + cap
+            while True:
+                try:
+                    attached = self._ensure_reader(port=port)
+                    break
+                except VCPNotEnumerated as ex:
+                    if time.monotonic() >= deadline:
+                        raise VCPError(
+                            message=(
+                                f"no ST-LINK VCP re-enumerated within {cap}s"
+                            ),
+                            vcp_marker="reconnect-timeout",
+                            port=port,
+                            requested_probe_sn=self.ctx.default_probe_sn,
+                            hint=(
+                                "raise reconnect_max_s / --max-wait, or "
+                                "check the USB cable"
+                            ),
+                            recoverable=False,
+                        ) from ex
+                    time.sleep(0.1)
             prior = PriorVCPState(
                 port=None, baud=None, last_byte_timestamp_s=None, open=False
             )
@@ -190,7 +223,7 @@ class VCP:
                 port=attached.port,
                 status="reconnected",
                 prior_state=prior,
-                duration_s=0.0,
+                duration_s=time.monotonic() - start,
             )
         return reader.reconnect(max_wait_s=max_wait_s)
 

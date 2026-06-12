@@ -12,7 +12,7 @@ Out of this module:
 - **B-017** — dropped per P-037 (CubeMX scope cut).
 - **B-010 / B-015 / B-020 / B-021** — T3 prompts deferred per M-014.
 
-See the CubeIDE API spec for the full method signatures + kwargs grid.
+See ``v1/cubeide-api.md`` for the full method signatures + kwargs grid.
 """
 
 from __future__ import annotations

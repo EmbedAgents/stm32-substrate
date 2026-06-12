@@ -1,6 +1,6 @@
 """ST-LINK VCP port discovery via pyserial.
 
-Per the VCP API spec § "discovery.py — VCP port discovery". Pure filter:
+Per ``v1/vcp-api.md`` § "discovery.py — VCP port discovery". Pure filter:
 ``discover_vcp_ports`` returns the matching list and never raises for
 ambiguity — ``VCP._ensure_reader()`` owns the 0 / 1 / 2+ branching.
 

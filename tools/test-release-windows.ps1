@@ -1,7 +1,7 @@
 #Requires -Version 5
 <#
 .SYNOPSIS
-    Validate the published stm32-substrate v0.1.0 release on Windows (no hardware).
+    Validate a published stm32-substrate release on Windows (no hardware).
 
 .DESCRIPTION
     Runs the two no-hardware tiers of the Windows release test and prints a
@@ -9,7 +9,8 @@
 
       Tier 1 - Published install (as a brand-new user would experience it):
         * create a throwaway venv
-        * pip install from the published GitHub repo (git+https)
+        * pip install from the published GitHub repo (git+https; pinned to
+          -ReleaseTag when given)
         * verify the `stm32` console script + version
         * verify the package-bundled JSON schemas load via importlib.resources
 
@@ -27,6 +28,13 @@
 .PARAMETER RepoUrl
     Git URL used for the Tier 1 fresh install. Defaults to the public repo.
 
+.PARAMETER ReleaseTag
+    Tag under test (e.g. v0.1.1). When given, Tier 1 installs git+RepoUrl@ReleaseTag
+    and asserts `stm32 --version` matches the tag (minus the leading v). When
+    omitted, Tier 1 installs the default branch and the expected version is read
+    from this checkout's pyproject.toml (dev-run mode). Run from a checkout of the
+    tag so Tier 2 tests the same code.
+
 .PARAMETER WorkDir
     Scratch directory for the throwaway venvs. Defaults to a temp folder; removed
     on exit unless -KeepWorkDir is given.
@@ -35,17 +43,32 @@
     Keep the scratch venvs after the run (useful for poking at a failure).
 
 .EXAMPLE
-    pwsh -File tools\test-release-windows.ps1
+    pwsh -File tools\test-release-windows.ps1 -ReleaseTag v0.1.1
 #>
 [CmdletBinding()]
 param(
     [string]$RepoUrl    = "https://github.com/EmbedAgents/stm32-substrate.git",
+    [string]$ReleaseTag = "",
     [string]$WorkDir    = (Join-Path $env:TEMP "stm32-release-test"),
     [switch]$KeepWorkDir
 )
 
 $ErrorActionPreference = "Continue"
 $RepoRoot = Split-Path -Parent $PSScriptRoot   # tools\ -> repo root
+
+# What to install in Tier 1, and which version string `stm32 --version` must show.
+if ($ReleaseTag) {
+    $PipSpec     = "git+$RepoUrl@$ReleaseTag"
+    $ExpectedVer = $ReleaseTag -replace '^v', ''
+} else {
+    $PipSpec     = "git+$RepoUrl"
+    $ExpectedVer = ""
+    $pyproject = Join-Path $RepoRoot "pyproject.toml"
+    if (Test-Path $pyproject) {
+        $m = Select-String -Path $pyproject -Pattern '^version\s*=\s*"([^"]+)"' | Select-Object -First 1
+        if ($m) { $ExpectedVer = $m.Matches[0].Groups[1].Value }
+    }
+}
 
 # --- result tracking ---------------------------------------------------------
 $results = New-Object System.Collections.Generic.List[object]
@@ -91,7 +114,7 @@ if (Test-Path $WorkDir) { Remove-Item -Recurse -Force $WorkDir }
 New-Item -ItemType Directory -Force -Path $WorkDir | Out-Null
 
 # --- Tier 1: published install ----------------------------------------------
-Section "Tier 1 - published install (git+https)"
+Section ("Tier 1 - published install (git+https{0})" -f $(if ($ReleaseTag) { ", tag $ReleaseTag" } else { "" }))
 
 if (-not $hasGit) {
     Skip "Tier 1 (all)" "git is required for a git+https install"
@@ -106,14 +129,20 @@ if (-not $hasGit) {
         Record "create install venv" $true
         & $t1py -m pip install --quiet --upgrade pip *> $null
 
-        $log = & $t1py -m pip install --quiet "git+$RepoUrl" 2>&1
+        $log = & $t1py -m pip install --quiet $PipSpec 2>&1
         $ok = ($LASTEXITCODE -eq 0)
-        Record "pip install git+$RepoUrl" $ok $(if (-not $ok) { ($log | Select-Object -Last 3) -join " | " })
+        Record "pip install $PipSpec" $ok $(if (-not $ok) { ($log | Select-Object -Last 3) -join " | " })
 
         if ($ok) {
             $stm32 = Join-Path $t1venv "Scripts\stm32.exe"
             $ver = (& $stm32 --version 2>&1) -join " "
-            Record "stm32 --version = 0.1.0" ($ver -match "0\.1\.0") $ver
+            if ($ExpectedVer) {
+                Record "stm32 --version = $ExpectedVer" ($ver -match [regex]::Escape($ExpectedVer)) $ver
+            } else {
+                # No tag given and no readable pyproject - at least require the
+                # console script to run and print something version-shaped.
+                Record "stm32 --version runs" ($ver -match "\d+\.\d+") $ver
+            }
 
             # bundled schemas load via importlib.resources
             $chk = Join-Path $WorkDir "schema_check.py"

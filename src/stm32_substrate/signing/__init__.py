@@ -5,7 +5,7 @@ Single-method module per RES-015. Public surface: ``SigningTool`` class
 from ``stm32_substrate.errors``).
 
 F-013 only — substrate doesn't validate device family (vendor CLI
-reports its own error). See the signing API spec for the full spec.
+reports its own error). See ``v1/signing-api.md`` for the full spec.
 
 Cross-module consumers:
 

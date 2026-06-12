@@ -348,6 +348,30 @@ class TestCores:
         assert _read_json(out)["primary_core"] == "Cortex-M7"
 
 
+class TestSvd:
+    def test_emits_svd_result(
+        self,
+        ensure_cli_on_path,
+        mock_client: MagicMock,
+        capsys: pytest.CaptureFixture,
+    ) -> None:
+        """A-007: 'stm32 prog svd' was absent behind a stale 'blocked on
+        ctx.svd_db / C4' note — everything it needed shipped."""
+        from stm32_substrate.cubeprogrammer.results import SVDResult
+
+        mock_client.svd_for_attached.return_value = SVDResult(
+            device_name="STM32L476RGTx",
+            device_id="0x415",
+            svd_path=Path("/opt/st/svd/STM32L476.svd"),
+            svd_version="1.2",
+        )
+        code, out, _ = _run(["prog", "svd"], capsys)
+        assert code == 0
+        payload = _read_json(out)
+        assert payload["svd_path"].endswith("STM32L476.svd")
+        mock_client.svd_for_attached.assert_called_once_with()
+
+
 class TestReadOb:
     def test_emits_option_bytes(
         self,
@@ -791,6 +815,36 @@ class TestFlashPair:
         )
         call = mock_client.flash_signed_pair.call_args
         assert call.kwargs["sign_unsigned"] is True
+        assert call.kwargs["signing_no_key"] is False
+
+    def test_no_key_flag_forwards_signing_no_key(
+        self,
+        ensure_cli_on_path,
+        mock_client: MagicMock,
+        capsys: pytest.CaptureFixture,
+        tmp_path: Path,
+    ) -> None:
+        boot = tmp_path / "boot.bin"
+        app = tmp_path / "app.bin"
+        for p in (boot, app):
+            p.write_bytes(b"")
+        mock_client.flash_signed_pair.return_value = PairFlashResult(
+            bootloader=None, application=None, both_succeeded=True
+        )
+        _run(
+            [
+                "prog",
+                "flash-pair",
+                str(boot),
+                str(app),
+                "--signed",
+                "--sign-unsigned",
+                "--no-key",
+            ],
+            capsys,
+        )
+        call = mock_client.flash_signed_pair.call_args
+        assert call.kwargs["signing_no_key"] is True
 
 
 class TestFlashExternal:
@@ -1147,11 +1201,16 @@ class TestCliErrorBoundary:
         env = self._assert_structured(code, out, err)
         assert env["error_type"] == "ValueError"
 
-    def test_sign_unsigned_not_traceback(
+    def test_sign_unsigned_missing_params_not_traceback(
         self, ensure_cli_on_path, capsys: pytest.CaptureFixture, tmp_path: Path
     ) -> None:
+        # A-005: sign_unsigned is wired now (RES-039); missing
+        # --header-version on an unsigned input surfaces as a structured
+        # envelope, never a traceback.
         boot = tmp_path / "boot.bin"
+        boot.write_bytes(b"\x00" * 64)  # unsigned — no STM2 magic
         app = tmp_path / "app.bin"
+        app.write_bytes(b"\x00" * 64)
         code, out, err = _run(
             [
                 "prog", "flash-pair", str(boot), str(app),
@@ -1160,8 +1219,8 @@ class TestCliErrorBoundary:
             capsys,
         )
         env = self._assert_structured(code, out, err)
-        assert env["error_type"] == "NotImplementedError"
-        assert "signing module" in env["message"]
+        assert env["error_type"] == "ValueError"
+        assert "signing_header_version" in env["message"]
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,9 @@
+# -exec-continue  (with a breakpoint armed at HAL_Delay)
+# captured 2026-06-11, arm-none-eabi-gdb MI3, NUCLEO-L476RG, BLINKY.elf
+24^running
+*running,thread-id="all"
+=breakpoint-modified,bkpt={number="2",type="breakpoint",disp="keep",enabled="y",addr="0x08000334",func="HAL_Delay",file="/home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal.c",fullname="/home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal.c",line="405",thread-groups=["i1"],times="1",original-location="HAL_Delay"}
+~"\n"
+~"Breakpoint 2, HAL_Delay (Delay=100) at /home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal.c:405\n"
+~"405\t  uint32_t tickstart = HAL_GetTick();\n"
+*stopped,reason="breakpoint-hit",disp="keep",bkptno="2",frame={addr="0x08000334",func="HAL_Delay",args=[{name="Delay",value="100"}],file="/home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal.c",fullname="/home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal.c",line="405",arch="armv7e-m"},thread-id="1",stopped-threads="all",core="0"

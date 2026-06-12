@@ -22,35 +22,35 @@
     {
       "name": "Bash",
       "args": {
-        "command": "python3 -c \"\nimport json\nwith open('/home/user/.claude/projects/-home-user-claude-projects-stm32-substrate-tests-fixtures-projects-STM32CubeL4-Projects-NUCLEO-L476RG-Examples-GPIO-GPIO-IOToggle-STM32CubeIDE/68e91a00-93db-43f4-9665-7b0d117d27b2/tool-results/bqho9f20q.txt') as f:\n    data = json.load(f)\n\n# Print just the fault-relevant registers\nfor reg in ['CFSR', 'HFSR', 'DFSR', 'MMFAR', 'BFAR', 'SHCSR']:\n    if reg in data['registers']:\n        r = data['registers'][reg]\n        print(f'=== {reg} @ 0x{int(r[\\\"address\\\"],16) if isinstance(r[\\\"address\\\"],str) else r[\\\"address\\\"]:08X}  raw=0x{r[\\\"raw_value\\\"]:08X} ===')\n        for fname, fv in r['fields'].items():\n            if fv['raw_value'] != 0:\n                print(f'  *** {fname} = {fv[\\\"raw_value\\\"]}  ({fv.get(\\\"enum_name\\\",\\\"\\\")}) [bit {fv[\\\"bit_offset\\\"]}]')\n            else:\n                print(f'      {fname} = 0')\n        print()\n\"\n",
+        "command": "python3 -c \"\nimport json\nwith open('/home/anup/.claude/projects/-home-anup-claude-projects-stm32-substrate-tests-fixtures-projects-STM32CubeL4-Projects-NUCLEO-L476RG-Examples-GPIO-GPIO-IOToggle-STM32CubeIDE/68e91a00-93db-43f4-9665-7b0d117d27b2/tool-results/bqho9f20q.txt') as f:\n    data = json.load(f)\n\n# Print just the fault-relevant registers\nfor reg in ['CFSR', 'HFSR', 'DFSR', 'MMFAR', 'BFAR', 'SHCSR']:\n    if reg in data['registers']:\n        r = data['registers'][reg]\n        print(f'=== {reg} @ 0x{int(r[\\\"address\\\"],16) if isinstance(r[\\\"address\\\"],str) else r[\\\"address\\\"]:08X}  raw=0x{r[\\\"raw_value\\\"]:08X} ===')\n        for fname, fv in r['fields'].items():\n            if fv['raw_value'] != 0:\n                print(f'  *** {fname} = {fv[\\\"raw_value\\\"]}  ({fv.get(\\\"enum_name\\\",\\\"\\\")}) [bit {fv[\\\"bit_offset\\\"]}]')\n            else:\n                print(f'      {fname} = 0')\n        print()\n\"\n",
         "description": "Extract and pretty-print fault-relevant SCB registers from saved dump"
       }
     },
     {
       "name": "Bash",
       "args": {
-        "command": "find /home/user/claude-projects/stm32-substrate/tests/fixtures/projects -name \"*.map\" 2>/dev/null | head -5\nfind /home/user/claude-projects/stm32-substrate/tests/fixtures/projects -name \"STM32L476*.ld\" -o -name \"*.ld\" 2>/dev/null | head -10",
+        "command": "find /home/anup/claude-projects/stm32-substrate/tests/fixtures/projects -name \"*.map\" 2>/dev/null | head -5\nfind /home/anup/claude-projects/stm32-substrate/tests/fixtures/projects -name \"STM32L476*.ld\" -o -name \"*.ld\" 2>/dev/null | head -10",
         "description": "Locate map file and linker script for stack region info"
       }
     },
     {
       "name": "Bash",
       "args": {
-        "command": "# Find which map file contains code near PC 0x08013074\npython3 -c \"\nimport os, glob\ntarget_pc = 0x08013074\nmaps = glob.glob('/home/user/claude-projects/stm32-substrate/tests/fixtures/projects/**/*.map', recursive=True)\nfor mf in maps:\n    try:\n        txt = open(mf).read()\n        # Look for the hex address near our PC\n        if '08013' in txt:\n            print(mf)\n    except: pass\n\"",
+        "command": "# Find which map file contains code near PC 0x08013074\npython3 -c \"\nimport os, glob\ntarget_pc = 0x08013074\nmaps = glob.glob('/home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/**/*.map', recursive=True)\nfor mf in maps:\n    try:\n        txt = open(mf).read()\n        # Look for the hex address near our PC\n        if '08013' in txt:\n            print(mf)\n    except: pass\n\"",
         "description": "Find which project map file covers the current PC 0x08013074"
       }
     },
     {
       "name": "Bash",
       "args": {
-        "command": "# Decode SP: 0x20018000 \u2014 check the FAULTING project's linker script for stack region\ngrep -E \"(_estack|_Min_Stack_Size|STACK|stack)\" \\\n  /home/user/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Projects/NUCLEO-L476RG/Examples/PWR/FAULTING/STM32CubeIDE/STM32L476RGTX_FLASH.ld \\\n  /home/user/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Projects/NUCLEO-L476RG/Examples/GPIO/BLINKY/STM32CubeIDE/STM32L476RGTX_FLASH.ld \\\n  /home/user/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Projects/NUCLEO-L476RG/Examples/PWR/VCP-ECHO/STM32CubeIDE/STM32L476RGTX_FLASH.ld 2>/dev/null",
+        "command": "# Decode SP: 0x20018000 \u2014 check the FAULTING project's linker script for stack region\ngrep -E \"(_estack|_Min_Stack_Size|STACK|stack)\" \\\n  /home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Projects/NUCLEO-L476RG/Examples/PWR/FAULTING/STM32CubeIDE/STM32L476RGTX_FLASH.ld \\\n  /home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Projects/NUCLEO-L476RG/Examples/GPIO/BLINKY/STM32CubeIDE/STM32L476RGTX_FLASH.ld \\\n  /home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Projects/NUCLEO-L476RG/Examples/PWR/VCP-ECHO/STM32CubeIDE/STM32L476RGTX_FLASH.ld 2>/dev/null",
         "description": "Check _estack and _Min_Stack_Size in known linker scripts"
       }
     },
     {
       "name": "Bash",
       "args": {
-        "command": "# Check the FAULTING map \u2014 most likely candidate given PC=0x08013074\npython3 -c \"\nimport re\nmf = '/home/user/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Projects/NUCLEO-L476RG/Examples/PWR/FAULTING/STM32CubeIDE/Debug/FAULTING.map'\ntxt = open(mf).read()\n\n# Find code section covering 0x08013074\npc = 0x08013074\nprint('=== Sections covering PC 0x{:08X} ==='.format(pc))\nfor m in re.finditer(r'0x([0-9a-f]{8,})\\s+0x([0-9a-f]+)\\s+(\\S+)', txt):\n    base = int(m.group(1), 16)\n    size = int(m.group(2), 16)\n    if base <= pc < base + size:\n        print(f'  base=0x{base:08X}  size=0x{size:X}  {m.group(3)}')\n\n# Print RAM layout summary: _estack, _end, __bss_end__, heap\nprint()\nprint('=== RAM layout symbols ===')\nfor sym in ['_estack', '_end', '__bss_end__', '__end__', '_Min_Stack', '_Min_Heap', 'PROVIDE']:\n    for m in re.finditer(r'(0x[0-9a-f]+)\\s+' + re.escape(sym) if sym not in ('PROVIDE',) else sym + r'.*', txt):\n        print(f'  {sym}: {m.group(0)[:80]}')\n        break\n\"\n",
+        "command": "# Check the FAULTING map \u2014 most likely candidate given PC=0x08013074\npython3 -c \"\nimport re\nmf = '/home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Projects/NUCLEO-L476RG/Examples/PWR/FAULTING/STM32CubeIDE/Debug/FAULTING.map'\ntxt = open(mf).read()\n\n# Find code section covering 0x08013074\npc = 0x08013074\nprint('=== Sections covering PC 0x{:08X} ==='.format(pc))\nfor m in re.finditer(r'0x([0-9a-f]{8,})\\s+0x([0-9a-f]+)\\s+(\\S+)', txt):\n    base = int(m.group(1), 16)\n    size = int(m.group(2), 16)\n    if base <= pc < base + size:\n        print(f'  base=0x{base:08X}  size=0x{size:X}  {m.group(3)}')\n\n# Print RAM layout summary: _estack, _end, __bss_end__, heap\nprint()\nprint('=== RAM layout symbols ===')\nfor sym in ['_estack', '_end', '__bss_end__', '__end__', '_Min_Stack', '_Min_Heap', 'PROVIDE']:\n    for m in re.finditer(r'(0x[0-9a-f]+)\\s+' + re.escape(sym) if sym not in ('PROVIDE',) else sym + r'.*', txt):\n        print(f'  {sym}: {m.group(0)[:80]}')\n        break\n\"\n",
         "description": "Parse FAULTING map file to identify active section at PC and RAM layout"
       }
     },
@@ -64,7 +64,7 @@
     {
       "name": "Bash",
       "args": {
-        "command": "find /home/user/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Projects/NUCLEO-L476RG/Examples/PWR/FAULTING \\\n  -name \"*.c\" -o -name \"*.h\" | head -20",
+        "command": "find /home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Projects/NUCLEO-L476RG/Examples/PWR/FAULTING \\\n  -name \"*.c\" -o -name \"*.h\" | head -20",
         "description": "List source files in FAULTING project"
       }
     },
@@ -78,13 +78,13 @@
     {
       "name": "Read",
       "args": {
-        "file_path": "/home/user/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Projects/NUCLEO-L476RG/Examples/PWR/FAULTING/Src/main.c"
+        "file_path": "/home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Projects/NUCLEO-L476RG/Examples/PWR/FAULTING/Src/main.c"
       }
     },
     {
       "name": "Read",
       "args": {
-        "file_path": "/home/user/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Projects/NUCLEO-L476RG/Examples/PWR/FAULTING/Inc/test.h"
+        "file_path": "/home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Projects/NUCLEO-L476RG/Examples/PWR/FAULTING/Inc/test.h"
       }
     }
   ],

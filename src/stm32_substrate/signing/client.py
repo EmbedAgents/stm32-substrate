@@ -23,6 +23,7 @@ from stm32_substrate.errors import (
     ToolError,
 )
 from stm32_substrate.signing.results import SigningResult
+from stm32_substrate.resolution import coerce_path
 from stm32_substrate.subprocess_runner import run_tool
 
 if TYPE_CHECKING:
@@ -30,8 +31,10 @@ if TYPE_CHECKING:
 
 
 _ADDRESS_RE = re.compile(r"^0x[0-9A-Fa-f]+$")
-_HEADER_VERSIONS: tuple[str, ...] = ("1", "2", "2.1", "2.2", "2.3")
-_IMAGE_TYPES: tuple[str, ...] = ("ssbl", "fsbl", "teeh", "teed", "teex", "copro")
+# No substrate-side header-version / image-type allowlists: SigningTool
+# reports its own validation errors (RES-015 Q2(c) / RES-018 — the
+# vendor-reports stance; an allowlist here would go stale as ST adds
+# families). IMP-43 removed the dead constants that implied otherwise.
 _ENTRY_POINT_REQUIRED: frozenset[str] = frozenset({"fsbl", "ssbl"})
 
 
@@ -88,11 +91,14 @@ class SigningTool:
     ) -> SigningResult:
         """Sign ``input_path``; return ``SigningResult`` on success.
 
-        See the signing API spec for validation rules + argv mapping
+        See ``v1/signing-api.md`` for validation rules + argv mapping
         (UM2543 §2.1). Raises ``ValueError`` on bad input, ``SigningToolError``
         on signing-stage / output-exists / vendor failure.
         """
         # ---- input file checks ----
+        input_path = coerce_path(input_path)  # str|Path tolerated (IMP-22)
+        if output_path is not None:
+            output_path = coerce_path(output_path)
         if not input_path.is_file():
             raise SigningToolError(
                 message=f"input file not found: {input_path}",

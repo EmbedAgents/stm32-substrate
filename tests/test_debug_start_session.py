@@ -31,6 +31,25 @@ def ctx(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SubstrateContext:
     return SubstrateContext.from_environment(project_path=tmp_path)
 
 
+def _ctx_with_defaults(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, debug_defaults: dict
+) -> SubstrateContext:
+    """Build a ctx whose ``defaults.debug`` carries the given knobs."""
+    for env_var, name in (
+        ("STM32_PROGRAMMER_CLI", "STM32_Programmer_CLI"),
+        ("STLINK_GDB_SERVER", "ST-LINK_gdbserver"),
+        ("ARM_NONE_EABI_GDB", "arm-none-eabi-gdb"),
+    ):
+        b = tmp_path / name
+        b.write_text("#!/bin/sh\nexit 0\n")
+        b.chmod(0o755)
+        monkeypatch.setenv(env_var, str(b))
+    (tmp_path / "stm32-runtime-defaults.jsonc").write_text(
+        json.dumps({"version": 1, "debug": debug_defaults})
+    )
+    return SubstrateContext.from_environment(project_path=tmp_path)
+
+
 # ---------------------------------------------------------------------------
 # ELF resolution
 # ---------------------------------------------------------------------------
@@ -113,27 +132,41 @@ class TestPortIteration:
     def test_custom_range_from_defaults(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        for env_var, name in (
-            ("STM32_PROGRAMMER_CLI", "STM32_Programmer_CLI"),
-            ("STLINK_GDB_SERVER", "ST-LINK_gdbserver"),
-            ("ARM_NONE_EABI_GDB", "arm-none-eabi-gdb"),
-        ):
-            b = tmp_path / name
-            b.write_text("")
-            b.chmod(0o755)
-            monkeypatch.setenv(env_var, str(b))
-        defaults = {
-            "version": 1,
-            "debug": {
+        ctx = _ctx_with_defaults(
+            tmp_path,
+            monkeypatch,
+            {
                 "gdb_port": 50000,
                 "gdb_port_fallback_range": [50000, 50001, 50002],
             },
-        }
-        (tmp_path / "stm32-runtime-defaults.jsonc").write_text(json.dumps(defaults))
-        ctx = SubstrateContext.from_environment(project_path=tmp_path)
+        )
         debug = Debug(ctx)
         ports = list(debug._port_iter(None))
         assert ports == [50000, 50001, 50002]
+
+    def test_gdb_port_knob_tried_first(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A-012: debug.gdb_port leads the walk even when it sits
+        # mid-range (spec: try gdb_port, then the fallback range).
+        ctx = _ctx_with_defaults(
+            tmp_path,
+            monkeypatch,
+            {
+                "gdb_port": 50001,
+                "gdb_port_fallback_range": [50000, 50001, 50002],
+            },
+        )
+        ports = list(Debug(ctx)._port_iter(None))
+        assert ports == [50001, 50000, 50002]
+
+    def test_gdb_port_knob_without_range_prepends_default_walk(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        ctx = _ctx_with_defaults(tmp_path, monkeypatch, {"gdb_port": 50005})
+        ports = list(Debug(ctx)._port_iter(None))
+        assert ports[0] == 50005
+        assert ports[1:] == list(range(61234, 61244))
 
 
 # ---------------------------------------------------------------------------
@@ -170,10 +203,12 @@ class TestSpawnHappyPath:
         assert spawn_gdbs.call_count == 1
         # gdb spawned once.
         assert spawn_gdb_mock.call_count == 1
-        # send_console called for "monitor reset halt" since halt=True.
+        # send_console called for "monitor reset" since halt=True
+        # (RES-041: gdbserver halts at Reset_Handler while attached;
+        # the OpenOCD "reset halt" form is rejected with ^error).
         gdb_mock.send_console.assert_called_once()
         cmd_arg = gdb_mock.send_console.call_args[0][0]
-        assert "monitor reset halt" == cmd_arg
+        assert "monitor reset" == cmd_arg
         # Session registered in ctx.session_state.
         assert ctx.session_state.active_debug_session is session
 
@@ -273,6 +308,129 @@ class TestPortFallback:
             with pytest.raises(GDBError) as excinfo:
                 debug.start_session(elf)
         assert excinfo.value.gdb_marker == "probe-not-found"
+        assert spawn_gdbs.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# teardown on unexpected spawn errors (IMP-11)
+# ---------------------------------------------------------------------------
+
+
+class TestSpawnTeardown:
+    def test_non_gdberror_from_spawn_gdb_closes_gdbserver(
+        self, ctx: SubstrateContext, tmp_path: Path
+    ) -> None:
+        elf = tmp_path / "demo.elf"
+        elf.write_text("")
+        debug = Debug(ctx)
+        gdbserver_mock = MagicMock(pid=1, port=61234)
+        with patch(
+            "stm32_substrate.debug.client.spawn_gdbserver",
+            return_value=gdbserver_mock,
+        ), patch(
+            "stm32_substrate.debug.client.spawn_gdb",
+            side_effect=RuntimeError("boom"),
+        ):
+            with pytest.raises(RuntimeError):
+                debug.start_session(elf)
+        gdbserver_mock.close.assert_called_once()
+
+    def test_non_gdberror_from_reset_halt_closes_both(
+        self, ctx: SubstrateContext, tmp_path: Path
+    ) -> None:
+        elf = tmp_path / "demo.elf"
+        elf.write_text("")
+        debug = Debug(ctx)
+        gdbserver_mock = MagicMock(pid=1, port=61234)
+        gdb_mock = MagicMock(pid=2)
+        gdb_mock.send_console.side_effect = RuntimeError("boom")
+        with patch(
+            "stm32_substrate.debug.client.spawn_gdbserver",
+            return_value=gdbserver_mock,
+        ), patch(
+            "stm32_substrate.debug.client.spawn_gdb", return_value=gdb_mock
+        ):
+            with pytest.raises(RuntimeError):
+                debug.start_session(elf, halt=True)
+        gdb_mock.close.assert_called_once()
+        gdbserver_mock.close.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# session-start timeout knobs (A-012)
+# ---------------------------------------------------------------------------
+
+
+class TestSessionStartTimeoutKnobs:
+    def test_handshake_knob_passed_to_spawn_gdbserver(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        ctx = _ctx_with_defaults(
+            tmp_path, monkeypatch, {"gdbserver_spawn_timeout_s": 3}
+        )
+        elf = tmp_path / "demo.elf"
+        elf.write_text("")
+        debug = Debug(ctx)
+        gdbserver_mock = MagicMock(pid=1, port=61234)
+        gdb_mock = MagicMock(pid=2)
+        with patch(
+            "stm32_substrate.debug.client.spawn_gdbserver",
+            return_value=gdbserver_mock,
+        ) as spawn_gdbs, patch(
+            "stm32_substrate.debug.client.spawn_gdb", return_value=gdb_mock
+        ):
+            debug.start_session(elf, halt=False)
+        assert spawn_gdbs.call_args.kwargs["handshake_timeout_s"] == 3.0
+
+    def test_connect_timeout_passed_to_spawn_gdb(
+        self, ctx: SubstrateContext, tmp_path: Path
+    ) -> None:
+        elf = tmp_path / "demo.elf"
+        elf.write_text("")
+        debug = Debug(ctx)
+        gdbserver_mock = MagicMock(pid=1, port=61234)
+        gdb_mock = MagicMock(pid=2)
+        with patch(
+            "stm32_substrate.debug.client.spawn_gdbserver",
+            return_value=gdbserver_mock,
+        ), patch(
+            "stm32_substrate.debug.client.spawn_gdb", return_value=gdb_mock
+        ) as spawn_gdb_mock:
+            debug.start_session(elf, halt=False)
+        # Per-step cap of 10 s, clipped to the (barely-touched) 30 s
+        # session budget → effectively 10.
+        connect_timeout = spawn_gdb_mock.call_args.kwargs["connect_timeout_s"]
+        assert 0 < connect_timeout <= 10.0
+
+    def test_session_budget_exhausted_during_port_walk_raises(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from types import SimpleNamespace
+
+        ctx = _ctx_with_defaults(
+            tmp_path, monkeypatch, {"session_start_timeout_s": 1}
+        )
+        elf = tmp_path / "demo.elf"
+        elf.write_text("")
+        debug = Debug(ctx)
+        # Each monotonic() call advances 0.6 s: deadline lands at 1.0;
+        # the second loop iteration sees the budget blown.
+        clock = iter([0.0, 0.6, 1.2, 1.8, 2.4, 3.0])
+        monkeypatch.setattr(
+            "stm32_substrate.debug.client.time",
+            SimpleNamespace(monotonic=lambda: next(clock)),
+        )
+        spawn_gdbs = MagicMock(
+            side_effect=GDBError(message="busy", gdb_marker="port-busy")
+        )
+        with patch(
+            "stm32_substrate.debug.client.spawn_gdbserver", spawn_gdbs
+        ):
+            with pytest.raises(GDBError) as excinfo:
+                debug.start_session(elf)
+        assert excinfo.value.gdb_marker == "command-timeout"
+        assert "session_start_timeout_s" in (excinfo.value.hint or "")
+        # One spawn attempt happened before the budget blew.
         assert spawn_gdbs.call_count == 1
 
 

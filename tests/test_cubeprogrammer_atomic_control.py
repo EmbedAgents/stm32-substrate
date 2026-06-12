@@ -173,9 +173,11 @@ class TestHaltCliPath:
 
 
 class TestHaltGdbPath:
-    def test_routes_through_send_monitor(
+    def test_routes_through_session_halt(
         self, ctx_with_debug_session: tuple[SubstrateContext, MagicMock]
     ) -> None:
+        """RES-041: gdb-side halt is the MI-level ``session.halt()``
+        (-exec-interrupt) — keeps gdb's target-state machine in sync."""
         ctx, session = ctx_with_debug_session
         client = CubeProgrammer(ctx)
         with patch(
@@ -183,7 +185,7 @@ class TestHaltGdbPath:
         ) as mocked_run_tool:
             result = client.halt()
         assert mocked_run_tool.call_count == 0
-        session.send_monitor.assert_called_once_with("halt")
+        session.halt.assert_called_once_with()
         assert result.data["via_gdb"] is True
         assert result.data["halted"] is True
 
@@ -219,11 +221,12 @@ class TestResumeCliPath:
 
 
 class TestResumeGdbPath:
-    def test_routes_through_send_monitor_continue(
+    def test_routes_through_session_resume(
         self, ctx_with_debug_session: tuple[SubstrateContext, MagicMock]
     ) -> None:
-        """gdb-side command is ``continue``, not ``run`` — substrate maps
-        F-018's CLI ``-run`` flag onto the gdb-canonical ``continue``."""
+        """RES-041: gdb-side resume is MI ``session.resume()``
+        (-exec-continue) — ST-LINK gdbserver has no resume-flavored Rcmd
+        (``monitor continue``/``go``/``resume`` all ^error on v7.13.0)."""
         ctx, session = ctx_with_debug_session
         client = CubeProgrammer(ctx)
         with patch(
@@ -231,7 +234,7 @@ class TestResumeGdbPath:
         ) as mocked_run_tool:
             result = client.resume()
         assert mocked_run_tool.call_count == 0
-        session.send_monitor.assert_called_once_with("continue")
+        session.resume.assert_called_once_with()
         assert result.data["via_gdb"] is True
 
 
@@ -255,7 +258,11 @@ class TestRoutingPrecedence:
             client.halt()
             client.resume()
         assert mocked_run_tool.call_count == 0
-        assert session.send_monitor.call_count == 3
+        # reset → send_monitor("reset"); halt/resume → MI-level
+        # session.halt()/session.resume() (RES-041).
+        session.send_monitor.assert_called_once_with("reset")
+        session.halt.assert_called_once_with()
+        session.resume.assert_called_once_with()
 
     def test_clearing_session_returns_to_cli_path(
         self, ctx_with_debug_session: tuple[SubstrateContext, MagicMock]
@@ -265,7 +272,7 @@ class TestRoutingPrecedence:
 
         # First call: gdb path.
         client.halt()
-        assert session.send_monitor.call_count == 1
+        assert session.halt.call_count == 1
 
         # Clear the session and try again — CLI path should fire.
         ctx.session_state.active_debug_session = None

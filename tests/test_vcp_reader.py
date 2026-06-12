@@ -506,3 +506,201 @@ class TestWriteLine:
         # Never opened — serial is None.
         with pytest.raises(VCPError):
             reader.write_line("hi")
+
+
+# ---------------------------------------------------------------------------
+# IMP-17 — drain-thread death must not leave a trusted zombie reader
+# ---------------------------------------------------------------------------
+
+
+class TestDrainDeath:
+    def test_drain_read_error_marks_reader_dead_and_warns(
+        self, ctx: SubstrateContext, port_path: str, caplog
+    ) -> None:
+        import logging
+
+        factory, holder = _serial_factory_capture()
+        reader = _VcpReader(
+            ctx=ctx, port=port_path, baud=115200, _serial_factory=factory
+        )
+        reader.open()
+        assert reader.is_alive() is True
+        ser = holder["serial"]
+
+        def _boom(n: int) -> bytes:
+            raise OSError("device reports readiness but returned no data")
+
+        with caplog.at_level(logging.WARNING, logger="stm32_substrate"):
+            ser.read = _boom  # type: ignore[method-assign]
+            assert reader._thread is not None
+            reader._thread.join(timeout=2.0)
+        # The port path still exists — only the drain-death flag can
+        # report this reader stale.
+        assert reader.is_alive() is False
+        assert any(
+            "drain thread died" in rec.message for rec in caplog.records
+        )
+        reader.close()
+
+    def test_reopen_after_drain_death_clears_flag(
+        self, ctx: SubstrateContext, port_path: str
+    ) -> None:
+        factory, holder = _serial_factory_capture()
+        reader = _VcpReader(
+            ctx=ctx, port=port_path, baud=115200, _serial_factory=factory
+        )
+        reader.open()
+        ser = holder["serial"]
+        ser.read = lambda n: (_ for _ in ()).throw(OSError("yank"))  # type: ignore[method-assign]
+        assert reader._thread is not None
+        reader._thread.join(timeout=2.0)
+        assert reader.is_alive() is False
+        reader.close()
+        reader.open()
+        assert reader.is_alive() is True
+        reader.close()
+
+
+# ---------------------------------------------------------------------------
+# IMP-18 — Windows COM names are not filesystem paths
+# ---------------------------------------------------------------------------
+
+
+class TestIsAliveComPort:
+    def test_com_port_name_skips_path_existence_probe(
+        self, ctx: SubstrateContext
+    ) -> None:
+        # os.path.exists('COM10') is False on every OS — a healthy
+        # Windows reader must not be declared stale for it.
+        factory, _holder = _serial_factory_capture()
+        reader = _VcpReader(
+            ctx=ctx, port="COM10", baud=115200, _serial_factory=factory
+        )
+        reader.open()
+        assert reader.is_alive() is True
+        reader.close()
+
+
+# ---------------------------------------------------------------------------
+# A-016 — send_and_read wall clock bounds a fast-streaming reply
+# ---------------------------------------------------------------------------
+
+
+class TestIdleReadWallBudget:
+    def test_wall_budget_bounds_continuously_streaming_firmware(
+        self, ctx: SubstrateContext, port_path: str
+    ) -> None:
+        factory, holder = _serial_factory_capture()
+        reader = _VcpReader(
+            ctx=ctx, port=port_path, baud=115200, _serial_factory=factory
+        )
+        reader.open()
+        ser = holder["serial"]
+
+        stop = threading.Event()
+
+        def _firehose() -> None:
+            # Lines far faster than the 200 ms idle gap — the idle exit
+            # never fires; only the wall clock can end the collection.
+            while not stop.is_set():
+                ser.feed(b"tick\n")
+                time.sleep(0.005)
+
+        feeder = threading.Thread(target=_firehose, daemon=True)
+        feeder.start()
+        try:
+            start = time.monotonic()
+            lines, timeout_hit = reader.read_lines_with_idle(
+                timeout_s=0.4, inter_line_idle_ms=200
+            )
+            elapsed = time.monotonic() - start
+        finally:
+            stop.set()
+            feeder.join(timeout=1.0)
+            reader.close()
+        assert lines  # replies were observed
+        assert timeout_hit is False
+        # Pre-fix this blocked for as long as the firmware kept printing.
+        assert elapsed < 2.0
+
+
+# ---------------------------------------------------------------------------
+# IMP-19 — follow mode must not drop lines arriving during backlog yield
+# ---------------------------------------------------------------------------
+
+
+class TestFollowBacklogGap:
+    def test_line_arriving_mid_backlog_is_not_dropped(
+        self, ctx: SubstrateContext, port_path: str
+    ) -> None:
+        factory, holder = _serial_factory_capture()
+        reader = _VcpReader(
+            ctx=ctx, port=port_path, baud=115200, _serial_factory=factory
+        )
+        reader.open()
+        ser = holder["serial"]
+        ser.feed(b"a\nb\n")
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline:
+            with reader._lock:
+                if len(reader._buffer) == 2:
+                    break
+            time.sleep(0.005)
+
+        gen = reader.read_lines(follow=True, last_n=2)
+        assert next(gen) == "a"
+        # A new line lands while the backlog is still being yielded.
+        ser.feed(b"c\n")
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline:
+            with reader._lock:
+                if reader._buffer:
+                    break
+            time.sleep(0.005)
+        assert next(gen) == "b"
+        assert next(gen) == "c"  # dropped by the pre-fix buffer.clear()
+        reader.close()
+
+
+# ---------------------------------------------------------------------------
+# RES-046 — follow mode honors an explicit wall-clock timeout
+# ---------------------------------------------------------------------------
+
+
+class TestFollowWallClockBound:
+    def test_follow_with_timeout_terminates_at_deadline(
+        self, ctx: SubstrateContext, port_path: str
+    ) -> None:
+        """``read_lines(follow=True, timeout_s=...)`` returns cleanly at
+        the deadline on a silent port (RES-046 — previously the value
+        was silently discarded and the stream ran forever; surfaced by a
+        Phase-4 live eval where ``vcp tail --follow --timeout 8`` hung
+        for 27+ minutes)."""
+        factory, holder = _serial_factory_capture()
+        reader = _VcpReader(
+            ctx=ctx, port=port_path, baud=115200, _serial_factory=factory
+        )
+        reader.open()
+        ser = holder["serial"]
+        ser.feed(b"pre\n")
+        start = time.monotonic()
+        lines = list(reader.read_lines(follow=True, last_n=10, timeout_s=0.6))
+        elapsed = time.monotonic() - start
+        assert lines == ["pre"]
+        assert elapsed < 5.0  # returned at ~0.6s, not hung
+        reader.close()
+
+    def test_follow_without_timeout_keeps_streaming(
+        self, ctx: SubstrateContext, port_path: str
+    ) -> None:
+        """A bare follow (timeout_s=None) does NOT self-terminate — the
+        Ctrl-C contract is preserved; only an explicit timeout bounds."""
+        factory, holder = _serial_factory_capture()
+        reader = _VcpReader(
+            ctx=ctx, port=port_path, baud=115200, _serial_factory=factory
+        )
+        reader.open()
+        gen = reader.read_lines(follow=True, timeout_s=None)
+        holder["serial"].feed(b"x\n")
+        assert next(gen) == "x"  # still live well past any default window
+        reader.close()

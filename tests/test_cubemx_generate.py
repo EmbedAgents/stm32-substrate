@@ -285,8 +285,12 @@ class TestPathResolution:
         assert str(ioc).replace("\\", "/") in call.kwargs["script_text"]
 
     def test_no_ioc_anywhere_raises(self, ctx: SubstrateContext) -> None:
+        # IMP-41: ConfigurationError with a hint, consistent with every
+        # other resolver (was a bare ValueError).
+        from stm32_substrate.errors import ConfigurationError
+
         client = CubeMX(ctx)
-        with pytest.raises(ValueError, match="ioc_path"):
+        with pytest.raises(ConfigurationError, match="cubemx.ioc_path"):
             client.generate()  # no kwarg + no descriptor field
 
 

@@ -212,6 +212,57 @@ class TestKwargValidation:
         with pytest.raises(ConfigurationError):
             client.build()
 
+    # A-001: unmapped option values must raise loud, not get written into
+    # .cproject verbatim with a success report.
+    def test_bare_debug_level_rejected(
+        self, ctx: SubstrateContext, project_dir: Path
+    ) -> None:
+        client = CubeIDE(ctx)
+        with pytest.raises(ValueError, match=r"invalid debug_level '2'.*-g3"):
+            client.build(project=project_dir, debug_level="2")
+
+    def test_bare_optimization_rejected(
+        self, ctx: SubstrateContext, project_dir: Path
+    ) -> None:
+        client = CubeIDE(ctx)
+        # The old stm32build.md documented bare "O2" — must not silently
+        # land in .cproject.
+        with pytest.raises(ValueError, match=r"invalid optimization 'O2'.*-Oz"):
+            client.build(project=project_dir, optimization="O2")
+
+    def test_unknown_optimization_rejected_before_any_edit(
+        self, ctx: SubstrateContext, project_dir: Path
+    ) -> None:
+        client = CubeIDE(ctx)
+        original_xml = (project_dir / ".cproject").read_bytes()
+        with pytest.raises(ValueError, match="invalid optimization"):
+            client.build(project=project_dir, optimization="-Omax")
+        # Validation fires before the edit protocol — .cproject untouched.
+        assert (project_dir / ".cproject").read_bytes() == original_xml
+
+    def test_fully_formed_cdt_enum_value_passes_through(
+        self, ctx: SubstrateContext, project_dir: Path
+    ) -> None:
+        # The documented escape hatch: a fully-formed CDT enum value
+        # (contains ".value.") bypasses the alias table verbatim.
+        client = CubeIDE(ctx)
+        with patch(
+            "stm32_substrate.cubeide.headless.run_tool",
+            return_value=_build_run_tool_success(),
+        ):
+            result = client.build(
+                project=project_dir,
+                debug_level="gnu.c.compiler.option.debuglevel.value.g3",
+            )
+        assert result.settings_modification is not None
+        tree = ET.parse(project_dir / ".cproject")
+        values = [
+            opt.get("value")
+            for opt in tree.iter("option")
+            if opt.get("superClass") == "gnu.c.compiler.option.debuglevel"
+        ]
+        assert "gnu.c.compiler.option.debuglevel.value.g3" in values
+
 
 # ---------------------------------------------------------------------------
 # Happy build path
@@ -453,7 +504,7 @@ class TestBuildFailure:
             "stm32_substrate.cubeide.headless.run_tool",
             return_value=_build_run_tool_failure(),
         ):
-            result = client.build(project=project_dir, debug_level="level.maximum")
+            result = client.build(project=project_dir, debug_level="-g1")
         assert result.success is False
         # .cproject was modified and stays modified after the build failed.
         new_xml = (project_dir / ".cproject").read_bytes()
@@ -930,3 +981,323 @@ class TestResolveHeadlessBuild:
         # ToolPaths is frozen; use object.__setattr__ to inject for the test.
         object.__setattr__(ctx.tools, "cubeide_headless_build", override)
         assert resolve_headless_build(ctx=ctx) == override
+
+
+# ---------------------------------------------------------------------------
+# IMP-10 — workspace mutations serialized under the substrate lock
+# ---------------------------------------------------------------------------
+
+
+class TestWorkspaceMutationOrdering:
+    def test_cleanup_runs_under_substrate_lock(
+        self,
+        ctx: SubstrateContext,
+        project_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """IMP-10: cleanup_stale_project (and the workspace mkdir) used
+        to run BEFORE acquire_workspace_lock — a concurrent invocation
+        could purge metadata out from under a running build, then raise
+        WorkspaceLockedError. All workspace mutations now happen inside
+        the lock."""
+        import contextlib as _ctxlib
+
+        from stm32_substrate.cubeide import workspace as ws_mod
+
+        events: list[str] = []
+        real_lock = ws_mod.acquire_workspace_lock
+
+        @_ctxlib.contextmanager
+        def recording_lock(path: Path):
+            events.append("lock-enter")
+            with real_lock(path):
+                yield
+            events.append("lock-exit")
+
+        monkeypatch.setattr(ws_mod, "acquire_workspace_lock", recording_lock)
+        # Simulate a stale import: workspace says the project lives
+        # somewhere else → cleanup path fires.
+        monkeypatch.setattr(
+            ws_mod,
+            "detect_project_imported",
+            lambda w, n: Path("/somewhere/else"),
+        )
+        monkeypatch.setattr(
+            ws_mod,
+            "cleanup_stale_project",
+            lambda w, n, logger=None: events.append("cleanup"),
+        )
+
+        client = CubeIDE(ctx)
+        with patch(
+            "stm32_substrate.cubeide.headless.run_tool",
+            return_value=_build_run_tool_success(),
+        ):
+            result = client.build(project=project_dir)
+        assert result.success is True
+        assert "cleanup" in events
+        assert (
+            events.index("lock-enter")
+            < events.index("cleanup")
+            < events.index("lock-exit")
+        )
+
+
+# ---------------------------------------------------------------------------
+# A-009 — the "already exists in the workspace" single bounded retry
+# (ratified RES-040; previously shipped unratified + untested)
+# ---------------------------------------------------------------------------
+
+
+def _already_exists_failure() -> ToolRunResult:
+    return ToolRunResult(
+        exit_code=1,
+        stdout="",
+        stderr='Project "demo" already exists in the workspace!\n',
+        duration_s=0.3,
+        timed_out=False,
+    )
+
+
+class TestAlreadyExistsRetry:
+    def test_retries_once_without_import_then_succeeds(
+        self, ctx: SubstrateContext, project_dir: Path
+    ) -> None:
+        calls: list[list[str]] = []
+
+        def record(binary, args, **kwargs):
+            calls.append([str(a) for a in args])
+            if len(calls) == 1:
+                return _already_exists_failure()
+            return _build_run_tool_success()
+
+        client = CubeIDE(ctx)
+        with patch(
+            "stm32_substrate.cubeide.headless.run_tool", side_effect=record
+        ):
+            result = client.build(project=project_dir)
+        assert result.success is True
+        assert len(calls) == 2
+        assert any("-import" in a for a in calls[0])
+        assert not any("-import" in a for a in calls[1])
+
+    def test_other_failures_do_not_retry(
+        self, ctx: SubstrateContext, project_dir: Path
+    ) -> None:
+        """M-017: the retry fires ONLY on the specific Eclipse
+        hidden-tree marker text — any other failure stays one-shot."""
+        calls: list[int] = []
+
+        def record(binary, args, **kwargs):
+            calls.append(1)
+            return _build_run_tool_failure()
+
+        client = CubeIDE(ctx)
+        with patch(
+            "stm32_substrate.cubeide.headless.run_tool", side_effect=record
+        ):
+            result = client.build(project=project_dir)
+        assert result.success is False
+        assert len(calls) == 1
+
+    def test_retry_is_single_never_a_loop(
+        self, ctx: SubstrateContext, project_dir: Path
+    ) -> None:
+        calls: list[int] = []
+
+        def record(binary, args, **kwargs):
+            calls.append(1)
+            return _already_exists_failure()
+
+        client = CubeIDE(ctx)
+        with patch(
+            "stm32_substrate.cubeide.headless.run_tool", side_effect=record
+        ):
+            result = client.build(project=project_dir)
+        assert result.success is False
+        assert len(calls) == 2  # initial + exactly one retry
+
+
+# ---------------------------------------------------------------------------
+# ARC-02 + IMP-09 — add_sources/add_symbols gates and typed copy errors
+# ---------------------------------------------------------------------------
+
+
+class TestAddSourcesExistingGate:
+    def _src(self, tmp_path: Path, content: str = "int helper(void){return 1;}\n") -> Path:
+        src = tmp_path / "external" / "helper.c"
+        src.parent.mkdir(parents=True, exist_ok=True)
+        src.write_text(content, encoding="utf-8")
+        return src
+
+    def test_existing_destination_without_callback_raises(
+        self, ctx: SubstrateContext, project_dir: Path, tmp_path: Path
+    ) -> None:
+        src = self._src(tmp_path)
+        (project_dir / "helper.c").write_text("ORIGINAL\n", encoding="utf-8")
+        client = CubeIDE(ctx)
+        with patch(
+            "stm32_substrate.cubeide.headless.run_tool",
+            return_value=_build_run_tool_success(),
+        ):
+            with pytest.raises(CProjectEditError, match="already exists"):
+                client.build(project=project_dir, add_sources=[src])
+        # Pre-existing file untouched.
+        assert (project_dir / "helper.c").read_text(encoding="utf-8") == "ORIGINAL\n"
+
+    def test_on_existing_replace_overwrites(
+        self, ctx: SubstrateContext, project_dir: Path, tmp_path: Path
+    ) -> None:
+        src = self._src(tmp_path)
+        (project_dir / "helper.c").write_text("ORIGINAL\n", encoding="utf-8")
+        client = CubeIDE(ctx)
+        with patch(
+            "stm32_substrate.cubeide.headless.run_tool",
+            return_value=_build_run_tool_success(),
+        ):
+            client.build(
+                project=project_dir,
+                add_sources=[src],
+                on_existing=lambda p: "replace",
+            )
+        assert "helper(void)" in (project_dir / "helper.c").read_text(
+            encoding="utf-8"
+        )
+
+    def test_on_existing_skip_leaves_destination(
+        self, ctx: SubstrateContext, project_dir: Path, tmp_path: Path
+    ) -> None:
+        src = self._src(tmp_path)
+        (project_dir / "helper.c").write_text("ORIGINAL\n", encoding="utf-8")
+        client = CubeIDE(ctx)
+        with patch(
+            "stm32_substrate.cubeide.headless.run_tool",
+            return_value=_build_run_tool_success(),
+        ):
+            result = client.build(
+                project=project_dir,
+                add_sources=[src],
+                on_existing=lambda p: "skip",
+            )
+        assert (project_dir / "helper.c").read_text(encoding="utf-8") == "ORIGINAL\n"
+        assert isinstance(result, BuildResult)
+
+    def test_on_existing_rename_copies_under_new_name(
+        self, ctx: SubstrateContext, project_dir: Path, tmp_path: Path
+    ) -> None:
+        src = self._src(tmp_path)
+        (project_dir / "helper.c").write_text("ORIGINAL\n", encoding="utf-8")
+        client = CubeIDE(ctx)
+        with patch(
+            "stm32_substrate.cubeide.headless.run_tool",
+            return_value=_build_run_tool_success(),
+        ):
+            client.build(
+                project=project_dir,
+                add_sources=[src],
+                on_existing=lambda p: "rename",
+            )
+        assert (project_dir / "helper.c").read_text(encoding="utf-8") == "ORIGINAL\n"
+        assert (project_dir / "helper-1.c").is_file()
+
+    def test_missing_source_raises_typed_error(
+        self, ctx: SubstrateContext, project_dir: Path, tmp_path: Path
+    ) -> None:
+        # IMP-09: was a raw FileNotFoundError straight through build().
+        client = CubeIDE(ctx)
+        with patch(
+            "stm32_substrate.cubeide.headless.run_tool",
+            return_value=_build_run_tool_success(),
+        ):
+            with pytest.raises(CProjectEditError, match="copy failed"):
+                client.build(
+                    project=project_dir,
+                    add_sources=[tmp_path / "no-such-file.c"],
+                )
+
+
+class TestAddSymbolsConflictGate:
+    def _build(self, ctx: SubstrateContext, project_dir: Path, **kwargs):
+        client = CubeIDE(ctx)
+        with patch(
+            "stm32_substrate.cubeide.headless.run_tool",
+            return_value=_build_run_tool_success(),
+        ):
+            return client.build(project=project_dir, **kwargs)
+
+    def _symbols(self, project_dir: Path) -> list[str]:
+        tree = ET.parse(project_dir / ".cproject")
+        out = []
+        for opt in tree.iter("option"):
+            if opt.get("superClass") == "gnu.c.compiler.option.definedsymbols":
+                out += [c.get("value") for c in opt.findall("listOptionValue")]
+        return out
+
+    def test_conflicting_value_without_callback_raises(
+        self, ctx: SubstrateContext, project_dir: Path
+    ) -> None:
+        self._build(ctx, project_dir, add_symbols=[("MY_VER", "1")])
+        with pytest.raises(CProjectEditError, match="already defined"):
+            self._build(ctx, project_dir, add_symbols=[("MY_VER", "2")])
+        # Rollback kept the original definition.
+        assert "MY_VER=1" in self._symbols(project_dir)
+        assert "MY_VER=2" not in self._symbols(project_dir)
+
+    def test_on_conflict_replace_swaps_value(
+        self, ctx: SubstrateContext, project_dir: Path
+    ) -> None:
+        self._build(ctx, project_dir, add_symbols=[("MY_VER", "1")])
+        seen = []
+        self._build(
+            ctx,
+            project_dir,
+            add_symbols=[("MY_VER", "2")],
+            on_conflict=lambda name, old, new: (seen.append((name, old, new)), "replace")[1],
+        )
+        assert seen == [("MY_VER", "MY_VER=1", "MY_VER=2")]
+        symbols = self._symbols(project_dir)
+        assert "MY_VER=2" in symbols
+        assert "MY_VER=1" not in symbols
+
+    def test_on_conflict_skip_keeps_existing(
+        self, ctx: SubstrateContext, project_dir: Path
+    ) -> None:
+        self._build(ctx, project_dir, add_symbols=[("MY_VER", "1")])
+        self._build(
+            ctx,
+            project_dir,
+            add_symbols=[("MY_VER", "2")],
+            on_conflict=lambda name, old, new: "skip",
+        )
+        symbols = self._symbols(project_dir)
+        assert "MY_VER=1" in symbols
+        assert "MY_VER=2" not in symbols
+
+    def test_on_conflict_abort_raises(
+        self, ctx: SubstrateContext, project_dir: Path
+    ) -> None:
+        self._build(ctx, project_dir, add_symbols=[("MY_VER", "1")])
+        with pytest.raises(CProjectEditError, match="abort"):
+            self._build(
+                ctx,
+                project_dir,
+                add_symbols=[("MY_VER", "2")],
+                on_conflict=lambda name, old, new: "abort",
+            )
+
+    def test_same_value_is_not_a_conflict(
+        self, ctx: SubstrateContext, project_dir: Path
+    ) -> None:
+        self._build(ctx, project_dir, add_symbols=[("MY_VER", "1")])
+        # Re-adding the identical definition dedupes silently; the
+        # callback must NOT fire.
+        def _no_call(name, old, new):
+            raise AssertionError("on_conflict fired for an identical value")
+
+        self._build(
+            ctx,
+            project_dir,
+            add_symbols=[("MY_VER", "1")],
+            on_conflict=_no_call,
+        )
+        assert self._symbols(project_dir).count("MY_VER=1") == 1

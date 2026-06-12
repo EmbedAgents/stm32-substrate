@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Callable, Literal, TYPE_CHECKING
 
 from stm32_substrate.cubeide import headless, presets, workspace
+from stm32_substrate.resolution import coerce_path
 from stm32_substrate.cubeide.cproject import CProjectEditor
 from stm32_substrate.cubeide.results import (
     BuildResult,
@@ -49,6 +50,18 @@ ExistingCallback = Callable[[Path], Literal["replace", "skip", "rename"]]
 AmbiguousCallback = Callable[[list[Path]], Path]
 """``(candidates) -> picked_path`` — fires from ``find_project`` (B-018 /
 B-019) when multiple ``.cproject`` paths match."""
+
+
+def _unique_destination(path: Path) -> Path:
+    """First non-existing ``<stem>-<n><suffix>`` sibling (on_existing='rename')."""
+    for i in range(1, 1000):
+        cand = path.with_name(f"{path.stem}-{i}{path.suffix}")
+        if not cand.exists():
+            return cand
+    raise CProjectEditError(
+        message=f"could not find a free rename target near {path}",
+        hint="clean up the numbered copies or pass an explicit (src, dest)",
+    )
 
 
 def _lib_ref(lib_path: Path) -> str:
@@ -136,7 +149,7 @@ class CubeIDE:
         """Run a headless CubeIDE build, optionally applying ``.cproject``
         edits first.
 
-        See the CubeIDE API spec § "Prompt → kwargs mapping" for the
+        See ``v1/cubeide-api.md`` § "Prompt → kwargs mapping" for the
         14-prompt grid. ``preset`` is exclusive with ``debug_level`` /
         ``optimization`` — passing both raises ``ValueError``. Multiple
         edit kwargs can combine in one call; they land in one
@@ -161,6 +174,31 @@ class CubeIDE:
             raise ValueError(
                 "preset is exclusive with debug_level/optimization"
             )
+        # A fully-formed CDT enum value (".value." in it) passes through
+        # verbatim — the documented escape hatch in presets.*_ALIASES.
+        # Anything else must be a known alias: an unmapped value would be
+        # written into .cproject verbatim and the build would report
+        # success while CubeIDE ignores or chokes on the option.
+        if (
+            debug_level is not None
+            and debug_level not in presets.DEBUG_LEVEL_ALIASES
+            and ".value." not in debug_level
+        ):
+            raise ValueError(
+                f"invalid debug_level {debug_level!r}: expected one of "
+                f"{sorted(presets.DEBUG_LEVEL_ALIASES)} "
+                "or a fully-formed CDT enum value (…debuglevel.value.<token>)"
+            )
+        if (
+            optimization is not None
+            and optimization not in presets.OPTIMIZATION_ALIASES
+            and ".value." not in optimization
+        ):
+            raise ValueError(
+                f"invalid optimization {optimization!r}: expected one of "
+                f"{sorted(presets.OPTIMIZATION_ALIASES)} "
+                "or a fully-formed CDT enum value (…optimization.level.value.<token>)"
+            )
 
         # ---- resolve project + configuration ----
         project_path = self._resolve_project_path(project)
@@ -181,29 +219,38 @@ class CubeIDE:
         )
 
         # ---- workspace lifecycle ----
-        if workspace.detect_workspace_lock(workspace_path):
-            raise WorkspaceLockedError(
-                message="CubeIDE GUI is holding this workspace",
-                cubeide_marker="workspace-locked",
-                workspace_path=workspace_path,
-                project_name=project_name,
-                configuration=config_name,
-                hint="close STM32CubeIDE GUI on this workspace, then re-run",
-            )
-
-        imported_loc = workspace.detect_project_imported(workspace_path, project_name)
-        if imported_loc is not None and imported_loc != project_path:
-            workspace.cleanup_stale_project(
-                workspace_path, project_name, logger=self._log
-            )
-            imported_loc = None
-        needs_import = imported_loc is None
-        if needs_import:
-            workspace_path.mkdir(parents=True, exist_ok=True)
-
-        # ---- apply .cproject edits inside the substrate-lock ----
+        # Everything that mutates the workspace — stale-project cleanup,
+        # directory creation, .cproject edits, the build itself — runs
+        # under the substrate lock. Cleanup used to run BEFORE the lock,
+        # so a concurrent invocation could purge metadata out from under
+        # a running build and only then raise WorkspaceLockedError
+        # (IMP-10). The GUI-lock pre-check lives inside too: it must be
+        # serialized against the cleanup that may delete a stale .lock.
         settings_modification = None
         with workspace.acquire_workspace_lock(workspace_path):
+            if workspace.detect_workspace_lock(workspace_path):
+                raise WorkspaceLockedError(
+                    message="CubeIDE GUI is holding this workspace",
+                    cubeide_marker="workspace-locked",
+                    workspace_path=workspace_path,
+                    project_name=project_name,
+                    configuration=config_name,
+                    hint="close STM32CubeIDE GUI on this workspace, then re-run",
+                )
+
+            imported_loc = workspace.detect_project_imported(
+                workspace_path, project_name
+            )
+            if imported_loc is not None and imported_loc != project_path:
+                workspace.cleanup_stale_project(
+                    workspace_path, project_name, logger=self._log
+                )
+                imported_loc = None
+            needs_import = imported_loc is None
+            if needs_import:
+                workspace_path.mkdir(parents=True, exist_ok=True)
+
+            # ---- apply .cproject edits inside the substrate-lock ----
             if edits_requested:
                 settings_modification = self._apply_settings(
                     project_path=project_path,
@@ -216,6 +263,8 @@ class CubeIDE:
                     add_libraries=add_libraries,
                     add_sources=add_sources,
                     add_include_paths=add_include_paths,
+                    on_conflict=on_conflict,
+                    on_existing=on_existing,
                 )
 
             # ---- invoke headless build ----
@@ -315,7 +364,7 @@ class CubeIDE:
         on_ambiguous: AmbiguousCallback | None = None,
     ) -> FoundProject:
         """Search 0..2 levels under ``folder`` for ``.cproject`` files."""
-        search_root = (folder or self.ctx.cwd).resolve()
+        search_root = coerce_path(folder) if folder is not None else self.ctx.cwd.resolve()
         cproject_paths = sorted(_search_cproject(search_root, max_depth=2))
 
         if not cproject_paths:
@@ -399,7 +448,7 @@ class CubeIDE:
         (logged at INFO). Anything else raises loud with a hint
         (HIL rule: no guessing).
         """
-        explicit = project.resolve()
+        explicit = coerce_path(project)  # str|Path tolerated (IMP-22)
         if (explicit / ".project").is_file():
             return explicit
         if not explicit.exists():
@@ -523,6 +572,8 @@ class CubeIDE:
         add_libraries: list | None,
         add_sources: list | None,
         add_include_paths: list | None,
+        on_conflict: ConflictCallback | None = None,
+        on_existing: ExistingCallback | None = None,
     ):
         """Run the CProjectEditor protocol for one ``build()`` call."""
         editor = CProjectEditor(project_path, logger=self._log)
@@ -551,15 +602,28 @@ class CubeIDE:
                     all_configurations=all_configurations,
                 )
             if add_symbols:
+                symbols_superclass = r".*\.compiler\.option\.definedsymbols"
                 for sym in add_symbols:
                     rendered = sym if isinstance(sym, str) else f"{sym[0]}={sym[1]}"
-                    editor.append_list_value(
+                    change = editor.append_list_value(
                         # Real CubeIDE: ...c.compiler.option.definedsymbols.
                         # (The old ...preprocessor.def.symbols regex never
                         # matched real ST output — see RES note in plan.)
-                        superclass=r".*\.compiler\.option\.definedsymbols",
+                        superclass=symbols_superclass,
                         value=rendered,
                         configuration=configuration if not all_configurations else None,
+                        all_configurations=all_configurations,
+                    )
+                    # ARC-02: same symbol already defined with a DIFFERENT
+                    # value → on_conflict decides; no callback → raise
+                    # (ambiguity raises, per HIL).
+                    self._resolve_symbol_conflict(
+                        editor,
+                        change,
+                        rendered,
+                        superclass=symbols_superclass,
+                        on_conflict=on_conflict,
+                        configuration=configuration,
                         all_configurations=all_configurations,
                     )
             if add_include_paths:
@@ -611,16 +675,133 @@ class CubeIDE:
                     else:
                         src_path, dest = Path(source), Path(Path(source).name)
                     dest_abs = dest if dest.is_absolute() else project_path / dest
-                    dest_abs.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(src_path, dest_abs)
+                    # ARC-02: an existing destination must not be silently
+                    # overwritten — on_existing decides; no callback → raise.
+                    if dest_abs.exists():
+                        decision = (
+                            on_existing(dest_abs)
+                            if on_existing is not None
+                            else None
+                        )
+                        if decision is None:
+                            raise CProjectEditError(
+                                message=(
+                                    f"add_sources destination already "
+                                    f"exists: {dest_abs}"
+                                ),
+                                hint=(
+                                    "pass on_existing=... returning "
+                                    "'replace' / 'skip' / 'rename', or "
+                                    "pick a different (src, dest) target"
+                                ),
+                                recoverable=True,
+                            )
+                        if decision == "skip":
+                            continue
+                        if decision == "rename":
+                            dest_abs = _unique_destination(dest_abs)
+                        elif decision != "replace":
+                            raise ValueError(
+                                f"on_existing returned invalid decision "
+                                f"{decision!r}; expected 'replace' / "
+                                "'skip' / 'rename'"
+                            )
+                    # IMP-09: a missing source / unwritable tree raised a
+                    # raw FileNotFoundError/OSError straight through the
+                    # protocol try-block (which catches CProjectEditError
+                    # only — so it also skipped rollback).
+                    try:
+                        dest_abs.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(src_path, dest_abs)
+                    except OSError as ex:
+                        raise CProjectEditError(
+                            message=(
+                                f"add_sources copy failed: {src_path} → "
+                                f"{dest_abs}: {ex}"
+                            ),
+                            hint=(
+                                "check that the source file exists and "
+                                "the project tree is writable"
+                            ),
+                        ) from ex
                     editor.track_aux(dest_abs)
-                    editor.unexclude_source(src_path.name)
+                    editor.unexclude_source(dest_abs.name)
             editor.write_and_validate()
             editor.commit()
         except CProjectEditError:
             editor.rollback()
             raise
         return editor.snapshot_record()
+
+    def _resolve_symbol_conflict(
+        self,
+        editor: CProjectEditor,
+        change,
+        rendered: str,
+        *,
+        superclass: str,
+        on_conflict: ConflictCallback | None,
+        configuration: str,
+        all_configurations: bool,
+    ) -> None:
+        """ARC-02 — gate ``add_symbols`` against an already-defined symbol.
+
+        ``change.old_value`` carries the pre-append list. A pre-existing
+        entry with the same symbol name but a different value is a
+        conflict: ``on_conflict(name, existing, requested)`` decides
+        'replace' (drop the old entry) / 'skip' (drop the new one) /
+        'abort'; no callback raises (ambiguity raises, per HIL). All
+        edits are in-memory — a raise rolls the whole protocol back.
+        """
+        name = rendered.split("=", 1)[0]
+        old_values = (
+            change.old_value if isinstance(change.old_value, tuple) else ()
+        )
+        config_kwarg = None if all_configurations else configuration
+        for existing in old_values:
+            if existing == rendered or existing.split("=", 1)[0] != name:
+                continue
+            decision = (
+                on_conflict(name, existing, rendered)
+                if on_conflict is not None
+                else None
+            )
+            if decision == "replace":
+                editor.remove_list_value(
+                    superclass=superclass,
+                    value=existing,
+                    configuration=config_kwarg,
+                    all_configurations=all_configurations,
+                )
+            elif decision == "skip":
+                editor.remove_list_value(
+                    superclass=superclass,
+                    value=rendered,
+                    configuration=config_kwarg,
+                    all_configurations=all_configurations,
+                )
+            elif decision is None or decision == "abort":
+                raise CProjectEditError(
+                    message=(
+                        f"symbol {name!r} already defined as {existing!r}; "
+                        f"requested {rendered!r}"
+                        + (
+                            " (on_conflict returned 'abort')"
+                            if decision == "abort"
+                            else ""
+                        )
+                    ),
+                    hint=(
+                        "pass on_conflict=... returning 'replace' or "
+                        "'skip', or remove the conflicting symbol first"
+                    ),
+                    recoverable=True,
+                )
+            else:
+                raise ValueError(
+                    f"on_conflict returned invalid decision {decision!r}; "
+                    "expected 'replace' / 'skip' / 'abort'"
+                )
 
     def _apply_preset(
         self,

@@ -1,6 +1,6 @@
 """Debug-module result dataclasses.
 
-All frozen, all JSON-serializable. Per the debug API spec § "Result types".
+All frozen, all JSON-serializable. Per ``v1/debug-api.md`` § "Result types".
 Substrate captures, doesn't interpret — ``raw_value`` / ``raw`` fields
 carry the unmodified gdb / SVD output for callers to inspect.
 """

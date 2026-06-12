@@ -339,8 +339,13 @@ CHECK_VARIABLE_AT_MAIN = EvalScenario(
 
 CHECK_REGISTER_AT_FN = EvalScenario(
     name="F-EVAL-DEBUG-CHECK-REG-AT-FN",
+    # Phase-4 reword: "when SystemClock_Config returns" sent a rigorous
+    # model hunting the actual return site (disasm, *addr breakpoints)
+    # past the turn cap on BOTH lean and verbose steering — while the
+    # assertion expects the entry-symbol form. Anchor at the symbol.
     user_prompt=(
-        "Verify that register r0 equals 0x1 when SystemClock_Config returns."
+        "Verify that register r0 equals 0x1 when execution reaches "
+        "SystemClock_Config."
     ),
     allowed_tools=("Bash",),
     cwd=PROJECT_CWD,

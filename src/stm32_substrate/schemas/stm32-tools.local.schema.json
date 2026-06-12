@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/EmbedAgents/stm32-substrate/schemas/stm32-tools.local.schema.json",
   "title": "STM32 substrate — local host tool discovery",
-  "description": "Machine-local tool path discovery for the six ST vendor CLIs plus the STM32CubeCLT umbrella install. Loaded by SubstrateContext.from_environment() and validated at load time. Linux and Windows are supported; the darwin candidate block is reserved and ignored on unsupported hosts.",
+  "description": "Machine-local tool path discovery for the six ST vendor CLIs plus the STM32CubeCLT umbrella install. Loaded by SubstrateContext.from_environment() and validated at load time (M-016). v1 is Linux-only per ADR-005; the windows / darwin candidate blocks are reserved for v2 forward-compat and ignored on v1 Linux hosts.",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "tools"],
@@ -33,7 +33,7 @@
       }
     },
     "tools": {
-      "description": "Machine-local tool discovery overrides keyed by supported tool name. Resolution order: env var -> configured candidates -> shutil.which against executable_name -> loud ConfigurationError naming the JSON key.",
+      "description": "Machine-local tool discovery overrides keyed by supported tool name. Resolution order per ADR-005: env var -> configured candidates -> shutil.which against executable_name -> loud ConfigurationError naming the JSON key.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -82,7 +82,7 @@
           "type": "string"
         },
         "candidates": {
-          "description": "Per-platform candidate paths checked before generic PATH fallback. `linux` and `windows` are read on their respective platforms; `darwin` is reserved.",
+          "description": "Per-platform candidate paths checked before generic PATH fallback. v1 reads `linux` only; `windows` and `darwin` are reserved for v2 forward-compat (ADR-005).",
           "type": "object",
           "additionalProperties": false,
           "properties": {

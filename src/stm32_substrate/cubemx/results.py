@@ -1,6 +1,6 @@
 """``CubeMXResult`` + cubemx-local ``ProgressEvent``.
 
-Per the CubeMX API spec § "Result type". Substrate captures, doesn't
+Per ``v1/cubemx-api.md`` § "Result type". Substrate captures, doesn't
 interpret: ``log_path`` / ``cubemx_log_path`` are handed to the caller
 verbatim; ``script_text`` is the audit copy of what substrate sent.
 

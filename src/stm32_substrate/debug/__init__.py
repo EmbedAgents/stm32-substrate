@@ -18,7 +18,7 @@ Public surface:
   / ``CallStack`` / ``Breakpoint`` / ``RunResult`` / ``VariableValue`` /
   ``ComparisonResult`` / ``DebugSnapshot`` + supporting shapes.
 
-See the debug API spec for the full method list, gdb-MI primitives,
+See ``v1/debug-api.md`` for the full method list, gdb-MI primitives,
 and recipe-vs-substrate split.
 """
 

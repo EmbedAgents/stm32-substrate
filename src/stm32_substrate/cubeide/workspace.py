@@ -1,6 +1,6 @@
 """CubeIDE workspace-state detection + lock acquisition.
 
-Per the CubeIDE API spec § "Workspace state detection". All file locking
+Per ``v1/cubeide-api.md`` § "Workspace state detection". All file locking
 goes through ``stm32_substrate.platform`` (ADR-005 — no inline ``fcntl``
 in business logic).
 
@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import re
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -97,7 +98,18 @@ def detect_project_imported(workspace: Path, project_name: str) -> Path | None:
             end = i
             break
     path_str = unquote(rest[:end]).rstrip()
-    return Path(path_str) if path_str else None
+    if not path_str:
+        return None
+    # Eclipse writes file URIs as ``file:/C:/...`` (sometimes
+    # ``file:///C:/...``) on Windows. The URI leading slash(es) before a
+    # drive letter are not part of the filesystem path — without
+    # stripping them, ``Path('/C:/...')`` never equals the descriptor's
+    # ``Path('C:/...')`` and every build spuriously ran
+    # ``cleanup_stale_project`` (IMP-06).
+    m = re.match(r"^/+([A-Za-z]:[/\\].*)$", path_str)
+    if m:
+        path_str = m.group(1)
+    return Path(path_str)
 
 
 def cleanup_stale_project(

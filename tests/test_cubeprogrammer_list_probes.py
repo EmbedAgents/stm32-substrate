@@ -185,6 +185,7 @@ class TestListProbesErrors:
             message="STM32_Programmer_CLI timed out after 30s",
             code="timeout",
             tool_output="",
+            hint="raise the timeout knob or check the device responsiveness",
         )
         client = CubeProgrammer(ctx_with_cli)
         with patch(
@@ -192,9 +193,12 @@ class TestListProbesErrors:
         ):
             with pytest.raises(CubeProgrammerError) as excinfo:
                 client.list_probes()
-        # Timeout's code is "timeout" (str), not int — parse_error normalises
-        # the exit_code path to -1 in that case.
-        assert excinfo.value.code == -1
+        # IMP-03: run_tool's timeout diagnosis is preserved — previously
+        # rendered as the misleading "exited with code -1" with no hint.
+        err = excinfo.value
+        assert err.code == "timeout"
+        assert "timed out after 30s" in err.message
+        assert err.hint == runner_err.hint
 
 
 class TestListProbesLogging:

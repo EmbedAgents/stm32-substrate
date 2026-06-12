@@ -7,13 +7,15 @@ n6_dev_mode prerequisites before spawning subprocesses per HIL.
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Callable, TYPE_CHECKING
 
 from stm32_substrate.debug.gdb import spawn_gdb
 from stm32_substrate.debug.gdbserver import GDBServerOptions, spawn_gdbserver
-from stm32_substrate.debug.session import DebugSession
+from stm32_substrate.debug.session import DebugSession, _debug_default
 from stm32_substrate.errors import ConfigurationError, GDBError
+from stm32_substrate.resolution import resolve_file
 
 if TYPE_CHECKING:
     from stm32_substrate.context import SubstrateContext
@@ -47,7 +49,7 @@ class Debug:
     ) -> DebugSession:
         """Spawn gdbserver + arm-gdb; return a ``DebugSession``.
 
-        Validation per the debug API spec:
+        Validation per ``v1/debug-api.md``:
 
         - ELF resolution per R-002 (kwarg → descriptor → ``ConfigurationError``).
         - Active-session check: ``ctx.session_state.active_debug_session
@@ -67,9 +69,30 @@ class Debug:
 
         cube_programmer_cli_dir = self._resolve_cube_programmer_cli_dir()
 
+        # Overall lifecycle budget (debug.session_start_timeout_s):
+        # gdbserver spawn + handshake + arm-gdb spawn + target-select +
+        # optional `monitor reset halt`. The gdbserver handshake has its
+        # own sub-budget (debug.gdbserver_spawn_timeout_s) inside it.
+        handshake_budget_s = _debug_default(
+            self.ctx, "gdbserver_spawn_timeout_s", 5.0
+        )
+        deadline = time.monotonic() + _debug_default(
+            self.ctx, "session_start_timeout_s", 30.0
+        )
+
         gdbserver = None
         last_port_error: GDBError | None = None
         for candidate_port in self._port_iter(port):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise GDBError(
+                    message=(
+                        "start_session exceeded debug.session_start_timeout_s "
+                        "while walking the gdb port fallback range"
+                    ),
+                    gdb_marker="command-timeout",
+                    hint="raise debug.session_start_timeout_s",
+                ) from last_port_error
             options = GDBServerOptions(
                 port=candidate_port,
                 cube_programmer_cli_dir=cube_programmer_cli_dir,
@@ -79,7 +102,11 @@ class Debug:
                 n6_dev_mode=n6_dev_mode,
             )
             try:
-                gdbserver = spawn_gdbserver(ctx=self.ctx, options=options)
+                gdbserver = spawn_gdbserver(
+                    ctx=self.ctx,
+                    options=options,
+                    handshake_timeout_s=min(handshake_budget_s, remaining),
+                )
                 break
             except GDBError as ex:
                 if ex.gdb_marker == "port-busy":
@@ -96,22 +123,38 @@ class Debug:
                 gdb_marker="no-free-gdb-port",
                 hint=(
                     "close conflicting processes or widen "
-                    "debug.gdb_port_fallback_count"
+                    "debug.gdb_port_fallback_range"
                 ),
             ) from last_port_error
 
+        # IMP-11: catch BaseException, not just GDBError — an unexpected
+        # error type leaking past here would orphan the persistent
+        # gdbserver, which keeps holding the singleton ST-LINK probe and
+        # fails every subsequent operation.
         try:
             gdb = spawn_gdb(
-                ctx=self.ctx, elf_path=elf, gdb_port=gdbserver.port
+                ctx=self.ctx,
+                elf_path=elf,
+                gdb_port=gdbserver.port,
+                connect_timeout_s=self._remaining_step_budget(deadline, 10.0),
             )
-        except GDBError:
+        except BaseException:
             gdbserver.close()
             raise
 
         if halt:
             try:
-                gdb.send_console("monitor reset halt", timeout_s=10.0)
-            except GDBError:
+                # ST-LINK gdbserver Rcmd syntax (bench-verified v7.13.0,
+                # RES-041): plain `monitor reset` system-resets AND holds
+                # the core halted at Reset_Handler while a debugger is
+                # attached. The OpenOCD-flavored `monitor reset halt` is
+                # REJECTED ("Unknown reset option" → ^error) — it never
+                # actually reset anything and raises since IMP-02.
+                gdb.send_console(
+                    "monitor reset",
+                    timeout_s=self._remaining_step_budget(deadline, 10.0),
+                )
+            except BaseException:
                 gdb.close()
                 gdbserver.close()
                 raise
@@ -149,23 +192,18 @@ class Debug:
     # internals
     # ------------------------------------------------------------------
 
-    def _resolve_elf(self, elf_path: Path | None) -> Path:
-        if elf_path is not None:
-            return elf_path.resolve()
-        descriptor = self.ctx.project
-        debug_block = getattr(descriptor, "debug", None) if descriptor else None
-        configured = (
-            getattr(debug_block, "elf_path", None) if debug_block else None
+    def _resolve_elf(self, elf_path: "Path | str | None") -> Path:
+        # R-002 via resolution.resolve_file: str|Path tolerated; a
+        # relative descriptor elf_path anchors to ctx.cwd, not the
+        # process CWD (IMP-22 / IMP-23).
+        resolved = resolve_file(
+            elf_path,
+            ctx=self.ctx,
+            descriptor_field="debug.elf_path",
+            arg_name="elf_path",
         )
-        if not configured:
-            raise ConfigurationError(
-                message="elf_path= not given and debug.elf_path is unset",
-                hint=(
-                    "pass elf_path=Path('...') to start_session, or set "
-                    "debug.elf_path in stm32-project.jsonc"
-                ),
-            )
-        return Path(configured).resolve()
+        assert resolved is not None  # required=True
+        return resolved
 
     def _check_active_session(self) -> None:
         if self.ctx.session_state.active_debug_session is not None:
@@ -237,25 +275,46 @@ class Debug:
             )
         return cli.parent
 
+    @staticmethod
+    def _remaining_step_budget(deadline: float, step_cap_s: float) -> float:
+        """Per-step timeout: the step's own cap, clipped to what's left of
+        the ``debug.session_start_timeout_s`` deadline (floored at 0.1 s so
+        an already-expired budget still surfaces as a step timeout rather
+        than an invalid non-positive timeout)."""
+        return max(min(step_cap_s, deadline - time.monotonic()), 0.1)
+
     def _port_iter(self, explicit: int | None):
         """Yield candidate gdb ports.
 
         - Explicit ``port=N`` → only try N.
-        - Default → walk ``debug.gdb_port_fallback_range`` (list of ints
-          declared by the schema), falling back to the canonical
-          61234..61243 range when the descriptor doesn't override.
+        - Default → try ``debug.gdb_port`` first when configured, then
+          walk ``debug.gdb_port_fallback_range`` (list of ints declared
+          by the schema), falling back to the canonical 61234..61243
+          range when the descriptor doesn't override.
         """
         if explicit is not None:
             yield explicit
             return
         debug_defaults = getattr(self.ctx.defaults, "debug", None)
+        initial = (
+            getattr(debug_defaults, "gdb_port", None)
+            if debug_defaults
+            else None
+        )
         configured_range = (
             getattr(debug_defaults, "gdb_port_fallback_range", None)
             if debug_defaults
             else None
         )
-        if configured_range:
-            for port in configured_range:
-                yield int(port)
-            return
-        yield from _DEFAULT_PORT_FALLBACK_RANGE
+        candidates = [
+            int(p)
+            for p in (
+                configured_range
+                if configured_range
+                else _DEFAULT_PORT_FALLBACK_RANGE
+            )
+        ]
+        if initial is not None:
+            yield int(initial)
+            candidates = [p for p in candidates if p != int(initial)]
+        yield from candidates

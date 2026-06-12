@@ -1,6 +1,6 @@
 """Thin logger wrapper for the substrate.
 
-Per the API conventions § "Logging and progress streaming":
+Per ``v1/api-conventions.md`` § "Logging and progress streaming":
 
 - Hierarchical loggers per tool: ``stm32_substrate``,
   ``stm32_substrate.cubeprogrammer``, ``stm32_substrate.cubeide``, …

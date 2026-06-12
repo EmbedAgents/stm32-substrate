@@ -1,58 +1,284 @@
 {
   "_metadata": {
-    "model": "claude-sonnet-4-6",
-    "cost_usd": 0.31002019999999997,
-    "duration_s": 129.328
+    "model": "claude-fable-5",
+    "cost_usd": 1.1514066000000003,
+    "duration_s": 384.158
   },
   "tool_calls": [
     {
       "name": "Bash",
       "args": {
-        "command": "stm32 debug read-peripheral DBGMCU",
-        "description": "Read DBGMCU to identify chip revision"
+        "command": "pwd && ls",
+        "description": "Check working directory contents"
       }
     },
     {
-      "name": "Bash",
+      "name": "Glob",
       "args": {
-        "command": "stm32 debug read-peripheral DMA1",
-        "description": "Read DMA1 peripheral registers"
-      }
-    },
-    {
-      "name": "Bash",
-      "args": {
-        "command": "stm32 debug read-peripheral SCB",
-        "description": "Read SCB (System Control Block) \u2014 cache enable bits, CCR, etc."
+        "pattern": "**/stm32-project.jsonc"
       }
     },
     {
       "name": "Read",
       "args": {
-        "file_path": "/home/user/.claude/projects/-home-user-claude-projects-stm32-substrate-tests-fixtures-projects-STM32CubeL4-Projects-NUCLEO-L476RG-Examples-GPIO-GPIO-IOToggle-STM32CubeIDE/4ad12f72-e170-4b40-8599-4b2c47e3c197/tool-results/by88bkdjx.txt"
+        "file_path": "/home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/stm32-project.jsonc"
       }
     },
     {
       "name": "Bash",
       "args": {
-        "command": "stm32 debug read-peripheral DMA2",
-        "description": "Read DMA2 peripheral registers"
+        "command": "stm32 debug snapshot --include-peripheral DMA1 --include-peripheral DMA2",
+        "description": "Halt-in-place snapshot with DMA peripheral dumps"
       }
     },
     {
       "name": "Bash",
       "args": {
-        "command": "stm32 debug read-peripheral FLASH",
-        "description": "Read FLASH peripheral registers (ART accelerator cache bits in ACR)"
+        "command": "stm32 prog list-probes",
+        "description": "List attached ST-LINK probes"
+      }
+    },
+    {
+      "name": "AskUserQuestion",
+      "args": {
+        "questions": [
+          {
+            "question": "Which board is the DMA stale-data issue on?",
+            "header": "Target board",
+            "multiSelect": false,
+            "options": [
+              {
+                "label": "STM32N6570-DK",
+                "description": "Cortex-M55 with D-cache \u2014 a real cache-coherency bug is plausible here. I'll need the path to that project/ELF (the cwd descriptor is for the L476)."
+              },
+              {
+                "label": "NUCLEO-L476RG",
+                "description": "Matches the project descriptor in this directory, but the M4 has no data cache \u2014 I'd be hunting a different root cause (volatile, DMA config, channel stalled)."
+              }
+            ]
+          }
+        ]
       }
     },
     {
       "name": "Bash",
       "args": {
-        "command": "stm32 debug read-peripheral MPU",
-        "description": "Read MPU registers to check memory region attributes (cache policy)"
+        "command": "ls /home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/",
+        "description": "List fixture project roots"
+      }
+    },
+    {
+      "name": "Agent",
+      "args": {
+        "description": "Find N6570-DK project descriptor",
+        "subagent_type": "Explore",
+        "prompt": "Search breadth: medium. I'm debugging a DMA issue on an STM32N6570-DK board and need its project on disk. Under /home/anup/claude-projects/ (and /home/anup/embedagents if needed), find any `stm32-project.jsonc` descriptor whose board/firmware mentions N6570 or STM32N6 (search file contents for \"N657\" or \"STM32N6\"), and any built ELF for an N6 project (e.g. **/Debug/*.elf under a path containing N6). Also check /home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/manifest.jsonc for N6 entries. Report: descriptor path(s), the debug.elf_path value, whether the ELF file actually exists on disk. Under 150 words."
+      }
+    },
+    {
+      "name": "Glob",
+      "args": {
+        "pattern": "**/stm32-project.jsonc"
+      }
+    },
+    {
+      "name": "Glob",
+      "args": {
+        "pattern": "**/Debug/*.elf"
+      }
+    },
+    {
+      "name": "Read",
+      "args": {
+        "file_path": "/home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/manifest.jsonc"
+      }
+    },
+    {
+      "name": "Grep",
+      "args": {
+        "pattern": "N657|STM32N6",
+        "path": "/home/anup/claude-projects/stm32-substrate/tests/fixtures/projects"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "find /home/anup/claude-projects -name stm32-project.jsonc -o -name '*N6*' -type d 2>/dev/null | head -20"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "find /home/anup/embedagents -name stm32-project.jsonc -o -name '*N6*' -type d 2>/dev/null | head -20"
+      }
+    },
+    {
+      "name": "Read",
+      "args": {
+        "file_path": "/home/anup/claude-projects/stm32-substrate/tests/fixtures/n6-projects-lib-test/x-cube-n6-ai-multi-pose-estimation/stm32-project.jsonc"
+      }
+    },
+    {
+      "name": "Read",
+      "args": {
+        "file_path": "/home/anup/embedagents/tests/fixtures/n6-projects/x-cube-n6-ai-multi-pose-estimation/stm32-project.jsonc"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "find /home/anup/claude-projects/stm32-substrate/tests/fixtures/n6-projects-lib-test -name \"*.elf\" 2>/dev/null | head -10"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "find /home/anup/embedagents/tests/fixtures/n6-projects -name \"*.elf\" 2>/dev/null | head -10"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "ls -lh /home/anup/claude-projects/stm32-substrate/tests/fixtures/n6-projects-lib-test/x-cube-n6-ai-multi-pose-estimation/STM32CubeIDE/Debug/x-cube-n6-ai-multi-pose-estimation.elf 2>/dev/null && echo \"FOUND: STM32 substrate N6 ELF\""
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "ls -lh /home/anup/embedagents/tests/fixtures/n6-projects/x-cube-n6-ai-multi-pose-estimation/STM32CubeIDE/Debug/x-cube-n6-ai-multi-pose-estimation.elf 2>/dev/null && echo \"FOUND: embedagents N6 ELF\" || echo \"NOT FOUND: embedagents ELF\""
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "cd /home/anup/claude-projects/stm32-substrate/tests/fixtures/n6-projects-lib-test/x-cube-n6-ai-multi-pose-estimation && STM32_PROGRAMMER_DEFAULT_SN=003400303235511638363730 stm32 debug snapshot --include-peripheral SCB --include-peripheral MPU --include-peripheral GPDMA1",
+        "description": "Snapshot N6 target: SCB, MPU, GPDMA1 state",
+        "timeout": 180000
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "cd /home/anup/claude-projects/stm32-substrate/tests/fixtures/n6-projects-lib-test/x-cube-n6-ai-multi-pose-estimation && STM32_PROGRAMMER_DEFAULT_SN=003400303235511638363730 stm32 debug snapshot --n6-dev-mode --include-peripheral SCB --include-peripheral MPU --include-peripheral GPDMA1",
+        "description": "Snapshot N6 target with dev-mode flag",
+        "timeout": 180000
+      }
+    },
+    {
+      "name": "AskUserQuestion",
+      "args": {
+        "questions": [
+          {
+            "question": "Is the STM32N6570-DK's BOOT switch in the DEV position (required for debug access)?",
+            "header": "N6 BOOT",
+            "multiSelect": false,
+            "options": [
+              {
+                "label": "Yes, in DEV mode",
+                "description": "I'll re-run the snapshot piping the confirmation through, and proceed with the cache-coherency inspection (SCB cache bits, MPU regions, GPDMA state)."
+              },
+              {
+                "label": "No / not sure",
+                "description": "Flip BOOT1 to the DEV position (or tell me) and I'll wait \u2014 the N6 debug port is not accessible in flash-boot mode."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "cd /home/anup/claude-projects/stm32-substrate/tests/fixtures/n6-projects-lib-test/x-cube-n6-ai-multi-pose-estimation && printf 'y\\n' | STM32_PROGRAMMER_DEFAULT_SN=003400303235511638363730 stm32 debug snapshot --n6-dev-mode --include-peripheral SCB --include-peripheral MPU --include-peripheral GPDMA1",
+        "description": "Snapshot N6 with piped BOOT confirmation",
+        "timeout": 180000
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "cd /home/anup/claude-projects/stm32-substrate/tests/fixtures/n6-projects-lib-test/x-cube-n6-ai-multi-pose-estimation && printf 'y\\n' | STM32_PROGRAMMER_DEFAULT_SN=003400303235511638363730 stm32 debug snapshot --n6-dev-mode --include-peripheral SCB --include-peripheral MPU --include-peripheral GPDMA1",
+        "description": "Retry N6 snapshot (known flaky attach)",
+        "timeout": 180000
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 prog --help 2>&1 | head -40",
+        "description": "List stm32 prog subcommands"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "stm32 prog read-mem --help",
+        "description": "Show read-mem usage"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "export STM32_PROGRAMMER_DEFAULT_SN=003400303235511638363730; cd /home/anup/claude-projects/stm32-substrate/tests/fixtures/n6-projects-lib-test/x-cube-n6-ai-multi-pose-estimation && stm32 prog read-mem --address 0xE000ED14 --size 4 && stm32 prog read-mem --address 0xE000ED90 --size 8 && stm32 prog read-mem --address 0xE000EDC0 --size 8",
+        "description": "Read SCB CCR, MPU_TYPE/CTRL, MAIR0/1 on N6",
+        "timeout": 120000
+      }
+    },
+    {
+      "name": "Grep",
+      "args": {
+        "pattern": "SCB_EnableDCache|SCB_InvalidateDCache|SCB_CleanDCache|MPU_Config|__attribute__\\(\\(section|NonCacheable|noncacheable|ALIGN_32|InvalidateDCache_by_Addr|CleanDCache_by_Addr",
+        "path": "/home/anup/claude-projects/stm32-substrate/tests/fixtures/n6-projects-lib-test/x-cube-n6-ai-multi-pose-estimation",
+        "output_mode": "content",
+        "glob": "*.{c,h}",
+        "head_limit": 60
+      }
+    },
+    {
+      "name": "Grep",
+      "args": {
+        "pattern": "nn_input_buffers|CACHE_OP|capture|Invalidate",
+        "path": "/home/anup/claude-projects/stm32-substrate/tests/fixtures/n6-projects-lib-test/x-cube-n6-ai-multi-pose-estimation/Src/app.c",
+        "output_mode": "content",
+        "-n": true
+      }
+    },
+    {
+      "name": "Grep",
+      "args": {
+        "pattern": "bqueue_put_ready|VsyncEventCallback|FrameEventCallback|CAM_|DCMIPP",
+        "path": "/home/anup/claude-projects/stm32-substrate/tests/fixtures/n6-projects-lib-test/x-cube-n6-ai-multi-pose-estimation/Src",
+        "output_mode": "content",
+        "-n": true,
+        "head_limit": 40
+      }
+    },
+    {
+      "name": "Read",
+      "args": {
+        "file_path": "/home/anup/claude-projects/stm32-substrate/tests/fixtures/n6-projects-lib-test/x-cube-n6-ai-multi-pose-estimation/Src/app.c",
+        "offset": 390,
+        "limit": 40
+      }
+    },
+    {
+      "name": "Read",
+      "args": {
+        "file_path": "/home/anup/claude-projects/stm32-substrate/tests/fixtures/n6-projects-lib-test/x-cube-n6-ai-multi-pose-estimation/Src/app.c",
+        "offset": 845,
+        "limit": 50
+      }
+    },
+    {
+      "name": "Grep",
+      "args": {
+        "pattern": "bqueue_get_ready\\(&nn_output_queue\\)",
+        "path": "/home/anup/claude-projects/stm32-substrate/tests/fixtures/n6-projects-lib-test/x-cube-n6-ai-multi-pose-estimation/Src/app.c",
+        "output_mode": "content",
+        "-n": true,
+        "-A": 12
       }
     }
   ],
-  "final_text": "I'll start by identifying the chip and then pull the DMA, cache (SCB/MPU), and memory-protection state in parallel so we can see the full picture at once.\nGood \u2014 chip identified as **STM32L476** (Cortex-M4, DEV_ID `0x415`). Now let me read the full SCB output and pull DMA2 and the Flash ART accelerator in parallel \u2014 all three are relevant to this bug.\nI have everything I need. Here's the full diagnosis.\n\n---\n\n## Diagnosis: DMA stale-data bug on STM32L476 (Cortex-M4)\n\n### Hardware state summary\n\n| Peripheral | Key findings |\n|---|---|\n| **DBGMCU** | DEV_ID `0x415` \u2192 **STM32L476**, halted at reset (DFSR.VCATCH=1) |\n| **DMA1** | All 7 channels: EN=0, CMAR=0, CPAR=0, NDT=0 \u2014 no active transfer at halt |\n| **DMA2** | No SVD registers decoded \u2014 not in use |\n| **FLASH ACR** | `ICEN=1`, **`DCEN=1`** \u2014 ART accelerator D-cache is ON; PRFTEN=0, LATENCY=0 |\n| **SCB CCR** | No DC/IC bits (correct \u2014 Cortex-M4 has no hardware L1 D-cache); ACTLR.DISDEFWBUF=0 (write buffer **active**) |\n| **MPU** | `MPU_CTRL.ENABLE=0` \u2014 **MPU is completely disabled**, no region attributes set |\n| **Faults** | CFSR/HFSR all clear \u2014 no fault has fired |\n\n---\n\n### Root cause: this is NOT a hardware cache problem\n\nThe **Cortex-M4 has no hardware L1 data cache**. The ART accelerator's `DCEN` only caches reads from **Flash** (`0x08000000`), not SRAM. DMA buffers live in SRAM. So the hardware itself cannot produce the cache incoherency you see on an H7.\n\nThe \"stale data\" is a **software visibility problem**, one of two causes:\n\n---\n\n### Cause 1 \u2014 Missing `volatile` (most likely)\n\nThe compiler sees the buffer pointer never written by the CPU, so it hoists the load into a register and never re-reads SRAM after the DMA writes it:\n\n```c\n// \u274c Wrong \u2014 compiler will keep old value in register\nuint8_t dma_buf[64];\n\n// \u2705 Correct \u2014 forces every read to go to SRAM\nvolatile uint8_t dma_buf[64];\n// HAL equivalent:\n__IO uint8_t dma_buf[64];\n```\n\n---\n\n### Cause 2 \u2014 Missing `__DMB()` barrier before consuming the buffer\n\nIf a TC interrupt sets a `dma_done` flag and your main loop polls it, the Cortex-M4 write buffer (`DISDEFWBUF=0`) plus compiler reordering can let the CPU speculatively load `dma_buf` *before* the flag load retires:\n\n```c\n// \u274c Without barrier \u2014 CPU can speculatively read dma_buf before the flag check\nif (dma_done) {\n    use(dma_buf[0]);\n}\n\n// \u2705 With barrier \u2014 DMB enforces: flag read happens-before buffer read\nif (dma_done) {\n    __DMB();               // Data Memory Barrier\n    use(dma_buf[0]);       // guaranteed to see DMA-written data\n}\n```\n\nThe `__DMB()` is the ISR/main-thread handshake \u2014 it ensures all bus transactions from the DMA (as seen by the AHB bus matrix) are visible to the CPU before the subsequent load.\n\n---\n\n### Cause 3 \u2014 ART data cache (secondary; only if buffer is in Flash)\n\n`FLASH_ACR.DCEN=1` is live. If you ever place a constant table in Flash that a DMA write was supposed to update, the ART D-cache would serve stale Flash data. Fix: set `FLASH_ACR.DCRST=1` to reset the ART data cache after the DMA completes. But **this only applies to Flash-resident data** \u2014 if your buffer is in SRAM1/SRAM2 it is irrelevant.\n\n---\n\n### The MPU note\n\nThe MPU is disabled. On an H7 you'd configure DMA buffers as `Non-cacheable` via MPU region. On the L476 that's unnecessary for SRAM (no M4 D-cache), but enabling the MPU with `PRIVDEFENA=1` and an explicit `Non-shareable` region for the DMA buffer is still best practice \u2014 it catches mis-mapped buffers and prevents speculative prefetch surprises.\n\n---\n\n### Fix checklist\n\n1. **Declare the buffer `volatile`** (or `__IO`) \u2014 eliminates Cause 1.\n2. **Add `__DMB()` before reading the buffer** after any ISR/flag handoff \u2014 eliminates Cause 2.\n3. **Confirm buffer is in SRAM, not Flash** \u2014 if it's in `.rodata` or a `const` section, that's a linker bug and also explains stale reads under `DCEN=1`.\n4. If you move to an H7 later, also add `SCB_InvalidateDCache_by_Addr()` before reading \u2014 but that's not needed here on the M4."
+  "final_text": "Multiple probes are attached \u2014 I need to pin the right one.\nReading the frame-event producer path and the inference consumer path to confirm where maintenance is (or isn't):\nFound it. Here's the full diagnosis:\n\n## Root cause: stale-read race on `nn_output_buffers` (NPU-DMA \u2192 CPU)\n\n**Live state** (CubeProgrammer hot-plug, since the gdb attach path hit the known N6 running-attach hang): the chip is parked in boot ROM (BOOT switch in DEV \u21d2 no flash boot), so the failing state wasn't live \u2014 but the source evidence is conclusive:\n\n1. **D-cache is enabled** (`main.c:73 SCB_EnableDCache()`), the **MPU is never configured** in app code (and was confirmed disabled on-target), so all DMA buffers sit in default-map **cacheable** Normal memory.\n\n2. **The only invalidate of the NPU output buffer happens *before* the hardware writes it** \u2014 `app.c:874`:\n   ```c\n   /* Invalidate output buffer before Hw access it */\n   CACHE_OP(SCB_InvalidateDCache_by_Addr(output_buffer, LL_ATON_NETWORK_OUT_1_SIZE_BYTES));\n   ```\n\n3. **The consumer CPU-reads it with no invalidate after the DMA write** \u2014 `app.c:1069\u20131075`, the postprocess task does `bqueue_get_ready(&nn_output_queue)` then `app_postprocess_run()` directly on the buffer.\n\nThe pre-invalidate-only pattern is racy on the M55: between the invalidate (NN thread) and the CPU read (postprocess thread), the core is free to **speculatively refill** lines of that cacheable buffer \u2014 no explicit access required. When that happens, postprocess reads the speculatively-cached (pre-inference) bytes instead of fresh NPU output. Classic intermittent \"DMA buffer reads stale data.\"\n\n(The capture path is clean: `nn_input_buffers` is camera-DMA-written and NPU-read \u2014 hardware on both sides, the `app.c:868` comment is correct. `lcd_*` buffers get explicit clean/clean-invalidate.)\n\n## Fix\n\nAdd the invalidate on the **consumer side, after the DMA write completes** \u2014 in `app.c` right after line 1069:\n\n```c\noutput_buffer = bqueue_get_ready(&nn_output_queue);\nassert(output_buffer);\nCACHE_OP(SCB_InvalidateDCache_by_Addr(output_buffer, NN_BUFFER_OUT_SIZE_ALIGN));\n```\n\nThe buffer is `ALIGN_32` with size rounded to `NN_BUFFER_OUT_SIZE_ALIGN`, so the by-addr invalidate won't clobber neighbours. Keep the line-874 pre-invalidate (it prevents dirty-line eviction corrupting the NPU's write). The bulletproof alternative is an MPU region marking the DMA buffers non-cacheable, but the one-line invalidate is the idiomatic fix here.\n\nTo verify on hardware afterwards: flip BOOT back to flash-boot, let the app run, and I can break at `app.c:1069` via a `DebugSession` and diff the CPU-visible buffer against a probe-side memory read \u2014 though note the N6 attach is currently flaky on this bench (DBG-012), so the simplest validation is just rebuilding and watching the pose output stop glitching."
 }

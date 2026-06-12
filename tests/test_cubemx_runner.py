@@ -117,6 +117,28 @@ def _spawn_factory(fake: FakePopen):
     return _spawn
 
 
+def _patch_tree_kill(
+    monkeypatch: pytest.MonkeyPatch, fake: FakePopen
+) -> list[int]:
+    """Replace the runner's terminate_process_tree with a recorder.
+
+    Mandatory for every test whose path reaches _terminate_proc: the
+    real implementation signals the process *group* of the given pid —
+    a FakePopen's made-up pid must never leak into a real killpg.
+    """
+    calls: list[int] = []
+
+    def fake_tree_kill(pid: int, *, grace_s: float = 2.0) -> None:
+        calls.append(pid)
+        fake.terminate()  # mark the fake exited, as the kill would
+
+    monkeypatch.setattr(
+        "stm32_substrate.cubemx.runner.terminate_process_tree",
+        fake_tree_kill,
+    )
+    return calls
+
+
 # ---------------------------------------------------------------------------
 # policy_from_ctx
 # ---------------------------------------------------------------------------
@@ -164,12 +186,16 @@ class TestPolicy:
 
 class TestMarkerAppearsMidRun:
     def test_success_terminates_subprocess(
-        self, ctx: SubstrateContext, output_dir: Path
+        self,
+        ctx: SubstrateContext,
+        output_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         marker = output_dir / ".cproject"
         # marker does NOT exist at T0.
 
         fake = FakePopen(poll_results=[None, None, None, None])
+        tree_kills = _patch_tree_kill(monkeypatch, fake)
         # Iterate a clock that triggers the loop a few times.
         clock = ClockController(values=[0.0, 0.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0])
         polls = {"n": 0}
@@ -191,7 +217,9 @@ class TestMarkerAppearsMidRun:
         )
         assert result.success is True
         assert result.terminated_after_marker is True
-        assert fake.terminate_called is True
+        # IMP-08: the whole tree is killed (JVM child included), not just
+        # the launcher PID.
+        assert tree_kills == [fake.pid]
         assert result.exit_code is None  # signal-derived; suppressed
         assert result.cubemx_log_path is None  # log "useless" on success
 
@@ -294,6 +322,72 @@ class TestPostExitGraceFailure:
         assert result.timed_out is False  # not a timeout — subprocess exited
         assert result.exit_code == 1
 
+    def test_nonzero_exit_regen_with_stale_marker_fails(
+        self, ctx: SubstrateContext, output_dir: Path
+    ) -> None:
+        """IMP-01: a failed regeneration on a previously-generated project
+        must not report success off the stale marker from the prior run."""
+        marker = output_dir / ".cproject"
+        marker.write_text("<cproject/>")  # stale, from the prior generation
+        # Backdate so an (unexpected) rewrite would advance mtime.
+        import os
+
+        stale_mtime = marker.stat().st_mtime - 3600
+        os.utime(marker, (stale_mtime, stale_mtime))
+
+        fake = FakePopen(poll_results=[1])  # regen failed: exited non-zero
+        clock = ClockController(
+            values=[0.0, 0.0, 0.5, 0.5, 100.0, 100.0, 100.0]
+        )
+
+        result = run_cubemx(
+            launcher=Path("/fake/STM32CubeMX"),
+            script_text="project generate",
+            expected_marker=marker,
+            output_dir=output_dir,
+            ctx=ctx,
+            _now=clock,
+            _spawn=_spawn_factory(fake),
+            _sleep=lambda _s: None,
+        )
+        assert result.success is False
+        assert result.exit_code == 1
+
+    def test_nonzero_exit_regen_marker_rewritten_in_grace_succeeds(
+        self, ctx: SubstrateContext, output_dir: Path
+    ) -> None:
+        """Regen counterpart of the grace-window success: the JVM child
+        rewrites the marker (mtime advances) after the launcher exits."""
+        import os
+
+        marker = output_dir / ".cproject"
+        marker.write_text("<cproject/>")
+        stale_mtime = marker.stat().st_mtime - 3600
+        os.utime(marker, (stale_mtime, stale_mtime))
+
+        fake = FakePopen(poll_results=[1])  # bootstrap exit; child still writing
+        clock = ClockController(
+            values=[0.0, 0.0, 0.5, 0.5, 1.0, 1.5, 2.0]
+        )
+        sleeps = {"n": 0}
+
+        def grace_sleep(_s: float) -> None:
+            sleeps["n"] += 1
+            if sleeps["n"] == 1:
+                marker.write_text("<cproject regenerated/>")  # mtime advances
+
+        result = run_cubemx(
+            launcher=Path("/fake/STM32CubeMX"),
+            script_text="project generate",
+            expected_marker=marker,
+            output_dir=output_dir,
+            ctx=ctx,
+            _now=clock,
+            _spawn=_spawn_factory(fake),
+            _sleep=grace_sleep,
+        )
+        assert result.success is True
+
 
 # ---------------------------------------------------------------------------
 # Branch: deadline + log activity → extension fires
@@ -327,6 +421,7 @@ class TestDeadlineExtension:
 
         marker = output_dir / ".cproject"
         fake = FakePopen(poll_results=[None] * 10)
+        _patch_tree_kill(monkeypatch, fake)
 
         # Clock walks: T0=0, then 0.5, 1.5 (past deadline → extension),
         # 2.5 (past extended deadline → extension), 3.5 (max reached →
@@ -388,6 +483,7 @@ class TestDeadlineNoActivity:
 
         marker = output_dir / ".cproject"
         fake = FakePopen(poll_results=[None, None, None])
+        tree_kills = _patch_tree_kill(monkeypatch, fake)
         # T0=0; next call → 100 (past deadline + past liveness threshold).
         clock = ClockController(values=[0.0, 0.0, 100.0, 100.0, 100.0])
 
@@ -404,7 +500,7 @@ class TestDeadlineNoActivity:
         assert result.success is False
         assert result.timed_out is True
         assert result.extensions_used == 0
-        assert fake.terminate_called is True
+        assert tree_kills == [fake.pid]  # IMP-08: whole tree, not just launcher
 
 
 # ---------------------------------------------------------------------------

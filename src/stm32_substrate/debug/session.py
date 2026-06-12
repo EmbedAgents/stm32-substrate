@@ -1,6 +1,6 @@
 """``DebugSession`` — in-session methods.
 
-Per the debug API spec § "DebugSession — in-session surface". Raw-reads
+Per ``v1/debug-api.md`` § "DebugSession — in-session surface". Raw-reads
 only (RES-012 Q1) — DIAG-001..017 peripheral-state checks compose from
 these as Claude-side recipes.
 
@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from stm32_substrate.debug.gdb import mi_quote
 from stm32_substrate.debug.parsers import (
     parse_breakpoint_insert,
     parse_evaluate_expression,
@@ -47,6 +48,20 @@ if TYPE_CHECKING:
     from stm32_substrate.progress import ProgressCallback
 
 
+def _debug_default(ctx: "SubstrateContext", name: str, default: float) -> float:
+    """Pull a numeric knob from ``ctx.defaults.debug.<name>`` with fallback.
+
+    Mirrors ``_vcp_default`` / ``CubeProgrammer._timeout_s`` — every
+    ``debug.*`` knob declared by the runtime-defaults schema is read here
+    or in ``debug.client`` (A-012: the schema must not carry dead knobs).
+    """
+    debug_defaults = getattr(ctx.defaults, "debug", None)
+    if debug_defaults is None:
+        return default
+    value = getattr(debug_defaults, name, None)
+    return default if value is None else float(value)
+
+
 class DebugSession:
     """Context manager owning gdbserver + gdb subprocesses for one session."""
 
@@ -71,6 +86,11 @@ class DebugSession:
         self._log = ctx.logger.getChild("debug.session")
         self._closed = False
         self._breakpoints: dict[int, Breakpoint] = {}
+        # Whether GDB's own state machine thinks the target is running.
+        # Diverges from ``target_halted`` after attach_running: the core
+        # runs, but gdb received a stop snapshot at connect. halt() picks
+        # its mechanism off this flag (RES-041).
+        self._gdb_believes_running = False
 
     # ------------------------------------------------------------------
     # context-manager protocol
@@ -101,8 +121,25 @@ class DebugSession:
     # ------------------------------------------------------------------
 
     def halt(self) -> None:
-        """Halt the target (``-exec-interrupt``)."""
-        self._gdb.send_mi("-exec-interrupt", timeout_s=5.0)
+        """Halt the target.
+
+        Mechanism depends on what GDB believes (RES-041, bench-verified
+        on the L476/v7.13.0):
+
+        - GDB thinks the target is running (we sent ``-exec-continue``)
+          → ``-exec-interrupt``, the proper MI interrupt.
+        - GDB thinks the target is stopped but the core is physically
+          running (the ``attach_running`` / gdbserver ``-g`` case — gdb
+          got a stop snapshot at connect) → ``monitor halt``, the
+          server-side Rcmd. ``-exec-interrupt`` here pokes an
+          already-"stopped" target and corrupts a faulted core's sticky
+          CFSR (extra UFSR/BFSR bits latch and memory reads garble).
+        """
+        if self._gdb_believes_running:
+            self._gdb.send_mi("-exec-interrupt", timeout_s=5.0)
+            self._gdb_believes_running = False
+        else:
+            self._gdb.send_console("monitor halt", timeout_s=10.0)
         self.target_halted = True
         self._log.info("halt")
 
@@ -110,15 +147,23 @@ class DebugSession:
         """Resume the target (``-exec-continue``)."""
         self._gdb.send_mi("-exec-continue", timeout_s=5.0)
         self.target_halted = False
+        self._gdb_believes_running = True
         self._log.info("resume")
 
     def reset(self, *, halt_after: bool = True) -> None:
-        """Reset the target via ``monitor reset [halt]``."""
-        self._gdb.send_console(
-            "monitor reset" + (" halt" if halt_after else ""),
-            timeout_s=10.0,
-        )
-        self.target_halted = halt_after
+        """Reset the target via ``monitor reset``.
+
+        ST-LINK gdbserver (bench-verified v7.13.0, RES-041): ``monitor
+        reset`` system-resets and leaves the core HALTED at
+        ``Reset_Handler`` while a debugger is attached; the OpenOCD form
+        ``monitor reset halt`` is rejected with ``^error``. So
+        ``halt_after=True`` is the server's natural behavior and
+        ``halt_after=False`` resumes explicitly after the reset.
+        """
+        self._gdb.send_console("monitor reset", timeout_s=10.0)
+        self.target_halted = True
+        if not halt_after:
+            self.resume()
         self._log.info("reset halt_after=%s", halt_after)
 
     def send_monitor(self, command: str) -> str:
@@ -131,9 +176,11 @@ class DebugSession:
         """
         lines = self._gdb.send_console(f"monitor {command}", timeout_s=10.0)
         # Update halt state on known commands so cross-module callers
-        # stay in sync.
+        # stay in sync. `reset` halts at Reset_Handler while attached
+        # (RES-041). The resume-flavored Rcmds don't exist on ST-LINK
+        # gdbserver (would ^error above) but stay mapped defensively.
         cmd_lower = command.strip().lower()
-        if cmd_lower in ("halt", "reset halt"):
+        if cmd_lower in ("halt", "reset"):
             self.target_halted = True
         elif cmd_lower in ("continue", "go", "resume"):
             self.target_halted = False
@@ -146,21 +193,42 @@ class DebugSession:
     def read_registers(self) -> RegisterDump:
         """DBG-006 — ``-data-list-register-names`` + ``-data-list-register-values x``."""
         self._require_halted()
-        names = self._gdb.send_mi("-data-list-register-names", timeout_s=5.0)
+        timeout_s = _debug_default(self.ctx, "read_timeout_s", 10.0)
+        names = self._gdb.send_mi(
+            "-data-list-register-names", timeout_s=timeout_s
+        )
         values = self._gdb.send_mi(
-            "-data-list-register-values x", timeout_s=5.0
+            "-data-list-register-values x", timeout_s=timeout_s
         )
         return parse_register_dump(values, names)
 
     def read_memory(self, address: str, size: int) -> MemoryReadResult:
-        """Raw memory read via ``-data-read-memory-bytes <addr> <size>``."""
+        """Raw memory read via ``-data-read-memory-bytes <addr> <size>``.
+
+        Timeout scales with size: ``debug.read_memory_base_s`` +
+        ``debug.read_memory_per_mb_s`` per MB requested.
+        """
         if size <= 0:
             raise ValueError(f"read_memory size must be positive; got {size}")
         self._require_halted()
+        timeout_s = _debug_default(
+            self.ctx, "read_memory_base_s", 5.0
+        ) + _debug_default(self.ctx, "read_memory_per_mb_s", 5.0) * (
+            size / 1_048_576
+        )
         record = self._gdb.send_mi(
-            f"-data-read-memory-bytes {address} {size}", timeout_s=10.0
+            f"-data-read-memory-bytes {mi_quote(address)} {size}",
+            timeout_s=timeout_s,
         )
         raw = parse_memory_read(record)
+        if len(raw) < size:
+            self._log.warning(
+                "read_memory: requested %d bytes at %s, got %d "
+                "(unreadable hole in the range — see bytes_read)",
+                size,
+                address,
+                len(raw),
+            )
         hex_dump = _render_hex_dump(raw, start_address=address)
         suspicious = bool(raw) and all(b == 0xFF for b in raw)
         return MemoryReadResult(
@@ -211,7 +279,7 @@ class DebugSession:
         )
         record = self._gdb.send_mi(
             f"-data-read-memory-bytes 0x{periph.base_address:08x} {max_offset}",
-            timeout_s=10.0,
+            timeout_s=_debug_default(self.ctx, "read_timeout_s", 10.0),
         )
         raw = parse_memory_read(record)
         suspicious = bool(raw) and all(b == 0xFF for b in raw)
@@ -237,14 +305,24 @@ class DebugSession:
         )
 
     def callstack(self, *, full: bool = False) -> CallStack:
-        """``-stack-list-frames`` + ``-thread-info`` for thread state."""
+        """``-stack-list-frames`` + ``-thread-info`` for thread state.
+
+        ``full=True`` additionally runs ``-stack-list-arguments 1`` and
+        merges the per-frame arguments into ``StackFrame.args`` by level.
+        (It must not *replace* the frames command — the args command's
+        ``stack-args`` payload carries no addr/func/file.)
+        """
         self._require_halted()
-        stack_cmd = "-stack-list-frames --no-frame-filters"
+        stack = self._gdb.send_mi(
+            "-stack-list-frames --no-frame-filters", timeout_s=5.0
+        )
+        args_record = None
         if full:
-            stack_cmd = "-stack-list-arguments --no-frame-filters 1"
-        stack = self._gdb.send_mi(stack_cmd, timeout_s=5.0)
+            args_record = self._gdb.send_mi(
+                "-stack-list-arguments --no-frame-filters 1", timeout_s=5.0
+            )
         threads = self._gdb.send_mi("-thread-info", timeout_s=5.0)
-        return parse_stack_list_frames(stack, threads)
+        return parse_stack_list_frames(stack, threads, args_record=args_record)
 
     # ------------------------------------------------------------------
     # snapshot (DIAG-021)
@@ -261,15 +339,42 @@ class DebugSession:
         ``include_peripherals`` lets the caller pick which peripherals to
         dump. ``None`` defaults to just ``"SCB"`` (the canonical
         fault-decode peripheral); add more for richer snapshots.
+
+        The whole capture is bounded by ``debug.snapshot_timeout_s``
+        (default 60 s, HIL no-long-waits): once the budget is exhausted,
+        remaining peripherals are skipped with a warning rather than
+        extending the wait — the result reflects what was captured.
         """
         self._require_halted()
+        deadline = time.monotonic() + _debug_default(
+            self.ctx, "snapshot_timeout_s", 60.0
+        )
         registers = self.read_registers()
-        cs = self.callstack()
+        try:
+            cs = self.callstack()
+        except GDBError as ex:
+            # A faulted target — DIAG-001's primary subject — often has
+            # an unwindable stack (corrupt SP is a canonical fault
+            # cause, and ST-LINK gdbserver can garble reads while
+            # unwinding the exception frame). Degrade like the
+            # per-peripheral legs: empty callstack + warning beats
+            # losing the registers/fault state the snapshot is for.
+            self._log.warning(
+                "snapshot: callstack unwind failed: %s", ex.message
+            )
+            cs = CallStack(frames=[], threads=[])
         disasm = self._capture_disasm_around_pc()
 
         peripherals = include_peripherals or ["SCB"]
         dumps: list[PeripheralDump] = []
         for name in peripherals:
+            if time.monotonic() >= deadline:
+                self._log.warning(
+                    "snapshot: debug.snapshot_timeout_s budget exhausted; "
+                    "skipping remaining peripherals starting at %s",
+                    name,
+                )
+                break
             try:
                 dumps.append(self.read_peripheral(name))
             except GDBError as ex:
@@ -306,9 +411,9 @@ class DebugSession:
     # ------------------------------------------------------------------
 
     def set_breakpoint(self, location: str) -> Breakpoint:
-        """``-break-insert <location>``."""
+        """``-break-insert <location>`` (location MI-quoted per IMP-15)."""
         record = self._gdb.send_mi(
-            f"-break-insert {location}", timeout_s=5.0
+            f"-break-insert {mi_quote(location)}", timeout_s=5.0
         )
         bp = parse_breakpoint_insert(record)
         self._breakpoints[bp.number] = bp
@@ -327,20 +432,26 @@ class DebugSession:
 
         Returns ``RunResult(breakpoint_hit=False, halt_reason="timeout")``
         when the timeout fires; sends ``-exec-interrupt`` to leave gdb
-        in a known state.
+        in a known state. ``timeout_s=None`` falls back to
+        ``debug.breakpoint_wait_timeout_s`` (default 30 s).
         """
         if timeout_s is None:
-            timeout_s = 30.0
+            timeout_s = _debug_default(
+                self.ctx, "breakpoint_wait_timeout_s", 30.0
+            )
         start = time.monotonic()
         self._gdb.send_mi("-exec-continue", timeout_s=5.0)
         self.target_halted = False
+        self._gdb_believes_running = True
         stop = self._gdb.wait_for_stopped(timeout_s=timeout_s)
         duration = time.monotonic() - start
         if stop is None:
-            # Bring target back to known state.
+            # Bring target back to known state. -exec-interrupt is the
+            # right mechanism here — gdb knows the target is running.
             try:
                 self._gdb.send_mi("-exec-interrupt", timeout_s=5.0)
                 self.target_halted = True
+                self._gdb_believes_running = False
             except GDBError:
                 pass
             return RunResult(
@@ -352,6 +463,7 @@ class DebugSession:
             )
 
         self.target_halted = True
+        self._gdb_believes_running = False
         bp = (
             self._breakpoints.get(stop.breakpoint_number)
             if stop.breakpoint_number is not None
@@ -373,10 +485,10 @@ class DebugSession:
         )
 
     def read_variable(self, name: str) -> VariableValue:
-        """``-data-evaluate-expression <name>``."""
+        """``-data-evaluate-expression <name>`` (expression MI-quoted per IMP-15)."""
         self._require_halted()
         record = self._gdb.send_mi(
-            f"-data-evaluate-expression {name}", timeout_s=5.0
+            f"-data-evaluate-expression {mi_quote(name)}", timeout_s=5.0
         )
         value = parse_evaluate_expression(record)
         # Inject the name (parser doesn't know it).

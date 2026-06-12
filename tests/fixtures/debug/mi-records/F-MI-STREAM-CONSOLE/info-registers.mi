@@ -1,0 +1,4 @@
+# -interpreter-exec console "info registers pc"
+# captured 2026-06-11, arm-none-eabi-gdb MI3, NUCLEO-L476RG, BLINKY.elf
+~"pc             0x8001474           0x8001474 <Reset_Handler>\n"
+19^done

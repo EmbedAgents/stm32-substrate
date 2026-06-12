@@ -1,0 +1,3 @@
+# -stack-list-frames --no-frame-filters
+# captured 2026-06-11, arm-none-eabi-gdb MI3, NUCLEO-L476RG, BLINKY.elf
+7^done,stack=[frame={level="0",addr="0x08001474",func="Reset_Handler",file="../Example/Startup/startup_stm32l476rgtx.s",fullname="/home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/Projects/NUCLEO-L476RG/Examples/GPIO/BLINKY/STM32CubeIDE/Example/Startup/startup_stm32l476rgtx.s",line="62",arch="armv7e-m"}]

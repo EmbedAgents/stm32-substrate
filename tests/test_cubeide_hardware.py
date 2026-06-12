@@ -9,7 +9,8 @@ group with the rest of the F.6 bench suite and gate on the same
 resolvable on this host).
 
 Prerequisite: HAL / CMSIS-device / BSP populated under the F-PROJ
-tree (user-provided). The .gitignore excludes these subtrees from the
+tree per RES-019 user-provides (see plan-windows.md F-PROJ HAL gap
+resolution note). The .gitignore excludes these subtrees from the
 repo - each developer's bench populates them locally from a
 STM32CubeL4 firmware-bundle extract.
 
@@ -200,7 +201,7 @@ def broken_compile_project(fresh_workspace_ctx) -> Path:
     if not (proj_root.is_dir() and main_c.is_file() and cubeide_dir.is_dir()):
         pytest.skip(
             f"BROKEN-COMPILE project not populated at {proj_root}; "
-            "user-provides per RES-019."
+            "user-provides per RES-019 (see plan-test.md)."
         )
     main_c.write_text(_BROKEN_COMPILE_MAIN_C, encoding="utf-8", newline="\n")
     return cubeide_dir
@@ -217,7 +218,7 @@ def broken_link_project(fresh_workspace_ctx) -> Path:
     if not (proj_root.is_dir() and main_c.is_file() and cubeide_dir.is_dir()):
         pytest.skip(
             f"BROKEN-LINK project not populated at {proj_root}; "
-            "user-provides per RES-019."
+            "user-provides per RES-019 (see plan-test.md)."
         )
     main_c.write_text(_BROKEN_LINK_MAIN_C, encoding="utf-8", newline="\n")
     return cubeide_dir

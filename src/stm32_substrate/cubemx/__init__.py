@@ -11,7 +11,7 @@ invokes the tool, observes external signals (subprocess state, marker
 file presence, log mtime), reports success / failure, hands the log
 path to the caller on failure.
 
-See the CubeMX API spec for the full spec.
+See ``v1/cubemx-api.md`` for the full spec.
 """
 
 from __future__ import annotations

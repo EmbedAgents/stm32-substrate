@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/EmbedAgents/stm32-substrate/schemas/stm32-runtime-defaults.schema.json",
   "title": "STM32 substrate — runtime defaults",
-  "description": "Repo-wide defaults for tool timeouts, retry caps, and other runtime knobs. Loaded by SubstrateContext.from_environment() and validated at load time. Organized into per-tool blocks.",
+  "description": "Repo-wide defaults for tool timeouts, retry caps, and other runtime knobs. Loaded by SubstrateContext.from_environment() and validated at load time (M-016). Per-tool blocks reflect the Schema additions sections of cubeprogrammer-api.md, cubeide-api.md, cubemx-api.md, debug-api.md, vcp-api.md, signing-api.md.",
   "type": "object",
   "additionalProperties": false,
   "required": ["version"],

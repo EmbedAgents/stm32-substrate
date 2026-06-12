@@ -1,6 +1,6 @@
 """Single subprocess helper used by every tool wrapper.
 
-Per the API conventions § "Process management — ``run_tool()``" and
+Per ``v1/api-conventions.md`` § "Process management — ``run_tool()``" and
 M-017 (no silent retries). Centralises timeout, signal handling, output
 capture, logging. Bare ``subprocess.run`` calls are not allowed inside
 business-logic modules — they all funnel through here.
@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Sequence
 
 from stm32_substrate.errors import ToolError
+from stm32_substrate.platform import terminate_process_tree
 
 if TYPE_CHECKING:
     from stm32_substrate.context import SubstrateContext
@@ -172,28 +173,22 @@ def run_tool(
 
 
 def _terminate(proc: subprocess.Popen) -> None:
-    """Terminate ``proc`` with the standard SIGTERM-then-SIGKILL grace.
+    """Terminate ``proc`` AND its descendants with the standard grace ladder.
 
-    Uses ``Popen.terminate`` / ``Popen.kill`` (subprocess's own signalling)
-    rather than ``os.kill`` directly, satisfying the ADR-005 rule that
-    business-logic code does not import ``signal``.
+    Routed through ``platform.terminate_process_tree`` (ADR-007: no
+    ``os.kill``/``signal`` here). Signalling only the direct child
+    orphans JVM grandchildren of the CubeIDE/CubeMX bootstrap launchers
+    — they kept running after a timeout/Ctrl-C, holding the Eclipse
+    workspace lock and writing output (IMP-16); ``start_new_session=True``
+    additionally shielded them from terminal SIGINT.
     """
     if proc.poll() is not None:
         return
+    terminate_process_tree(proc.pid, grace_s=_TIMEOUT_GRACE_S)
     try:
-        proc.terminate()
-        try:
-            proc.wait(timeout=_TIMEOUT_GRACE_S)
-            return
-        except subprocess.TimeoutExpired:
-            pass
-        proc.kill()
-        try:
-            proc.wait(timeout=_TIMEOUT_GRACE_S)
-        except subprocess.TimeoutExpired:
-            _log.warning("subprocess pid=%s did not die after SIGKILL", proc.pid)
-    except ProcessLookupError:
-        return
+        proc.wait(timeout=_TIMEOUT_GRACE_S)  # reap; tree kill already ran
+    except subprocess.TimeoutExpired:
+        _log.warning("subprocess pid=%s did not die after tree kill", proc.pid)
 
 
 def _coerce_partial(value: str | bytes | None) -> str:

@@ -72,7 +72,7 @@ class TestDetectProjectImported:
         )
         loc.parent.mkdir(parents=True)
         # Construct a realistic-ish blob with a NUL trailer.
-        path = "/home/user/projects/demo"
+        path = "/home/anup/projects/demo"
         loc.write_bytes(
             b"\x40\x40\x00\x14\x10URI//file:" + path.encode() + b"\x00\x80"
         )
@@ -90,9 +90,43 @@ class TestDetectProjectImported:
             / ".location"
         )
         loc.parent.mkdir(parents=True)
-        loc.write_bytes(b"x\x00file:/home/user/my%20projects/demo\x00y")
+        loc.write_bytes(b"x\x00file:/home/anup/my%20projects/demo\x00y")
         result = workspace.detect_project_imported(tmp_path, "demo")
-        assert result == Path("/home/user/my projects/demo")
+        assert result == Path("/home/anup/my projects/demo")
+
+    def test_decodes_windows_drive_uri(self, tmp_path: Path) -> None:
+        """IMP-06: Eclipse on Windows writes ``file:/C:/...`` — the URI
+        leading slash is not part of the path. Undecoded, the comparison
+        against the descriptor path never matched and every build ran
+        cleanup_stale_project, purging live workspace metadata."""
+        loc = (
+            tmp_path
+            / ".metadata"
+            / ".plugins"
+            / "org.eclipse.core.resources"
+            / ".projects"
+            / "demo"
+            / ".location"
+        )
+        loc.parent.mkdir(parents=True)
+        loc.write_bytes(b"x\x00file:/C:/Users/dev/proj/demo\x00y")
+        result = workspace.detect_project_imported(tmp_path, "demo")
+        assert result == Path("C:/Users/dev/proj/demo")
+
+    def test_decodes_triple_slash_windows_uri(self, tmp_path: Path) -> None:
+        loc = (
+            tmp_path
+            / ".metadata"
+            / ".plugins"
+            / "org.eclipse.core.resources"
+            / ".projects"
+            / "demo"
+            / ".location"
+        )
+        loc.parent.mkdir(parents=True)
+        loc.write_bytes(b"x\x00file:///C:/ws/demo\x00y")
+        result = workspace.detect_project_imported(tmp_path, "demo")
+        assert result == Path("C:/ws/demo")
 
     def test_missing_file_marker_returns_none(self, tmp_path: Path) -> None:
         loc = (

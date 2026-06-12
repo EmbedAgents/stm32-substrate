@@ -1,0 +1,3 @@
+# -data-evaluate-expression no_such_variable_xyz
+# captured 2026-06-11, arm-none-eabi-gdb MI3, NUCLEO-L476RG, BLINKY.elf
+16^error,msg="No symbol \"no_such_variable_xyz\" in current context."

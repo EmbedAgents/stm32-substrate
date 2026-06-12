@@ -1,7 +1,7 @@
 """JSON serialization helpers for the ``stm32`` CLI surface.
 
 Every CLI subcommand produces JSON on stdout (per
-the CubeProgrammer API spec § "CLI subcommand surface" — "Output format:
+``v1/cubeprogrammer-api.md`` § "CLI subcommand surface" — "Output format:
 stdout = JSON; pretty-printed via ``--pretty``"). Errors raised as
 ``SubstrateError`` are serialised here too for stderr output.
 

@@ -4,7 +4,7 @@ Public surface: ``CubeProgrammer`` class + the prompt-specific result
 dataclasses + ``CubeProgrammerErrorCode`` enum. Maps 1:1 to D-* and F-*
 prompts, plus DIAG-001 binary-only path, DIAG-018, VCP-007 SWO, and CP-001.
 
-See the CubeProgrammer API spec for the full method list, signatures,
+See ``v1/cubeprogrammer-api.md`` for the full method list, signatures,
 and CLI subcommand mapping.
 """
 

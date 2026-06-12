@@ -177,3 +177,78 @@ def _windows_terminate(pid: int, grace_s: float) -> None:
         kernel32.WaitForSingleObject(handle, 1000)
     finally:
         kernel32.CloseHandle(handle)
+
+
+# ---------------------------------------------------------------------------
+# Process-tree termination
+# ---------------------------------------------------------------------------
+
+
+def terminate_process_tree(pid: int, *, grace_s: float = 2.0) -> None:
+    """Terminate ``pid`` and its descendants; never raises.
+
+    The vendor launchers (CubeIDE headless, CubeMX) are bootstrap
+    processes whose JVM child does the real work — signalling only the
+    direct child orphans the JVM, which keeps writing the output tree
+    and holding the Eclipse workspace lock (IMP-08 / IMP-16).
+
+    Linux: the substrate spawns children with ``start_new_session=True``,
+    so ``pid`` is a process-group leader — ``killpg(SIGTERM)``, grace,
+    then a ``killpg(SIGKILL)`` sweep (which also reaps grandchildren that
+    outlived the leader). Windows: ``taskkill /T`` (polite tree kill),
+    grace, then ``taskkill /F /T``.
+    """
+    if pid <= 0:
+        return
+    if sys.platform == "win32":
+        _windows_terminate_tree(pid, grace_s)
+    else:
+        _linux_terminate_tree(pid, grace_s)
+
+
+def _linux_terminate_tree(pid: int, grace_s: float) -> None:
+    try:
+        os.killpg(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    except PermissionError:
+        # Not a group we may signal (shouldn't happen for our own
+        # children) — fall back to the single-process ladder.
+        _linux_terminate(pid, grace_s)
+        return
+
+    poll_interval_s = 0.05
+    deadline = time.monotonic() + max(0.0, grace_s)
+    while time.monotonic() < deadline:
+        if not _linux_alive(pid):
+            break
+        time.sleep(poll_interval_s)
+
+    # Final sweep regardless of the leader's state: grandchildren can
+    # outlive the leader within the same process group.
+    try:
+        os.killpg(pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+
+def _windows_terminate_tree(pid: int, grace_s: float) -> None:
+    import subprocess  # wrapper layer — not business logic
+
+    creation = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    subprocess.run(
+        ["taskkill", "/T", "/PID", str(pid)],
+        capture_output=True,
+        creationflags=creation,
+    )
+    poll_interval_s = 0.05
+    deadline = time.monotonic() + max(0.0, grace_s)
+    while time.monotonic() < deadline:
+        if not _windows_alive(pid):
+            break
+        time.sleep(poll_interval_s)
+    subprocess.run(
+        ["taskkill", "/F", "/T", "/PID", str(pid)],
+        capture_output=True,
+        creationflags=creation,
+    )

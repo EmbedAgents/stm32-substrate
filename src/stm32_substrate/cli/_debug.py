@@ -11,7 +11,7 @@ context manager. The CLI exists for Claude's fix-loop consumption
 (B-021, DIAG-001/019/020, DBG-008/9/11, CP-003/007/013) and one-shot
 human queries — not for interactive debugging (use CubeIDE's GUI).
 
-Subcommand surface (per the debug API spec § "CLI subcommand surface"):
+Subcommand surface (per ``v1/debug-api.md`` § "CLI subcommand surface"):
 
 - ``start ELF [--port] [--no-halt] [--n6-dev-mode]`` — lifecycle only:
   spawn + handshake + emit ``SessionHandle`` + tear down. DBG-001 /
@@ -280,7 +280,7 @@ def _add_callstack(sub: argparse._SubParsersAction) -> None:
     p.add_argument(
         "--full",
         action="store_true",
-        help="include args + locals per frame ('bt full')",
+        help="include per-frame function arguments",
     )
     _add_session_args(p)
     p.set_defaults(debug_fn=_cmd_callstack)
@@ -371,7 +371,7 @@ def _cmd_check_variable(args: argparse.Namespace, ctx: SubstrateContext) -> Any:
             args.var_name, _parse_expected(args.expected), mask=args.mask
         )
 
-    return _with_fresh_session(ctx, args, op)
+    return _with_fresh_session(ctx, args, op, reset=True)
 
 
 def _cmd_check_register(args: argparse.Namespace, ctx: SubstrateContext) -> Any:
@@ -395,7 +395,7 @@ def _cmd_check_register(args: argparse.Namespace, ctx: SubstrateContext) -> Any:
             args.reg_name, args.expected, mask=args.mask
         )
 
-    return _with_fresh_session(ctx, args, op)
+    return _with_fresh_session(ctx, args, op, reset=True)
 
 
 def _cmd_read_registers(args: argparse.Namespace, ctx: SubstrateContext) -> Any:
@@ -448,24 +448,47 @@ def _with_fresh_session(
     ctx: SubstrateContext,
     args: argparse.Namespace,
     fn: Callable[[DebugSession], Any],
+    *,
+    reset: bool = False,
 ) -> Any:
     """Spawn a one-shot DebugSession, run ``fn(session)``, tear down.
 
     All recipes go through this helper. ``elf`` is autodiscovered from
-    the project descriptor when ``args.elf`` is None per R-002. Every
-    session is started halted (``halt=True``) — recipes operate on a
-    paused target.
+    the project descriptor when ``args.elf`` is None per R-002.
+
+    ``reset=False`` (the read recipes): attach to the running target
+    without reset (gdbserver ``-g``) and halt it in place — the state
+    being read is the firmware's live state. ``halt=True`` would send
+    ``monitor reset``, wiping the sticky fault registers (CFSR / HFSR
+    clear on reset) and returning every peripheral to its power-on
+    defaults — DIAG-001 then always saw a clean fault state (A-003).
+
+    ``reset=True`` (check-variable / check-register): reset-and-halt so
+    the breakpoint is armed before execution reaches the location —
+    DBG-004/005 semantics require running *through* the program from
+    the top.
     """
     debug = Debug(ctx)
     n6 = getattr(args, "n6_dev_mode", False)
     session = debug.start_session(
         getattr(args, "elf", None),
-        halt=True,
+        halt=reset,
         port=getattr(args, "port", None),
         n6_dev_mode=n6,
         on_n6_boot_confirm=(_console_confirm if n6 else None),
     )
     try:
+        if not reset and not session.target_halted:
+            try:
+                session.halt()
+            except GDBError as ex:
+                # Some gdb/gdbserver combos stop the core during the
+                # attach itself; -exec-interrupt then errors. The reads
+                # below still verify halt state and fail loud if the
+                # target is genuinely running.
+                if ex.gdb_marker != "command-error":
+                    raise
+                session.target_halted = True
         return fn(session)
     finally:
         session.close()

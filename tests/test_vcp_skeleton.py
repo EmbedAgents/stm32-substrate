@@ -1,7 +1,7 @@
 """Skeleton + result-type tests for the ``vcp`` module.
 
 Verifies imports, dataclass shapes, and the error-subclass plumbing per
-the VCP API spec. No serial I/O.
+``v1/vcp-api.md``. No serial I/O.
 """
 
 from __future__ import annotations

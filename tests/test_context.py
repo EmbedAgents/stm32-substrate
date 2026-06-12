@@ -413,3 +413,143 @@ class TestContextShape:
         ctx = SubstrateContext.from_environment(project_path=tmp_path)
         with pytest.raises(Exception):
             ctx.cwd = Path("/elsewhere")  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# IMP-20 — set-but-broken tool-path env vars raise loud
+# ---------------------------------------------------------------------------
+
+
+class TestBrokenEnvVarPin:
+    def test_env_var_pointing_at_nonexistent_path_raises(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("STM32_PROGRAMMER_CLI", str(tmp_path / "typo"))
+        with pytest.raises(ConfigurationError) as excinfo:
+            SubstrateContext.from_environment(project_path=tmp_path)
+        assert "STM32_PROGRAMMER_CLI" in excinfo.value.message
+        assert "typo" in excinfo.value.message
+
+    def test_unset_env_var_still_falls_through(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("STM32_PROGRAMMER_CLI", raising=False)
+        ctx = SubstrateContext.from_environment(project_path=tmp_path)
+        # No raise; resolution proceeded to candidates/PATH (may be None).
+        assert isinstance(ctx, SubstrateContext)
+
+
+# ---------------------------------------------------------------------------
+# IMP-21 — explicit config-path params must exist
+# ---------------------------------------------------------------------------
+
+
+class TestExplicitConfigPathTypos:
+    def test_missing_project_path_raises(self, tmp_path: Path) -> None:
+        with pytest.raises(ConfigurationError) as excinfo:
+            SubstrateContext.from_environment(
+                project_path=tmp_path / "no-such-dir"
+            )
+        assert "project_path" in excinfo.value.message
+
+    def test_missing_defaults_config_path_raises(
+        self, tmp_path: Path
+    ) -> None:
+        with pytest.raises(ConfigurationError) as excinfo:
+            SubstrateContext.from_environment(
+                project_path=tmp_path,
+                defaults_config_path=tmp_path / "typo-defaults.jsonc",
+            )
+        assert "defaults_config_path" in excinfo.value.message
+
+    def test_missing_tools_config_path_raises(self, tmp_path: Path) -> None:
+        with pytest.raises(ConfigurationError) as excinfo:
+            SubstrateContext.from_environment(
+                project_path=tmp_path,
+                tools_config_path=tmp_path / "typo-tools.jsonc",
+            )
+        assert "tools_config_path" in excinfo.value.message
+
+    def test_existing_dir_without_descriptor_stays_valid(
+        self, tmp_path: Path
+    ) -> None:
+        # A real directory with no stm32-project.jsonc anchors ctx.cwd;
+        # the descriptor itself is optional.
+        ctx = SubstrateContext.from_environment(project_path=tmp_path)
+        assert ctx.project is None
+        assert ctx.cwd == tmp_path.resolve()
+
+
+# ---------------------------------------------------------------------------
+# A-019 — invalid-sample rejection for the OTHER two schemas (M-016)
+# ---------------------------------------------------------------------------
+
+
+class TestRuntimeDefaultsSchemaValidation:
+    def test_wrong_type_knob_raises_with_loud_fields(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("STM32_SUBSTRATE_SKIP_SCHEMA_VALIDATION", raising=False)
+        bad = {
+            "version": 1,
+            "debug": {"read_timeout_s": "ten"},  # integer required
+        }
+        _write_jsonc(tmp_path / "stm32-runtime-defaults.jsonc", bad)
+        with pytest.raises(ConfigurationError) as excinfo:
+            SubstrateContext.from_environment(project_path=tmp_path)
+        err = excinfo.value
+        assert err.schema_name == "stm32-runtime-defaults.schema.json"
+        assert err.json_path == "debug.read_timeout_s"
+
+    def test_unknown_knob_rejected(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("STM32_SUBSTRATE_SKIP_SCHEMA_VALIDATION", raising=False)
+        bad = {"version": 1, "debug": {"no_such_knob": 5}}
+        _write_jsonc(tmp_path / "stm32-runtime-defaults.jsonc", bad)
+        with pytest.raises(ConfigurationError) as excinfo:
+            SubstrateContext.from_environment(project_path=tmp_path)
+        assert excinfo.value.schema_name == "stm32-runtime-defaults.schema.json"
+
+    def test_out_of_range_port_rejected(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("STM32_SUBSTRATE_SKIP_SCHEMA_VALIDATION", raising=False)
+        bad = {"version": 1, "debug": {"gdb_port": 80}}  # minimum 1024
+        _write_jsonc(tmp_path / "stm32-runtime-defaults.jsonc", bad)
+        with pytest.raises(ConfigurationError) as excinfo:
+            SubstrateContext.from_environment(project_path=tmp_path)
+        assert excinfo.value.json_path == "debug.gdb_port"
+
+
+class TestToolsLocalSchemaValidation:
+    def test_wrong_version_raises_with_loud_fields(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("STM32_SUBSTRATE_SKIP_SCHEMA_VALIDATION", raising=False)
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        bad = {"version": 2, "tools": {}}  # const=1
+        _write_jsonc(claude_dir / "stm32-tools.local.jsonc", bad)
+        with pytest.raises(ConfigurationError) as excinfo:
+            SubstrateContext.from_environment(project_path=tmp_path)
+        err = excinfo.value
+        assert err.schema_name == "stm32-tools.local.schema.json"
+        assert err.json_path == "version"
+
+    def test_wrong_candidates_shape_rejected(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("STM32_SUBSTRATE_SKIP_SCHEMA_VALIDATION", raising=False)
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        bad = {
+            "version": 1,
+            "tools": {
+                "cube_programmer": {"candidates": "/usr/bin/cli"}
+            },  # object with per-OS lists required
+        }
+        _write_jsonc(claude_dir / "stm32-tools.local.jsonc", bad)
+        with pytest.raises(ConfigurationError) as excinfo:
+            SubstrateContext.from_environment(project_path=tmp_path)
+        assert excinfo.value.schema_name == "stm32-tools.local.schema.json"

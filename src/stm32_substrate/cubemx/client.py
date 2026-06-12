@@ -14,6 +14,7 @@ from stm32_substrate.cubemx import runner
 from stm32_substrate.cubemx.launcher import resolve_cubemx_launcher
 from stm32_substrate.cubemx.results import CubeMXResult
 from stm32_substrate.errors import CubeMXError
+from stm32_substrate.resolution import resolve_file
 
 if TYPE_CHECKING:
     from stm32_substrate.context import SubstrateContext
@@ -177,34 +178,30 @@ class CubeMX:
     # resolution helpers
     # ------------------------------------------------------------------
 
-    def _resolve_ioc_path(self, ioc_path: Path | None) -> Path:
-        if ioc_path is not None:
-            return ioc_path.resolve()
-        descriptor = self.ctx.project
-        cubemx_block = getattr(descriptor, "cubemx", None) if descriptor else None
-        configured = (
-            getattr(cubemx_block, "ioc_path", None) if cubemx_block else None
+    def _resolve_ioc_path(self, ioc_path: "Path | str | None") -> Path:
+        # R-002 via resolution.resolve_file (IMP-22/IMP-23). Missing both
+        # sources raises ConfigurationError with a hint — previously a
+        # bare ValueError, the lone outlier among the resolvers (IMP-41).
+        resolved = resolve_file(
+            ioc_path,
+            ctx=self.ctx,
+            descriptor_field="cubemx.ioc_path",
+            arg_name="ioc_path",
         )
-        if not configured:
-            raise ValueError(
-                "ioc_path= not given and cubemx.ioc_path is unset in "
-                "stm32-project.jsonc"
-            )
-        return Path(configured).resolve()
+        assert resolved is not None  # required=True
+        return resolved
 
     def _resolve_output_path(
-        self, output_path: Path | None, ioc_path: Path
+        self, output_path: "Path | str | None", ioc_path: Path
     ) -> Path:
-        if output_path is not None:
-            return output_path.resolve()
-        descriptor = self.ctx.project
-        cubemx_block = getattr(descriptor, "cubemx", None) if descriptor else None
-        configured = (
-            getattr(cubemx_block, "output_path", None) if cubemx_block else None
+        resolved = resolve_file(
+            output_path,
+            ctx=self.ctx,
+            descriptor_field="cubemx.output_path",
+            arg_name="output_path",
+            required=False,
         )
-        if configured:
-            return Path(configured).resolve()
-        return ioc_path.parent
+        return resolved if resolved is not None else ioc_path.parent
 
     def _resolve_project_name(
         self, project_name: str | None, ioc_path: Path

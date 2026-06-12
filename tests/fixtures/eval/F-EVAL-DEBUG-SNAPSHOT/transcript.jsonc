@@ -1,24 +1,60 @@
 {
   "_metadata": {
-    "model": "claude-sonnet-4-6",
-    "cost_usd": 0.037521,
-    "duration_s": 18.64
+    "model": "claude-fable-5",
+    "cost_usd": 0.2210955,
+    "duration_s": 59.505
   },
   "tool_calls": [
     {
-      "name": "Skill",
+      "name": "Bash",
       "args": {
-        "skill": "stm32debug",
-        "args": "Take a debug snapshot of the attached target."
+        "command": "stm32 debug snapshot",
+        "description": "Take debug snapshot of attached target"
       }
     },
     {
       "name": "Bash",
       "args": {
-        "command": "stm32 debug snapshot",
-        "description": "Take a composite debug snapshot (registers + callstack + disasm-around-PC) of the attached target"
+        "command": "stm32 prog list-probes",
+        "description": "List attached ST-LINK probes"
+      }
+    },
+    {
+      "name": "AskUserQuestion",
+      "args": {
+        "questions": [
+          {
+            "question": "Two probes are attached \u2014 which target should I snapshot?",
+            "header": "Target",
+            "options": [
+              {
+                "label": "NUCLEO-L476RG",
+                "description": "ST-LINK V2 (SN 066DFF48\u2026), primary bench board"
+              },
+              {
+                "label": "STM32N6570-DK",
+                "description": "ST-LINK V3 (SN 00340030\u2026), N6 board \u2014 snapshot would run with --n6-dev-mode considerations"
+              }
+            ],
+            "multiSelect": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "ls stm32-project.jsonc 2>/dev/null && cat stm32-project.jsonc || (cd .. && ls stm32-project.jsonc 2>/dev/null && cat stm32-project.jsonc); pwd",
+        "description": "Check for project descriptor to identify target board"
+      }
+    },
+    {
+      "name": "Bash",
+      "args": {
+        "command": "STM32_PROGRAMMER_DEFAULT_SN=066DFF485754727567021514 stm32 debug snapshot",
+        "description": "Snapshot L476RG target via its ST-LINK probe"
       }
     }
   ],
-  "final_text": "\"Take a debug snapshot\" maps directly to `stm32 debug snapshot`. ELF autodiscovery will pick it up from the project descriptor if present.\nThe snapshot failed \u2014 the ST-LINK firmware on the attached probe is out of date. The gdbserver exited with code 6 and reported:\n\n> **ST-LINK firmware upgrade required. Please upgrade the ST-LINK firmware using the upgrade tool.**\n\n**What to do:**\n\n1. Open **STM32CubeProgrammer** \u2192 menu **Firmware Upgrade** (or run `STM32_Programmer_CLI --upgrade` from the command line).\n2. Select the detected ST-LINK probe and click **Upgrade**.\n3. Once the upgrade completes, re-plug the USB cable (or power-cycle the board).\n4. Re-run the snapshot:\n   ```\n   stm32 debug snapshot\n   ```\n\nThis is the same ST-LINK V2J28M17 firmware issue noted for the bench F401RE board \u2014 the fix is the same firmware upgrade path."
+  "final_text": "Snapshot captured. The full JSON is saved at `~/.claude/projects/.../tool-results/bo85mcj66.txt` \u2014 here's the summary:\n\n## Debug snapshot \u2014 NUCLEO-L476RG (probe 066DFF48\u2026, attached without reset)\n\n**Target state:** halted in place, single thread (`main`), executing from flash.\n\n**Core registers:**\n| Reg | Value | |\n|---|---|---|\n| PC | `0x08002B76` | flash, mid-function |\n| LR | `0x08001BE3` | caller in flash (Thumb) |\n| SP/MSP | `0x20017FA8` | main stack, PSP unused (0) |\n| CONTROL | 0 | privileged, MSP |\n| xPSR | `0x61000000` | Thumb state, no active exception (IPSR=0) \u2014 **not faulted** |\n| r0 | `0x2000002C` | SRAM pointer |\n| r3 | `0xFFFFFFFF` | |\n\nFPU present, all FP regs clear; PRIMASK/FAULTMASK/BASEPRI all 0 (interrupts enabled).\n\n**Callstack:**\n- #0 `0x08002b76` \u2014 `??`\n- #1 `0x08001be2` \u2014 `??`\n\n**Disassembly at PC** shows a classic HAL flag-polling loop: load a register through a struct pointer (`[r3, #28]`), AND against a mask, compare, branch back \u2014 the target is busy-waiting on a peripheral status flag (consistent with a `HAL_*` timeout/flag wait), not crashed.\n\n**One caveat:** symbols resolved as `??` even though the descriptor's ELF (`Debug/BLINKY.elf`) was autodiscovered \u2014 the firmware on the board likely doesn't match the built BLINKY ELF (the address layout fits a HAL-based image, but symbol addresses don't line up). If you want named frames, either rebuild/reflash BLINKY or point me at the ELF that's actually on the board and I'll re-run `callstack --full`."
 }
