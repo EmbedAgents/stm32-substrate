@@ -20,13 +20,13 @@ from typing import Any
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.debug.gdbserver import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.debug.gdbserver import (
     GDBServerOptions,
     GDBServerProcess,
     spawn_gdbserver,
 )
-from stm32_substrate.errors import GDBError
+from embedagents.stm32.errors import GDBError
 
 
 @dataclass

@@ -8,14 +8,14 @@ from unittest.mock import patch
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.errors import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.errors import (
     ConfigurationError,
     SigningToolError,
     ToolError,
 )
-from stm32_substrate.signing import SigningResult, SigningTool
-from stm32_substrate.subprocess_runner import ToolRunResult
+from embedagents.stm32.signing import SigningResult, SigningTool
+from embedagents.stm32.subprocess_runner import ToolRunResult
 
 
 @pytest.fixture()
@@ -53,7 +53,7 @@ class TestConstruction:
     def test_construct_with_resolved_cli(self, ctx: SubstrateContext) -> None:
         tool = SigningTool(ctx)
         assert tool._cli is not None
-        assert tool._log.name == "stm32_substrate.signing"
+        assert tool._log.name == "embedagents.stm32.signing"
 
     def test_unresolved_cli_loud_error(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -171,7 +171,7 @@ class TestEntryPointConditional:
     ) -> None:
         tool = SigningTool(ctx)
         with patch(
-            "stm32_substrate.signing.client.run_tool", return_value=_success()
+            "embedagents.stm32.signing.client.run_tool", return_value=_success()
         ) as mocked:
             result = tool.sign_binary(
                 input_bin,
@@ -198,9 +198,9 @@ class TestAlignResolution:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         tool = SigningTool(ctx)
-        with caplog.at_level(logging.INFO, logger="stm32_substrate.signing"):
+        with caplog.at_level(logging.INFO, logger="embedagents.stm32.signing"):
             with patch(
-                "stm32_substrate.signing.client.run_tool",
+                "embedagents.stm32.signing.client.run_tool",
                 return_value=_success(),
             ) as mocked:
                 result = tool.sign_binary(
@@ -238,7 +238,7 @@ class TestAlignResolution:
     ) -> None:
         tool = SigningTool(ctx)
         with patch(
-            "stm32_substrate.signing.client.run_tool", return_value=_success()
+            "embedagents.stm32.signing.client.run_tool", return_value=_success()
         ) as mocked:
             tool.sign_binary(
                 input_bin,
@@ -256,7 +256,7 @@ class TestAlignResolution:
     ) -> None:
         tool = SigningTool(ctx)
         with patch(
-            "stm32_substrate.signing.client.run_tool", return_value=_success()
+            "embedagents.stm32.signing.client.run_tool", return_value=_success()
         ) as mocked:
             result = tool.sign_binary(
                 input_bin,
@@ -274,7 +274,7 @@ class TestAlignResolution:
     ) -> None:
         tool = SigningTool(ctx)
         with patch(
-            "stm32_substrate.signing.client.run_tool", return_value=_success()
+            "embedagents.stm32.signing.client.run_tool", return_value=_success()
         ) as mocked:
             tool.sign_binary(
                 input_bin,
@@ -301,9 +301,9 @@ class TestNoKeyWarning:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         tool = SigningTool(ctx)
-        with caplog.at_level(logging.WARNING, logger="stm32_substrate.signing"):
+        with caplog.at_level(logging.WARNING, logger="embedagents.stm32.signing"):
             with patch(
-                "stm32_substrate.signing.client.run_tool",
+                "embedagents.stm32.signing.client.run_tool",
                 return_value=_success(),
             ):
                 tool.sign_binary(
@@ -330,7 +330,7 @@ class TestOutputPath:
     ) -> None:
         tool = SigningTool(ctx)
         with patch(
-            "stm32_substrate.signing.client.run_tool", return_value=_success()
+            "embedagents.stm32.signing.client.run_tool", return_value=_success()
         ):
             result = tool.sign_binary(
                 input_bin,
@@ -365,7 +365,7 @@ class TestOutputPath:
         custom.parent.mkdir()
         tool = SigningTool(ctx)
         with patch(
-            "stm32_substrate.signing.client.run_tool", return_value=_success()
+            "embedagents.stm32.signing.client.run_tool", return_value=_success()
         ) as mocked:
             result = tool.sign_binary(
                 input_bin,
@@ -390,7 +390,7 @@ class TestArgvShape:
     ) -> None:
         tool = SigningTool(ctx)
         with patch(
-            "stm32_substrate.signing.client.run_tool", return_value=_success()
+            "embedagents.stm32.signing.client.run_tool", return_value=_success()
         ) as mocked:
             tool.sign_binary(
                 input_bin,
@@ -433,7 +433,7 @@ class TestSubprocessFailure:
         )
         tool = SigningTool(ctx)
         with patch(
-            "stm32_substrate.signing.client.run_tool", side_effect=runner_err
+            "embedagents.stm32.signing.client.run_tool", side_effect=runner_err
         ):
             with pytest.raises(SigningToolError) as excinfo:
                 tool.sign_binary(
@@ -470,7 +470,7 @@ class TestHappyPath:
 
         tool = SigningTool(ctx)
         with patch(
-            "stm32_substrate.signing.client.run_tool",
+            "embedagents.stm32.signing.client.run_tool",
             side_effect=fake_run_tool,
         ):
             result = tool.sign_binary(
@@ -523,7 +523,7 @@ class TestTimeoutKnob:
         ctx2 = SubstrateContext.from_environment(project_path=tmp_path)
         tool = SigningTool(ctx2)
         with patch(
-            "stm32_substrate.signing.client.run_tool", return_value=_success()
+            "embedagents.stm32.signing.client.run_tool", return_value=_success()
         ) as mocked:
             tool.sign_binary(
                 input_bin,

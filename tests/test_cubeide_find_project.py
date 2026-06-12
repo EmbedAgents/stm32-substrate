@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeide import CubeIDE, FoundProject
-from stm32_substrate.errors import CubeIDEError, ProjectAmbiguityError
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeide import CubeIDE, FoundProject
+from embedagents.stm32.errors import CubeIDEError, ProjectAmbiguityError
 
 
 def _make_project(parent: Path, *, name: str | None = None) -> Path:
@@ -140,7 +140,7 @@ class TestNameMatching:
 
         proj = _make_project(tmp_path, name="alphabeta")
         client = CubeIDE(ctx)
-        with caplog.at_level(logging.WARNING, logger="stm32_substrate.cubeide"):
+        with caplog.at_level(logging.WARNING, logger="embedagents.stm32.cubeide"):
             result = client.find_project(tmp_path, name="alpha")
         assert result.path == proj
         warnings = [r for r in caplog.records if r.levelname == "WARNING"]

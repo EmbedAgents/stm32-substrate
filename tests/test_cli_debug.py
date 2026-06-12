@@ -8,7 +8,7 @@ Layout mirrors ``test_cli_prog.py`` / ``test_cli_build.py``:
 
 - A fixture sets ``STM32_PROGRAMMER_CLI`` to a stub so
   ``SubstrateContext.from_environment()`` succeeds during ``dispatch``.
-- A ``mock_debug`` fixture patches ``stm32_substrate.cli._debug.Debug``
+- A ``mock_debug`` fixture patches ``embedagents.stm32.cli._debug.Debug``
   to return a MagicMock whose ``start_session(...)`` yields a fully
   pre-configured ``DebugSession`` substitute.
 - One test class per subcommand validates argv parsing, recipe
@@ -23,8 +23,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from stm32_substrate.cli import main
-from stm32_substrate.debug.results import (
+from embedagents.stm32.cli import main
+from embedagents.stm32.debug.results import (
     Breakpoint,
     CallStack,
     ComparisonResult,
@@ -37,7 +37,7 @@ from stm32_substrate.debug.results import (
     SessionHandle,
     StackFrame,
 )
-from stm32_substrate.errors import GDBError, SubstrateError
+from embedagents.stm32.errors import GDBError, SubstrateError
 
 
 @pytest.fixture()
@@ -110,7 +110,7 @@ def mock_debug(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     instance = MagicMock(name="Debug-instance")
     instance.start_session.return_value = session
     factory = MagicMock(return_value=instance)
-    monkeypatch.setattr("stm32_substrate.cli._debug.Debug", factory)
+    monkeypatch.setattr("embedagents.stm32.cli._debug.Debug", factory)
     # Stash the session on the factory mock so tests can read it.
     factory._session = session
     factory._instance = instance
@@ -176,7 +176,7 @@ class TestSvdPath:
         fake_svd_db.find_for.return_value = svd_path
         fake_svd_db.roots.configured.return_value = ["cubeide", "cube_programmer"]
 
-        from stm32_substrate.context import SubstrateContext
+        from embedagents.stm32.context import SubstrateContext
         original_from_env = SubstrateContext.from_environment
 
         def patched(*args, **kwargs):

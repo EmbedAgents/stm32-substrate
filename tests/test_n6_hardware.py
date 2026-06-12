@@ -34,10 +34,10 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.results import FlashConfirmation, PairFlashResult
-from stm32_substrate.signing import SigningTool
-from stm32_substrate.signing.results import SigningResult
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.results import FlashConfirmation, PairFlashResult
+from embedagents.stm32.signing import SigningTool
+from embedagents.stm32.signing.results import SigningResult
 
 
 _N6_LOADER_NAME = "MX66UW1G45G_STM32N6570-DK.stldr"

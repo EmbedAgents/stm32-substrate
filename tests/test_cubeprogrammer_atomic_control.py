@@ -11,15 +11,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.codes import CubeProgrammerErrorCode
-from stm32_substrate.cubeprogrammer.results import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.codes import CubeProgrammerErrorCode
+from embedagents.stm32.cubeprogrammer.results import (
     Confirmation,
     ResetConfirmation,
 )
-from stm32_substrate.errors import CubeProgrammerError, ToolError
-from stm32_substrate.subprocess_runner import ToolRunResult
+from embedagents.stm32.errors import CubeProgrammerError, ToolError
+from embedagents.stm32.subprocess_runner import ToolRunResult
 
 
 ERRORS = Path(__file__).resolve().parent / "fixtures" / "cubeprogrammer" / "errors"
@@ -60,7 +60,7 @@ class TestResetCliPath:
     def test_soft_reset(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             result = client.reset()
@@ -74,7 +74,7 @@ class TestResetCliPath:
     def test_hard_reset(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             result = client.reset(hard=True)
@@ -87,7 +87,7 @@ class TestResetCliPath:
     def test_uses_atomic_timeout(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             client.reset()
@@ -101,7 +101,7 @@ class TestResetCliPath:
         )
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", side_effect=runner_err
+            "embedagents.stm32.cubeprogrammer.client.run_tool", side_effect=runner_err
         ):
             with pytest.raises(CubeProgrammerError):
                 client.reset()
@@ -114,7 +114,7 @@ class TestResetGdbPath:
         ctx, session = ctx_with_debug_session
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool"
+            "embedagents.stm32.cubeprogrammer.client.run_tool"
         ) as mocked_run_tool:
             result = client.reset()
         # CLI never invoked when session is active.
@@ -146,7 +146,7 @@ class TestHaltCliPath:
     def test_argv(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             result = client.halt()
@@ -166,7 +166,7 @@ class TestHaltCliPath:
         )
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", side_effect=runner_err
+            "embedagents.stm32.cubeprogrammer.client.run_tool", side_effect=runner_err
         ):
             with pytest.raises(CubeProgrammerError):
                 client.halt()
@@ -181,7 +181,7 @@ class TestHaltGdbPath:
         ctx, session = ctx_with_debug_session
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool"
+            "embedagents.stm32.cubeprogrammer.client.run_tool"
         ) as mocked_run_tool:
             result = client.halt()
         assert mocked_run_tool.call_count == 0
@@ -199,7 +199,7 @@ class TestResumeCliPath:
     def test_argv_uses_dash_run(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             result = client.resume()
@@ -213,7 +213,7 @@ class TestResumeCliPath:
     def test_uses_atomic_timeout(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             client.resume()
@@ -230,7 +230,7 @@ class TestResumeGdbPath:
         ctx, session = ctx_with_debug_session
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool"
+            "embedagents.stm32.cubeprogrammer.client.run_tool"
         ) as mocked_run_tool:
             result = client.resume()
         assert mocked_run_tool.call_count == 0
@@ -252,7 +252,7 @@ class TestRoutingPrecedence:
         ctx, session = ctx_with_debug_session
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool"
+            "embedagents.stm32.cubeprogrammer.client.run_tool"
         ) as mocked_run_tool:
             client.reset()
             client.halt()
@@ -277,7 +277,7 @@ class TestRoutingPrecedence:
         # Clear the session and try again — CLI path should fire.
         ctx.session_state.active_debug_session = None
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked_run_tool:
             client.halt()

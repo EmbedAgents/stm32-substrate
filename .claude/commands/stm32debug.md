@@ -37,8 +37,8 @@ Multi-step sessions (several breakpoints, observe, adapt) have no CLI surface â€
 
 ```bash
 python - <<'PY'
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.debug import Debug
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.debug import Debug
 ctx = SubstrateContext.from_environment()
 with Debug(ctx).start_session(elf_path="Debug/firmware.elf") as s:
     s.set_breakpoint("main")

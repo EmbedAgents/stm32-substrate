@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from stm32_substrate.vcp.discovery import (
+from embedagents.stm32.vcp.discovery import (
     ST_LINK_PIDS,
     ST_LINK_VID,
     discover_vcp_ports,

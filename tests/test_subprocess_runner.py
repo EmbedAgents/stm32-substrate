@@ -12,9 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.errors import ToolError
-from stm32_substrate.subprocess_runner import ToolRunResult, run_tool
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.errors import ToolError
+from embedagents.stm32.subprocess_runner import ToolRunResult, run_tool
 
 
 @pytest.fixture()
@@ -127,7 +127,7 @@ class TestTimeout:
         the vendor bootstrap launchers."""
         import time as _time
 
-        from stm32_substrate.platform import process_alive
+        from embedagents.stm32.platform import process_alive
 
         pidfile = tmp_path / "grandchild.pid"
         # The pidfile lands via write-then-rename so the kill can never
@@ -190,7 +190,7 @@ class TestLogging:
         python_bin: Path,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        with caplog.at_level(logging.INFO, logger="stm32_substrate.subprocess_runner"):
+        with caplog.at_level(logging.INFO, logger="embedagents.stm32.subprocess_runner"):
             run_tool(python_bin, ["-c", "pass"], ctx=ctx, timeout_s=5)
         msgs = [r.message for r in caplog.records]
         assert any("run_tool argv=" in m for m in msgs)

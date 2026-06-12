@@ -12,10 +12,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from stm32_substrate.cli import _prog, main
-from stm32_substrate.cli._serialize import dumps, serialise_error, to_dict
-from stm32_substrate.cubeprogrammer.codes import CubeProgrammerErrorCode
-from stm32_substrate.cubeprogrammer.results import (
+from embedagents.stm32.cli import _prog, main
+from embedagents.stm32.cli._serialize import dumps, serialise_error, to_dict
+from embedagents.stm32.cubeprogrammer.codes import CubeProgrammerErrorCode
+from embedagents.stm32.cubeprogrammer.results import (
     BannerResult,
     BooleanResult,
     Confirmation,
@@ -34,7 +34,7 @@ from stm32_substrate.cubeprogrammer.results import (
     RecoveryResult,
     ResetConfirmation,
 )
-from stm32_substrate.errors import (
+from embedagents.stm32.errors import (
     CubeProgrammerError,
     ProtocolError,
     SubstrateError,
@@ -57,7 +57,7 @@ def mock_client(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     pre-configured mock instead of the real wrapper."""
     instance = MagicMock(name="CubeProgrammer-instance")
     factory = MagicMock(return_value=instance)
-    monkeypatch.setattr("stm32_substrate.cli._prog.CubeProgrammer", factory)
+    monkeypatch.setattr("embedagents.stm32.cli._prog.CubeProgrammer", factory)
     return instance
 
 
@@ -357,7 +357,7 @@ class TestSvd:
     ) -> None:
         """A-007: 'stm32 prog svd' was absent behind a stale 'blocked on
         ctx.svd_db / C4' note — everything it needed shipped."""
-        from stm32_substrate.cubeprogrammer.results import SVDResult
+        from embedagents.stm32.cubeprogrammer.results import SVDResult
 
         mock_client.svd_for_attached.return_value = SVDResult(
             device_name="STM32L476RGTx",

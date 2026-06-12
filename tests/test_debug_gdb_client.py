@@ -18,13 +18,13 @@ from typing import Any
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.debug.gdb import GDBClient, spawn_gdb
-from stm32_substrate.debug.results import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.debug.gdb import GDBClient, spawn_gdb
+from embedagents.stm32.debug.results import (
     MIAsyncRecord,
     StoppedNotification,
 )
-from stm32_substrate.errors import GDBError, GDBSessionLost
+from embedagents.stm32.errors import GDBError, GDBSessionLost
 
 
 @dataclass
@@ -164,7 +164,7 @@ class TestSendMi:
     ) -> None:
         """End-to-end pin of the ledger symptom: read_variable('typo')
         used to return an empty VariableValue instead of an error."""
-        from stm32_substrate.debug.session import DebugSession
+        from embedagents.stm32.debug.session import DebugSession
 
         proc = FakeProc(
             stdout_lines=[
@@ -266,7 +266,7 @@ class TestWaitForStopped:
         proc = FakeProc(stdout_lines=[])
         client = GDBClient(proc=proc, ctx=ctx)  # type: ignore[arg-type]
         # Pre-seed an async record into the queue.
-        from stm32_substrate.debug.parsers import parse_mi_record
+        from embedagents.stm32.debug.parsers import parse_mi_record
 
         rec = parse_mi_record('*stopped,reason="end-stepping-range"')
         assert isinstance(rec, MIAsyncRecord)
@@ -514,19 +514,19 @@ class TestSpawnGdbLeaks:
 
 class TestMiQuote:
     def test_plain_string_wrapped(self) -> None:
-        from stm32_substrate.debug.gdb import mi_quote
+        from embedagents.stm32.debug.gdb import mi_quote
 
         assert mi_quote("main") == '"main"'
 
     def test_newline_injection_neutralised(self) -> None:
-        from stm32_substrate.debug.gdb import mi_quote
+        from embedagents.stm32.debug.gdb import mi_quote
 
         quoted = mi_quote("x\n-exec-run")
         assert "\n" not in quoted
         assert quoted == '"x\\n-exec-run"'
 
     def test_quotes_and_backslashes_escaped(self) -> None:
-        from stm32_substrate.debug.gdb import mi_quote
+        from embedagents.stm32.debug.gdb import mi_quote
 
         assert mi_quote('a"b\\c') == '"a\\"b\\\\c"'
 

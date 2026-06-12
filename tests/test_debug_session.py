@@ -12,9 +12,9 @@ from typing import Any
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.debug.parsers import parse_mi_record
-from stm32_substrate.debug.results import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.debug.parsers import parse_mi_record
+from embedagents.stm32.debug.results import (
     Breakpoint,
     CallStack,
     DebugSnapshot,
@@ -27,15 +27,15 @@ from stm32_substrate.debug.results import (
     StoppedNotification,
     VariableValue,
 )
-from stm32_substrate.debug.session import DebugSession
-from stm32_substrate.debug.svd import (
+from embedagents.stm32.debug.session import DebugSession
+from embedagents.stm32.debug.svd import (
     SvdDb,
     SvdField,
     SvdPeripheral,
     SvdRegister,
     SvdSourceRoots,
 )
-from stm32_substrate.errors import GDBError, TargetNotHalted
+from embedagents.stm32.errors import GDBError, TargetNotHalted
 
 
 # ---------------------------------------------------------------------------
@@ -297,11 +297,11 @@ class TestReadPeripheral:
 
         svd_mock = MagicMock(spec=SvdDb)
         svd_mock.get_peripheral.return_value = fake_periph
-        from stm32_substrate.debug.svd import _canonical_svd_filename  # noqa: F401
+        from embedagents.stm32.debug.svd import _canonical_svd_filename  # noqa: F401
 
         # decode_register passes through to the real implementation so
         # we can verify the bitfield extraction end-to-end.
-        from stm32_substrate.debug.svd import SvdDb as _RealSvdDb
+        from embedagents.stm32.debug.svd import SvdDb as _RealSvdDb
 
         svd_mock.decode_register.side_effect = _RealSvdDb.decode_register.__get__(
             SvdDb(roots=SvdSourceRoots()), SvdDb
@@ -431,7 +431,7 @@ class TestBreakpoints:
         gdb = MagicMock()
         # First send_mi → exec-continue ^done.
         gdb.send_mi.return_value = parse_mi_record("1^done")
-        from stm32_substrate.debug.parsers import parse_stopped
+        from embedagents.stm32.debug.parsers import parse_stopped
 
         stopped_record = parse_mi_record(
             '*stopped,reason="breakpoint-hit",bkptno="3"'
@@ -674,7 +674,7 @@ class TestRuntimeDefaultKnobs:
         # reports the budget as long blown.
         clock = iter([0.0] + [100.0] * 50)
         monkeypatch.setattr(
-            "stm32_substrate.debug.session.time",
+            "embedagents.stm32.debug.session.time",
             SimpleNamespace(monotonic=lambda: next(clock)),
         )
         gdb = MagicMock()

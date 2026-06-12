@@ -12,8 +12,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from stm32_substrate.cli import main
-from stm32_substrate.signing.results import SigningResult
+from embedagents.stm32.cli import main
+from embedagents.stm32.signing.results import SigningResult
 
 
 @pytest.fixture()
@@ -34,11 +34,11 @@ def ensure_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 def mock_signing(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     instance = MagicMock(name="SigningTool-instance")
     factory = MagicMock(return_value=instance)
-    monkeypatch.setattr("stm32_substrate.signing.SigningTool", factory)
-    monkeypatch.setattr("stm32_substrate.signing.client.SigningTool", factory, raising=False)
+    monkeypatch.setattr("embedagents.stm32.signing.SigningTool", factory)
+    monkeypatch.setattr("embedagents.stm32.signing.client.SigningTool", factory, raising=False)
     # The handler imports SigningTool inside _cmd_sign, so patch the
     # import target inside the cli._prog module path. Since we used
-    # `from stm32_substrate.signing import SigningTool` inside the
+    # `from embedagents.stm32.signing import SigningTool` inside the
     # function, the lookup happens at call time and the package-level
     # patch above takes effect.
     return instance

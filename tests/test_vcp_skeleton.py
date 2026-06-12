@@ -11,15 +11,15 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.errors import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.errors import (
     VCPAmbiguousProbe,
     VCPError,
     VCPNotEnumerated,
     VCPPortInUse,
     VCPReaderAlreadyActive,
 )
-from stm32_substrate.vcp import (
+from embedagents.stm32.vcp import (
     VCP,
     PriorVCPState,
     ReconnectResult,
@@ -50,7 +50,7 @@ class TestPublicSurface:
     def test_construct(self, ctx: SubstrateContext) -> None:
         client = VCP(ctx)
         assert client.ctx is ctx
-        assert client._log.name == "stm32_substrate.vcp"
+        assert client._log.name == "embedagents.stm32.vcp"
 
     def test_close_idempotent_with_no_reader(self, ctx: SubstrateContext) -> None:
         client = VCP(ctx)

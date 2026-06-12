@@ -1,0 +1,82 @@
+name: Release
+
+# Publishes embedagents-stm32 to PyPI via Trusted Publishers (OIDC) when a
+# GitHub Release is published on the PUBLIC repo. workflow_dispatch is the
+# recovery path (re-publish after a transient failure without re-cutting
+# the Release). The dev repo receives this file through the release export
+# but can never publish: the publish job is repository-guarded, the dev
+# repo has no `pypi` environment, and the PyPI Trusted Publisher mapping
+# names EmbedAgents/stm32-substrate specifically.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build + verify artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Build sdist + wheel
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+
+      # Fail fast BEFORE anything reaches PyPI: tag must match the built
+      # version, artifacts must pass twine, the wheel must bundle the
+      # schemas, must not leak tests, and must NOT contain an
+      # embedagents/__init__.py (PEP 420 namespace — a stray init would
+      # break merging with future embedagents-* distributions).
+      - name: Verify artifacts
+        run: |
+          python -m twine check dist/*
+          python - <<'EOF'
+          import glob, os, re, tarfile, zipfile
+          wheel = glob.glob("dist/*.whl")[0]
+          names = zipfile.ZipFile(wheel).namelist()
+          schemas = [n for n in names if n.endswith(".schema.json")]
+          assert len(schemas) >= 3, f"schemas missing from wheel: {schemas}"
+          assert not [n for n in names if n.startswith("tests/")], "tests leaked into wheel"
+          assert "embedagents/__init__.py" not in names, "namespace broken: embedagents/__init__.py shipped"
+          assert any(n.startswith("embedagents/stm32/") for n in names), "package not under embedagents/stm32/"
+          sdist = glob.glob("dist/*.tar.gz")[0]
+          snames = tarfile.open(sdist).getnames()
+          assert not [n for n in snames if "/tests/" in n], "tests leaked into sdist"
+          ref = os.environ.get("GITHUB_REF_NAME", "")
+          if ref.startswith("v"):
+              built = re.search(r"-(\d[^-]*)-py3", os.path.basename(wheel)).group(1)
+              assert built == ref[1:], f"tag {ref} != built version {built}"
+              print(f"tag/version match: {ref} == {built}")
+          print(f"wheel {len(names)} files / sdist {len(snames)} files - all checks passed")
+          EOF
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: publish to PyPI (Trusted Publishers)
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.repository == 'EmbedAgents/stm32-substrate'
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0

@@ -8,16 +8,16 @@ from unittest.mock import patch
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.codes import CubeProgrammerErrorCode
-from stm32_substrate.cubeprogrammer.results import FlashConfirmation, PairFlashResult
-from stm32_substrate.errors import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.codes import CubeProgrammerErrorCode
+from embedagents.stm32.cubeprogrammer.results import FlashConfirmation, PairFlashResult
+from embedagents.stm32.errors import (
     CubeProgrammerError,
     ToolError,
     UserAbortedError,
 )
-from stm32_substrate.subprocess_runner import ToolRunResult
+from embedagents.stm32.subprocess_runner import ToolRunResult
 
 
 ERRORS = Path(__file__).resolve().parent / "fixtures" / "cubeprogrammer" / "errors"
@@ -78,7 +78,7 @@ class TestFlashToBank:
     ) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ):
             result = client.flash_to_bank(bin_file, bank=2, address="0x08100000")
@@ -113,7 +113,7 @@ class TestFlashBinNoAddress:
     ) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             result = client.flash_bin_no_address(bin_file)
@@ -134,7 +134,7 @@ class TestFlashBinNoAddress:
 
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ):
             result = client.flash_bin_no_address(bin_file, on_confirm=cb)
@@ -146,7 +146,7 @@ class TestFlashBinNoAddress:
     ) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             with pytest.raises(UserAbortedError):
@@ -171,7 +171,7 @@ class TestFlashPair:
         app_file.write_bytes(b"\x00" * 512)
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             result = client.flash_pair(
@@ -200,7 +200,7 @@ class TestFlashPair:
         app_file.write_bytes(b"\x00" * 512)
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=_rdp_error(),
         ):
             with pytest.raises(CubeProgrammerError) as excinfo:
@@ -233,7 +233,7 @@ class TestFlashPair:
             raise _rdp_error()
 
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=fake_run_tool,
         ):
             result = client.flash_pair(
@@ -263,7 +263,7 @@ class TestFlashSignedPair:
         app_file.write_bytes(b"\x00" * 512)
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ):
             result = client.flash_signed_pair(
@@ -293,10 +293,10 @@ class TestFlashSignedPair:
         app.write_bytes(b"STM2" + b"\x00" * 508)
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ), patch(
-            "stm32_substrate.signing.client.SigningTool.sign_binary"
+            "embedagents.stm32.signing.client.SigningTool.sign_binary"
         ) as sign_mock:
             result = client.flash_signed_pair(
                 boot,
@@ -315,7 +315,7 @@ class TestFlashSignedPair:
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        from stm32_substrate.signing.results import SigningResult
+        from embedagents.stm32.signing.results import SigningResult
 
         boot = tmp_path / "boot.bin"  # unsigned — no STM2 magic
         boot.write_bytes(b"\x00" * 512)
@@ -347,7 +347,7 @@ class TestFlashSignedPair:
             )
 
         monkeypatch.setattr(
-            "stm32_substrate.signing.client.SigningTool.sign_binary", fake_sign
+            "embedagents.stm32.signing.client.SigningTool.sign_binary", fake_sign
         )
         flashed: list[str] = []
 
@@ -357,7 +357,7 @@ class TestFlashSignedPair:
 
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=record_run_tool,
         ):
             result = client.flash_signed_pair(
@@ -385,7 +385,7 @@ class TestFlashSignedPair:
         Phase-3 N6 bench finding: without the forward, sign_unsigned was
         unreachable on a keyless bench — SigningTool rejects keyed hv>=2
         signing ("Header v2.3 accepts 8 public keys")."""
-        from stm32_substrate.signing.results import SigningResult
+        from embedagents.stm32.signing.results import SigningResult
 
         boot = tmp_path / "boot.bin"  # unsigned — no STM2 magic
         boot.write_bytes(b"\x00" * 512)
@@ -415,11 +415,11 @@ class TestFlashSignedPair:
             )
 
         monkeypatch.setattr(
-            "stm32_substrate.signing.client.SigningTool.sign_binary", fake_sign
+            "embedagents.stm32.signing.client.SigningTool.sign_binary", fake_sign
         )
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ):
             result = client.flash_signed_pair(
@@ -465,7 +465,7 @@ class TestDownloadImage:
     ) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ):
             result = client.download_image(elf_file)
@@ -476,7 +476,7 @@ class TestDownloadImage:
     ) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ):
             result = client.download_image(hex_file)
@@ -487,7 +487,7 @@ class TestDownloadImage:
     ) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ):
             result = client.download_image(bin_file, address="0x08000000")
@@ -499,7 +499,7 @@ class TestDownloadImage:
     ) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ):
             result = client.download_image(bin_file)
@@ -527,7 +527,7 @@ class TestDownloadImage:
         fw.write_bytes(b"\x00" * 128)
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ):
             result = client.download_image(fw)
@@ -540,7 +540,7 @@ class TestDownloadImage:
         upper.write_bytes(b"\x7fELF" + b"\x00" * 100)
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ):
             result = client.download_image(upper)

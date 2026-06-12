@@ -7,14 +7,14 @@ from unittest.mock import patch
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.parsers import parse_hex_dump
-from stm32_substrate.cubeprogrammer.results import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.parsers import parse_hex_dump
+from embedagents.stm32.cubeprogrammer.results import (
     Confirmation,
     MemoryReadResult,
 )
-from stm32_substrate.subprocess_runner import ToolRunResult
+from embedagents.stm32.subprocess_runner import ToolRunResult
 
 
 HEX_DUMPS = Path(__file__).resolve().parent / "fixtures" / "cubeprogrammer" / "hex-dumps"
@@ -146,7 +146,7 @@ class TestReadMemoryHappyPath:
         which preserves the byte-granular ``size`` semantics."""
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(_hex("ram-32bytes.txt")),
         ) as mocked:
             result = client.read_memory("0x20000000", size=32)
@@ -158,7 +158,7 @@ class TestReadMemoryHappyPath:
     def test_default_size_256(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(_hex("ram-32bytes.txt")),
         ) as mocked:
             client.read_memory("0x20000000")
@@ -168,7 +168,7 @@ class TestReadMemoryHappyPath:
     def test_atomic_timeout(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(_hex("ram-32bytes.txt")),
         ) as mocked:
             client.read_memory("0x20000000", size=32)
@@ -199,9 +199,9 @@ class TestReadMemoryUnmappedWarning:
         import logging
 
         client = CubeProgrammer(ctx)
-        with caplog.at_level(logging.WARNING, logger="stm32_substrate.cubeprogrammer"):
+        with caplog.at_level(logging.WARNING, logger="embedagents.stm32.cubeprogrammer"):
             with patch(
-                "stm32_substrate.cubeprogrammer.client.run_tool",
+                "embedagents.stm32.cubeprogrammer.client.run_tool",
                 return_value=_success(_hex("unmapped-region-allff.txt")),
             ):
                 result = client.read_memory("0x080F0000", size=32)
@@ -222,7 +222,7 @@ class TestReadFlashToFileExplicit:
         output = tmp_path / "dump.bin"
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             result = client.read_flash_to_file(
@@ -270,7 +270,7 @@ class TestReadFlashToFileExplicit:
         output = tmp_path / "subdir" / "deep" / "dump.bin"
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ):
             client.read_flash_to_file(
@@ -296,7 +296,7 @@ class TestReadFlashToFileDefaults:
             return _success(banner_stdout)
 
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=fake_run_tool,
         ):
             result = client.read_flash_to_file()
@@ -326,7 +326,7 @@ class TestReadFlashToFileDefaults:
             return _success(banner_stdout)
 
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=fake_run_tool,
         ):
             result = client.read_flash_to_file(address="0x08010000")
@@ -340,7 +340,7 @@ class TestReadFlashToFileTimeoutScaling:
     ) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             client.read_flash_to_file(

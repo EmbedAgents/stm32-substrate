@@ -10,7 +10,7 @@
 // Cortex-M33 (STM32L5, TrustZone-capable; FreeRTOS_MPU is a single image at
 // 0x08000000). board.mcu STM32L552ZETxQ → STM32L552.svd.
 {
-  "$schema": "../../../../src/stm32_substrate/schemas/stm32-project.schema.json",
+  "$schema": "../../../../src/embedagents/stm32/schemas/stm32-project.schema.json",
   "version": 1,
   "project_name": "FreeRTOS_MPU",
   "board": {

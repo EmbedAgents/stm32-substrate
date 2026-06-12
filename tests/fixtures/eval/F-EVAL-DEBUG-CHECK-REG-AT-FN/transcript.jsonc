@@ -37,21 +37,21 @@
       "name": "Grep",
       "args": {
         "pattern": "def (reset|read_register|set_breakpoint|run_until|read_variable)",
-        "path": "/home/anup/claude-projects/stm32-substrate/src/stm32_substrate",
+        "path": "/home/anup/claude-projects/stm32-substrate/src/embedagents/stm32",
         "output_mode": "content"
       }
     },
     {
       "name": "Bash",
       "args": {
-        "command": "STM32_PROGRAMMER_DEFAULT_SN=066DFF485754727567021514 python - <<'PY'\nfrom stm32_substrate.context import SubstrateContext\nfrom stm32_substrate.debug import Debug\nctx = SubstrateContext.from_environment()\nwith Debug(ctx).start_session(elf_path=\"Projects/NUCLEO-L476RG/Examples/GPIO/BLINKY/STM32CubeIDE/Debug/BLINKY.elf\") as s:\n    s.reset(halt_after=True)\n    s.set_breakpoint(\"SystemClock_Config\")\n    s.run_until_breakpoint(timeout_s=30)\n    regs = s.read_registers()\n    print(regs)\nPY",
+        "command": "STM32_PROGRAMMER_DEFAULT_SN=066DFF485754727567021514 python - <<'PY'\nfrom embedagents.stm32.context import SubstrateContext\nfrom embedagents.stm32.debug import Debug\nctx = SubstrateContext.from_environment()\nwith Debug(ctx).start_session(elf_path=\"Projects/NUCLEO-L476RG/Examples/GPIO/BLINKY/STM32CubeIDE/Debug/BLINKY.elf\") as s:\n    s.reset(halt_after=True)\n    s.set_breakpoint(\"SystemClock_Config\")\n    s.run_until_breakpoint(timeout_s=30)\n    regs = s.read_registers()\n    print(regs)\nPY",
         "description": "Reset target, break at SystemClock_Config, read registers"
       }
     },
     {
       "name": "Read",
       "args": {
-        "file_path": "/home/anup/claude-projects/stm32-substrate/src/stm32_substrate/debug/session.py",
+        "file_path": "/home/anup/claude-projects/stm32-substrate/src/embedagents/stm32/debug/session.py",
         "offset": 413,
         "limit": 75
       }
@@ -59,7 +59,7 @@
     {
       "name": "Read",
       "args": {
-        "file_path": "/home/anup/claude-projects/stm32-substrate/src/stm32_substrate/debug/session.py",
+        "file_path": "/home/anup/claude-projects/stm32-substrate/src/embedagents/stm32/debug/session.py",
         "offset": 153,
         "limit": 42
       }
@@ -67,28 +67,28 @@
     {
       "name": "Bash",
       "args": {
-        "command": "STM32_PROGRAMMER_DEFAULT_SN=066DFF485754727567021514 python - <<'PY'\nfrom stm32_substrate.context import SubstrateContext\nfrom stm32_substrate.debug import Debug\nctx = SubstrateContext.from_environment()\nwith Debug(ctx).start_session(elf_path=\"Projects/NUCLEO-L476RG/Examples/GPIO/BLINKY/STM32CubeIDE/Debug/BLINKY.elf\") as s:\n    s.reset(halt_after=True)\n    pc_lines = s.send_monitor(\"halt\")  # ensure halted\n    bp = s.set_breakpoint(\"SystemClock_Config\")\n    print(\"BP:\", bp)\n    res = s.run_until_breakpoint(timeout_s=15)\n    print(\"RUN:\", res)\n    if res.breakpoint_hit:\n        regs = s.read_registers()\n        print(\"REGS:\", regs)\nPY",
+        "command": "STM32_PROGRAMMER_DEFAULT_SN=066DFF485754727567021514 python - <<'PY'\nfrom embedagents.stm32.context import SubstrateContext\nfrom embedagents.stm32.debug import Debug\nctx = SubstrateContext.from_environment()\nwith Debug(ctx).start_session(elf_path=\"Projects/NUCLEO-L476RG/Examples/GPIO/BLINKY/STM32CubeIDE/Debug/BLINKY.elf\") as s:\n    s.reset(halt_after=True)\n    pc_lines = s.send_monitor(\"halt\")  # ensure halted\n    bp = s.set_breakpoint(\"SystemClock_Config\")\n    print(\"BP:\", bp)\n    res = s.run_until_breakpoint(timeout_s=15)\n    print(\"RUN:\", res)\n    if res.breakpoint_hit:\n        regs = s.read_registers()\n        print(\"REGS:\", regs)\nPY",
         "description": "Reset, break at SystemClock_Config with diagnostics"
       }
     },
     {
       "name": "Bash",
       "args": {
-        "command": "STM32_PROGRAMMER_DEFAULT_SN=066DFF485754727567021514 python - <<'PY'\nfrom stm32_substrate.context import SubstrateContext\nfrom stm32_substrate.debug import Debug\nctx = SubstrateContext.from_environment()\nwith Debug(ctx).start_session(elf_path=\"Projects/NUCLEO-L476RG/Examples/GPIO/BLINKY/STM32CubeIDE/Debug/BLINKY.elf\") as s:\n    s.reset(halt_after=True)\n    bp = s.set_breakpoint(\"SystemClock_Config\")\n    print(\"BP addr:\", bp.address, \"line:\", bp.line)\n    res = s.run_until_breakpoint(timeout_s=20)\n    print(\"RUN:\", res)\n    if res.breakpoint_hit:\n        regs = s.read_registers()\n        d = regs.registers if hasattr(regs, \"registers\") else regs\n        print(\"r0 =\", d.get(\"r0\") if hasattr(d, \"get\") else d)\n        print(\"pc =\", d.get(\"pc\") if hasattr(d, \"get\") else \"\")\nPY",
+        "command": "STM32_PROGRAMMER_DEFAULT_SN=066DFF485754727567021514 python - <<'PY'\nfrom embedagents.stm32.context import SubstrateContext\nfrom embedagents.stm32.debug import Debug\nctx = SubstrateContext.from_environment()\nwith Debug(ctx).start_session(elf_path=\"Projects/NUCLEO-L476RG/Examples/GPIO/BLINKY/STM32CubeIDE/Debug/BLINKY.elf\") as s:\n    s.reset(halt_after=True)\n    bp = s.set_breakpoint(\"SystemClock_Config\")\n    print(\"BP addr:\", bp.address, \"line:\", bp.line)\n    res = s.run_until_breakpoint(timeout_s=20)\n    print(\"RUN:\", res)\n    if res.breakpoint_hit:\n        regs = s.read_registers()\n        d = regs.registers if hasattr(regs, \"registers\") else regs\n        print(\"r0 =\", d.get(\"r0\") if hasattr(d, \"get\") else d)\n        print(\"pc =\", d.get(\"pc\") if hasattr(d, \"get\") else \"\")\nPY",
         "description": "Reset, break at SystemClock_Config, read r0"
       }
     },
     {
       "name": "Bash",
       "args": {
-        "command": "STM32_PROGRAMMER_DEFAULT_SN=066DFF485754727567021514 python - <<'PY'\nfrom stm32_substrate.context import SubstrateContext\nfrom stm32_substrate.debug import Debug\nctx = SubstrateContext.from_environment()\nwith Debug(ctx).start_session(elf_path=\"Projects/NUCLEO-L476RG/Examples/GPIO/BLINKY/STM32CubeIDE/Debug/BLINKY.elf\") as s:\n    s.reset(halt_after=True)\n    bp = s.set_breakpoint(\"SystemClock_Config\")\n    res = None\n    for attempt in range(4):\n        res = s.run_until_breakpoint(timeout_s=20)\n        print(f\"RUN[{attempt}]:\", res.breakpoint_hit, res.halt_reason, f\"{res.duration_s:.4f}s\")\n        if res.breakpoint_hit or res.halt_reason == \"timeout\":\n            break\n    if res.breakpoint_hit:\n        regs = s.read_registers()\n        print(\"REGS:\", regs)\nPY",
+        "command": "STM32_PROGRAMMER_DEFAULT_SN=066DFF485754727567021514 python - <<'PY'\nfrom embedagents.stm32.context import SubstrateContext\nfrom embedagents.stm32.debug import Debug\nctx = SubstrateContext.from_environment()\nwith Debug(ctx).start_session(elf_path=\"Projects/NUCLEO-L476RG/Examples/GPIO/BLINKY/STM32CubeIDE/Debug/BLINKY.elf\") as s:\n    s.reset(halt_after=True)\n    bp = s.set_breakpoint(\"SystemClock_Config\")\n    res = None\n    for attempt in range(4):\n        res = s.run_until_breakpoint(timeout_s=20)\n        print(f\"RUN[{attempt}]:\", res.breakpoint_hit, res.halt_reason, f\"{res.duration_s:.4f}s\")\n        if res.breakpoint_hit or res.halt_reason == \"timeout\":\n            break\n    if res.breakpoint_hit:\n        regs = s.read_registers()\n        print(\"REGS:\", regs)\nPY",
         "description": "Drain stale stop events, run to SystemClock_Config, dump registers"
       }
     },
     {
       "name": "Bash",
       "args": {
-        "command": "STM32_PROGRAMMER_DEFAULT_SN=066DFF485754727567021514 python - <<'PY'\nfrom stm32_substrate.context import SubstrateContext\nfrom stm32_substrate.debug import Debug\nctx = SubstrateContext.from_environment()\nwith Debug(ctx).start_session(elf_path=\"Projects/NUCLEO-L476RG/Examples/GPIO/BLINKY/STM32CubeIDE/Debug/BLINKY.elf\") as s:\n    s.reset(halt_after=True)\n    bp = s.set_breakpoint(\"SystemClock_Config\")\n    res = s.run_until_breakpoint(timeout_s=20)\n    print(\"RUN:\", res.breakpoint_hit, res.halt_reason)\n    if not res.breakpoint_hit:\n        # stale reset *stopped consumed; target is genuinely running \u2014 wait for the real stop\n        stop = s._gdb.wait_for_stopped(timeout_s=20)\n        print(\"STOP:\", stop)\n        s.target_halted = True\n        s._gdb_believes_running = False\n    regs = s.read_registers()\n    print(\"REGS:\", regs)\nPY",
+        "command": "STM32_PROGRAMMER_DEFAULT_SN=066DFF485754727567021514 python - <<'PY'\nfrom embedagents.stm32.context import SubstrateContext\nfrom embedagents.stm32.debug import Debug\nctx = SubstrateContext.from_environment()\nwith Debug(ctx).start_session(elf_path=\"Projects/NUCLEO-L476RG/Examples/GPIO/BLINKY/STM32CubeIDE/Debug/BLINKY.elf\") as s:\n    s.reset(halt_after=True)\n    bp = s.set_breakpoint(\"SystemClock_Config\")\n    res = s.run_until_breakpoint(timeout_s=20)\n    print(\"RUN:\", res.breakpoint_hit, res.halt_reason)\n    if not res.breakpoint_hit:\n        # stale reset *stopped consumed; target is genuinely running \u2014 wait for the real stop\n        stop = s._gdb.wait_for_stopped(timeout_s=20)\n        print(\"STOP:\", stop)\n        s.target_halted = True\n        s._gdb_believes_running = False\n    regs = s.read_registers()\n    print(\"REGS:\", regs)\nPY",
         "description": "Wait for real breakpoint stop, then read registers"
       }
     }

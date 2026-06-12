@@ -14,10 +14,10 @@ from unittest.mock import patch
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubemx import CubeMX, CubeMXResult
-from stm32_substrate.cubemx.client import _build_script
-from stm32_substrate.errors import CubeMXError
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubemx import CubeMX, CubeMXResult
+from embedagents.stm32.cubemx.client import _build_script
+from embedagents.stm32.errors import CubeMXError
 
 
 @pytest.fixture()
@@ -164,7 +164,7 @@ class TestIocMissing:
         upper.write_text("")
         client = CubeMX(ctx)
         with patch(
-            "stm32_substrate.cubemx.client.runner.run_cubemx"
+            "embedagents.stm32.cubemx.client.runner.run_cubemx"
         ) as runner_mock:
             runner_mock.return_value = _fake_result(
                 tmp_path, tmp_path / "log"
@@ -187,7 +187,7 @@ class TestToolchainGuard:
     def test_cubeide_accepted(self, ctx: SubstrateContext, ioc: Path) -> None:
         client = CubeMX(ctx)
         with patch(
-            "stm32_substrate.cubemx.client.runner.run_cubemx"
+            "embedagents.stm32.cubemx.client.runner.run_cubemx"
         ) as runner_mock:
             runner_mock.return_value = _fake_result(ioc.parent, Path("/tmp/log"))
             client.generate(ioc, toolchain="STM32CubeIDE")
@@ -206,7 +206,7 @@ class TestPathResolution:
         output = tmp_path / "explicit_out"
         client = CubeMX(ctx)
         with patch(
-            "stm32_substrate.cubemx.client.runner.run_cubemx"
+            "embedagents.stm32.cubemx.client.runner.run_cubemx"
         ) as runner_mock:
             runner_mock.return_value = _fake_result(output, Path("/tmp/log"))
             client.generate(ioc, output_path=output, project_name="custom")
@@ -223,7 +223,7 @@ class TestPathResolution:
     ) -> None:
         client = CubeMX(ctx)
         with patch(
-            "stm32_substrate.cubemx.client.runner.run_cubemx"
+            "embedagents.stm32.cubemx.client.runner.run_cubemx"
         ) as runner_mock:
             runner_mock.return_value = _fake_result(
                 ioc.parent, Path("/tmp/log")
@@ -243,7 +243,7 @@ class TestPathResolution:
     ) -> None:
         client = CubeMX(ctx)
         with patch(
-            "stm32_substrate.cubemx.client.runner.run_cubemx"
+            "embedagents.stm32.cubemx.client.runner.run_cubemx"
         ) as runner_mock:
             runner_mock.return_value = _fake_result(
                 ioc.parent, Path("/tmp/log")
@@ -272,7 +272,7 @@ class TestPathResolution:
 
         client = CubeMX(ctx2)
         with patch(
-            "stm32_substrate.cubemx.client.runner.run_cubemx"
+            "embedagents.stm32.cubemx.client.runner.run_cubemx"
         ) as runner_mock:
             runner_mock.return_value = _fake_result(tmp_path, Path("/tmp/log"))
             client.generate()  # no kwargs at all
@@ -287,7 +287,7 @@ class TestPathResolution:
     def test_no_ioc_anywhere_raises(self, ctx: SubstrateContext) -> None:
         # IMP-41: ConfigurationError with a hint, consistent with every
         # other resolver (was a bare ValueError).
-        from stm32_substrate.errors import ConfigurationError
+        from embedagents.stm32.errors import ConfigurationError
 
         client = CubeMX(ctx)
         with pytest.raises(ConfigurationError, match="cubemx.ioc_path"):
@@ -307,7 +307,7 @@ class TestGenerateContract:
         expected = _fake_result(output, tmp_path / "log")
         client = CubeMX(ctx)
         with patch(
-            "stm32_substrate.cubemx.client.runner.run_cubemx",
+            "embedagents.stm32.cubemx.client.runner.run_cubemx",
             return_value=expected,
         ):
             result = client.generate(ioc, output_path=output)
@@ -318,7 +318,7 @@ class TestGenerateContract:
     ) -> None:
         client = CubeMX(ctx)
         with patch(
-            "stm32_substrate.cubemx.client.runner.run_cubemx"
+            "embedagents.stm32.cubemx.client.runner.run_cubemx"
         ) as runner_mock:
             runner_mock.return_value = _fake_result(
                 ioc.parent, Path("/tmp/log")
@@ -332,7 +332,7 @@ class TestGenerateContract:
         output = tmp_path / "out"
         client = CubeMX(ctx)
         with patch(
-            "stm32_substrate.cubemx.client.runner.run_cubemx"
+            "embedagents.stm32.cubemx.client.runner.run_cubemx"
         ) as runner_mock:
             runner_mock.return_value = _fake_result(output, Path("/tmp/log"))
             client.generate(ioc, output_path=output)
@@ -352,7 +352,7 @@ class TestGenerateContract:
         assert not nested.exists()
         client = CubeMX(ctx)
         with patch(
-            "stm32_substrate.cubemx.client.runner.run_cubemx"
+            "embedagents.stm32.cubemx.client.runner.run_cubemx"
         ) as runner_mock:
             runner_mock.return_value = _fake_result(nested, Path("/tmp/log"))
             client.generate(ioc, output_path=nested)
@@ -373,7 +373,7 @@ class TestCLIMxGenerate:
         capsys: pytest.CaptureFixture,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        from stm32_substrate.cli import main
+        from embedagents.stm32.cli import main
 
         output = tmp_path / "out"
         fake_result = _fake_result(output, tmp_path / "log")
@@ -383,7 +383,7 @@ class TestCLIMxGenerate:
         client_mock = MagicMock()
         client_mock.generate.return_value = fake_result
         factory = MagicMock(return_value=client_mock)
-        monkeypatch.setattr("stm32_substrate.cli._mx.CubeMX", factory)
+        monkeypatch.setattr("embedagents.stm32.cli._mx.CubeMX", factory)
 
         code = main(
             [
@@ -405,7 +405,7 @@ class TestCLIMxGenerate:
     def test_help_lists_generate(
         self, ctx: SubstrateContext, capsys: pytest.CaptureFixture
     ) -> None:
-        from stm32_substrate.cli import main
+        from embedagents.stm32.cli import main
 
         with pytest.raises(SystemExit):
             main(["mx", "--help"])
@@ -419,7 +419,7 @@ class TestCLIMxGenerate:
         capsys: pytest.CaptureFixture,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        from stm32_substrate.cli import main
+        from embedagents.stm32.cli import main
         from unittest.mock import MagicMock
 
         client_mock = MagicMock()
@@ -429,7 +429,7 @@ class TestCLIMxGenerate:
             ioc_path=tmp_path / "nope.ioc",
         )
         factory = MagicMock(return_value=client_mock)
-        monkeypatch.setattr("stm32_substrate.cli._mx.CubeMX", factory)
+        monkeypatch.setattr("embedagents.stm32.cli._mx.CubeMX", factory)
 
         code = main(["mx", "generate", str(tmp_path / "nope.ioc")])
         captured = capsys.readouterr()
@@ -447,7 +447,7 @@ class TestCLIMxGenerate:
         capsys: pytest.CaptureFixture,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        from stm32_substrate.cli import main
+        from embedagents.stm32.cli import main
         from unittest.mock import MagicMock
 
         client_mock = MagicMock()
@@ -463,7 +463,7 @@ class TestCLIMxGenerate:
             script_text="",
         )
         factory = MagicMock(return_value=client_mock)
-        monkeypatch.setattr("stm32_substrate.cli._mx.CubeMX", factory)
+        monkeypatch.setattr("embedagents.stm32.cli._mx.CubeMX", factory)
 
         code = main(["mx", "generate", str(ioc)])
         captured = capsys.readouterr()

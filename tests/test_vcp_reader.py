@@ -15,9 +15,9 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.errors import VCPError, VCPPortInUse
-from stm32_substrate.vcp.reader import _VcpReader
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.errors import VCPError, VCPPortInUse
+from embedagents.stm32.vcp.reader import _VcpReader
 
 
 # ---------------------------------------------------------------------------
@@ -236,7 +236,7 @@ class TestDecoding:
         )
         reader.open()
         try:
-            with caplog.at_level(logging.WARNING, logger="stm32_substrate.vcp"):
+            with caplog.at_level(logging.WARNING, logger="embedagents.stm32.vcp"):
                 holder["serial"].feed(b"bad\xffbyte\nworse\xfe\n")
                 lines = list(reader.read_lines(last_n=2, timeout_s=1.0))
             assert "�" in "".join(lines)
@@ -296,7 +296,7 @@ class TestBoundedQueue:
         )
         reader.open()
         try:
-            with caplog.at_level(logging.WARNING, logger="stm32_substrate.vcp"):
+            with caplog.at_level(logging.WARNING, logger="embedagents.stm32.vcp"):
                 holder["serial"].feed(b"a\nb\nc\nd\ne\n")
                 # Wait for the drain thread to absorb the chunk.
                 time.sleep(0.2)
@@ -376,7 +376,7 @@ class TestReconnect:
         )
         reader.open()
         # Force the re-enumeration helper to always return empty.
-        from stm32_substrate.vcp import reader as reader_mod
+        from embedagents.stm32.vcp import reader as reader_mod
 
         monkeypatch.setattr(reader_mod, "discover_vcp_ports", lambda *a, **k: [])
         with pytest.raises(VCPError) as ex:
@@ -400,8 +400,8 @@ class TestReconnect:
             _serial_factory=factory,
         )
         reader.open()
-        from stm32_substrate.vcp import reader as reader_mod
-        from stm32_substrate.vcp.results import VCPPortCandidate
+        from embedagents.stm32.vcp import reader as reader_mod
+        from embedagents.stm32.vcp.results import VCPPortCandidate
 
         def _fake_discover(*, probe_sn=None):
             assert probe_sn == "ABC"
@@ -435,8 +435,8 @@ class TestReconnect:
             _serial_factory=factory,
         )
         reader.open()
-        from stm32_substrate.vcp import reader as reader_mod
-        from stm32_substrate.vcp.results import VCPPortCandidate
+        from embedagents.stm32.vcp import reader as reader_mod
+        from embedagents.stm32.vcp.results import VCPPortCandidate
 
         monkeypatch.setattr(
             reader_mod,
@@ -530,7 +530,7 @@ class TestDrainDeath:
         def _boom(n: int) -> bytes:
             raise OSError("device reports readiness but returned no data")
 
-        with caplog.at_level(logging.WARNING, logger="stm32_substrate"):
+        with caplog.at_level(logging.WARNING, logger="embedagents.stm32"):
             ser.read = _boom  # type: ignore[method-assign]
             assert reader._thread is not None
             reader._thread.join(timeout=2.0)

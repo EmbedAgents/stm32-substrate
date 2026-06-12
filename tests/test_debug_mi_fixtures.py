@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.debug.parsers import (
+from embedagents.stm32.debug.parsers import (
     parse_breakpoint_insert,
     parse_evaluate_expression,
     parse_memory_read,
@@ -28,12 +28,12 @@ from stm32_substrate.debug.parsers import (
     parse_stack_list_frames,
     parse_stopped,
 )
-from stm32_substrate.debug.results import (
+from embedagents.stm32.debug.results import (
     MIAsyncRecord,
     MIResultRecord,
     MIStreamRecord,
 )
-from stm32_substrate.errors import GDBError
+from embedagents.stm32.errors import GDBError
 
 MI_RECORDS = (
     Path(__file__).resolve().parent / "fixtures" / "debug" / "mi-records"

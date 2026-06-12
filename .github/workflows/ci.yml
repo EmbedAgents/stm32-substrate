@@ -88,7 +88,11 @@ jobs:
           assert len(schemas) >= 3, f"schemas missing from wheel: {schemas}"
           leaked = [n for n in names if n.startswith("tests/")]
           assert not leaked, f"tests leaked into wheel: {leaked[:5]}"
-          print(f"wheel OK: {len(names)} files, {len(schemas)} schemas")
+          # PEP 420 namespace guard: a stray embedagents/__init__.py would
+          # silently break merging with future embedagents-* distributions.
+          assert "embedagents/__init__.py" not in names, "namespace broken"
+          assert any(n.startswith("embedagents/stm32/") for n in names)
+          print(f"wheel OK: {len(names)} files, {len(schemas)} schemas, namespace clean")
           EOF
           # sdist must not ship the test tree (SEC-08).
           python - <<'EOF'

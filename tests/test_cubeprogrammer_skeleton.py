@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer import (
     BankInfo,
     BannerResult,
     BooleanResult,
@@ -36,7 +36,7 @@ from stm32_substrate.cubeprogrammer import (
     SVDResult,
     is_recoverable,
 )
-from stm32_substrate.errors import ConfigurationError
+from embedagents.stm32.errors import ConfigurationError
 
 
 # ---------------------------------------------------------------------------
@@ -180,7 +180,7 @@ class TestClientSkeleton:
     def test_construct(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         assert client.ctx is ctx
-        assert client._log.name == "stm32_substrate.cubeprogrammer"
+        assert client._log.name == "embedagents.stm32.cubeprogrammer"
 
     def test_cli_unresolved_in_isolated_ctx(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

@@ -7,15 +7,15 @@ from unittest.mock import patch
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.external_loader import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.external_loader import (
     discover_external_loader,
     extract_family_prefix,
 )
-from stm32_substrate.cubeprogrammer.results import FlashConfirmation
-from stm32_substrate.errors import ConfigurationError
-from stm32_substrate.subprocess_runner import ToolRunResult
+from embedagents.stm32.cubeprogrammer.results import FlashConfirmation
+from embedagents.stm32.errors import ConfigurationError
+from embedagents.stm32.subprocess_runner import ToolRunResult
 
 
 BANNERS = Path(__file__).resolve().parent / "fixtures" / "cubeprogrammer" / "banners"
@@ -205,7 +205,7 @@ class TestFlashExternalExplicitLoader:
         loader.write_bytes(b"")
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             result = client.flash_external(
@@ -253,7 +253,7 @@ class TestFlashExternalAutoDiscovery:
             return _success(_banner("nucleo-l476rg-good.txt"))
 
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=fake_run_tool,
         ):
             result = client.flash_external(payload, "0x90000000")
@@ -271,7 +271,7 @@ class TestFlashExternalAutoDiscovery:
             return _success(_banner("nucleo-l476rg-good.txt"))
 
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=fake_run_tool,
         ):
             with pytest.raises(ConfigurationError, match="no external loader"):
@@ -291,7 +291,7 @@ class TestFlashExternalAutoDiscovery:
             return _success(_banner("nucleo-l476rg-good.txt"))
 
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=fake_run_tool,
         ):
             with pytest.raises(ConfigurationError, match="multiple external loaders"):
@@ -320,7 +320,7 @@ class TestFlashExternalAutoDiscovery:
             return _success(_banner("nucleo-l476rg-good.txt"))
 
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=fake_run_tool,
         ):
             result = client.flash_external(
@@ -348,7 +348,7 @@ class TestFlashExternalAutoDiscovery:
             return _success(_banner("nucleo-l476rg-good.txt"))
 
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=fake_run_tool,
         ):
             with pytest.raises(ValueError, match="not one of the discovered"):

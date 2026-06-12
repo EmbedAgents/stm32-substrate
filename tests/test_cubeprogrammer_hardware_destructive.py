@@ -16,14 +16,14 @@ from __future__ import annotations
 
 import pytest
 
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.results import (
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.results import (
     Confirmation,
     EraseConfirmation,
     MemoryReadResult,
     OptionBytesDiff,
 )
-from stm32_substrate.errors import ProtocolError
+from embedagents.stm32.errors import ProtocolError
 
 
 @pytest.mark.hardware_destructive

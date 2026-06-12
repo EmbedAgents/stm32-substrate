@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.cubeide.cproject import CProjectEditor
-from stm32_substrate.cubeide.presets import (
+from embedagents.stm32.cubeide.cproject import CProjectEditor
+from embedagents.stm32.cubeide.presets import (
     FAMILY_FPU_TABLE,
     PRESET_BALANCED,
     PRESET_FAST,
@@ -16,8 +16,8 @@ from stm32_substrate.cubeide.presets import (
     PRESETS,
     fpu_flags_for_family,
 )
-from stm32_substrate.cubeide.results import SettingChange, SettingsModification
-from stm32_substrate.errors import CProjectEditError
+from embedagents.stm32.cubeide.results import SettingChange, SettingsModification
+from embedagents.stm32.errors import CProjectEditError
 
 
 # ---------------------------------------------------------------------------

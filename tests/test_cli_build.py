@@ -9,13 +9,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from stm32_substrate.cli import main
-from stm32_substrate.cubeide.results import (
+from embedagents.stm32.cli import main
+from embedagents.stm32.cubeide.results import (
     BuildResult,
     FoundProject,
     SettingsModification,
 )
-from stm32_substrate.errors import (
+from embedagents.stm32.errors import (
     CProjectEditError,
     SubstrateError,
     WorkspaceLockedError,
@@ -34,7 +34,7 @@ def ensure_cubeide(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 def mock_client(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     instance = MagicMock(name="CubeIDE-instance")
     factory = MagicMock(return_value=instance)
-    monkeypatch.setattr("stm32_substrate.cli._build.CubeIDE", factory)
+    monkeypatch.setattr("embedagents.stm32.cli._build.CubeIDE", factory)
     return instance
 
 
@@ -217,32 +217,32 @@ class TestPreParseArgv:
     """Pure-function contract for ``_build.pre_parse_argv``."""
 
     def test_empty(self) -> None:
-        from stm32_substrate.cli._build import pre_parse_argv
+        from embedagents.stm32.cli._build import pre_parse_argv
 
         assert pre_parse_argv([]) == []
 
     def test_path_rewritten(self) -> None:
-        from stm32_substrate.cli._build import pre_parse_argv
+        from embedagents.stm32.cli._build import pre_parse_argv
 
         assert pre_parse_argv(["/p"]) == ["--project", "/p"]
 
     def test_path_with_trailing_flags(self) -> None:
-        from stm32_substrate.cli._build import pre_parse_argv
+        from embedagents.stm32.cli._build import pre_parse_argv
 
         assert pre_parse_argv(["/p", "--clean"]) == ["--project", "/p", "--clean"]
 
     def test_flag_first_untouched(self) -> None:
-        from stm32_substrate.cli._build import pre_parse_argv
+        from embedagents.stm32.cli._build import pre_parse_argv
 
         assert pre_parse_argv(["--project", "/p"]) == ["--project", "/p"]
 
     def test_action_untouched(self) -> None:
-        from stm32_substrate.cli._build import pre_parse_argv
+        from embedagents.stm32.cli._build import pre_parse_argv
 
         assert pre_parse_argv(["add-symbol", "FOO=1"]) == ["add-symbol", "FOO=1"]
 
     def test_every_action_keyword_untouched(self) -> None:
-        from stm32_substrate.cli._build import pre_parse_argv
+        from embedagents.stm32.cli._build import pre_parse_argv
 
         for action in (
             "add-symbol", "add-lib", "add-source",
@@ -478,7 +478,7 @@ class TestOutputShape:
         self, ensure_cubeide, mock_client: MagicMock, capsys: pytest.CaptureFixture
     ) -> None:
         from dataclasses import replace
-        from stm32_substrate.cubeide.results import SettingChange
+        from embedagents.stm32.cubeide.results import SettingChange
 
         sm = SettingsModification(
             file=Path("/x/.cproject"),

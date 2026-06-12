@@ -119,14 +119,14 @@
     {
       "name": "Bash",
       "args": {
-        "command": "python3 -c \"\nimport json\ns=json.load(open('/home/anup/claude-projects/stm32-substrate/src/stm32_substrate/schemas/stm32-project.schema.json'))\nv=s.get('properties',{}).get('vcp')\nprint(json.dumps(v, indent=1) if v else 'no vcp key; top-level props: '+', '.join(s.get('properties',{})))\n\"",
+        "command": "python3 -c \"\nimport json\ns=json.load(open('/home/anup/claude-projects/stm32-substrate/src/embedagents/stm32/schemas/stm32-project.schema.json'))\nv=s.get('properties',{}).get('vcp')\nprint(json.dumps(v, indent=1) if v else 'no vcp key; top-level props: '+', '.join(s.get('properties',{})))\n\"",
         "description": "Inspect vcp section of project schema"
       }
     },
     {
       "name": "Bash",
       "args": {
-        "command": "python3 -c \"\nimport json\ns=json.load(open('/home/anup/claude-projects/stm32-substrate/src/stm32_substrate/schemas/stm32-runtime-defaults.schema.json'))\nprint(json.dumps(s.get('properties',{}).get('vcp'), indent=1))\n\"; ls /home/anup/claude-projects/stm32-substrate/.claude/ 2>/dev/null; ls /home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/.claude 2>/dev/null",
+        "command": "python3 -c \"\nimport json\ns=json.load(open('/home/anup/claude-projects/stm32-substrate/src/embedagents/stm32/schemas/stm32-runtime-defaults.schema.json'))\nprint(json.dumps(s.get('properties',{}).get('vcp'), indent=1))\n\"; ls /home/anup/claude-projects/stm32-substrate/.claude/ 2>/dev/null; ls /home/anup/claude-projects/stm32-substrate/tests/fixtures/projects/F-PROJ-NUCLEO-L476RG/.claude 2>/dev/null",
         "description": "Check runtime-defaults schema vcp block and config locations"
       }
     },

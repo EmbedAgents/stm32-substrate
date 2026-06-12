@@ -7,11 +7,11 @@ from unittest.mock import patch
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.parsers import parse_option_bytes
-from stm32_substrate.cubeprogrammer.results import OptionBytesResult
-from stm32_substrate.subprocess_runner import ToolRunResult
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.parsers import parse_option_bytes
+from embedagents.stm32.cubeprogrammer.results import OptionBytesResult
+from embedagents.stm32.subprocess_runner import ToolRunResult
 
 
 OB = Path(__file__).resolve().parent / "fixtures" / "cubeprogrammer" / "option-bytes"
@@ -151,7 +151,7 @@ class TestReadOptionBytesIntegration:
     def test_happy_path(self, ctx_with_cli: SubstrateContext) -> None:
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(_ob("stm32l4-default.txt")),
         ):
             result = client.read_option_bytes()
@@ -163,7 +163,7 @@ class TestReadOptionBytesIntegration:
     def test_invokes_ob_displ_argv(self, ctx_with_cli: SubstrateContext) -> None:
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(_ob("stm32l4-default.txt")),
         ) as mocked:
             client.read_option_bytes()
@@ -175,7 +175,7 @@ class TestReadOptionBytesIntegration:
     def test_rdp2_path(self, ctx_with_cli: SubstrateContext) -> None:
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(_ob("stm32l4-rdp2.txt")),
         ):
             result = client.read_option_bytes()
@@ -189,9 +189,9 @@ class TestReadOptionBytesIntegration:
         import logging
 
         client = CubeProgrammer(ctx_with_cli)
-        with caplog.at_level(logging.INFO, logger="stm32_substrate.cubeprogrammer"):
+        with caplog.at_level(logging.INFO, logger="embedagents.stm32.cubeprogrammer"):
             with patch(
-                "stm32_substrate.cubeprogrammer.client.run_tool",
+                "embedagents.stm32.cubeprogrammer.client.run_tool",
                 return_value=_success(_ob("stm32l4-default.txt")),
             ):
                 client.read_option_bytes()

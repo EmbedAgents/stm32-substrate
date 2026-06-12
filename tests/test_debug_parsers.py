@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from stm32_substrate.debug.parsers import (
+from embedagents.stm32.debug.parsers import (
     _Parser,
     parse_breakpoint_insert,
     parse_evaluate_expression,
@@ -18,7 +18,7 @@ from stm32_substrate.debug.parsers import (
     parse_stack_list_frames,
     parse_stopped,
 )
-from stm32_substrate.debug.results import (
+from embedagents.stm32.debug.results import (
     Breakpoint,
     CallStack,
     MIAsyncRecord,
@@ -398,7 +398,7 @@ class TestMemoryRead:
 
 class TestParseMiRecordHardening:
     def test_truncated_result_record_raises_typed_gdb_error(self) -> None:
-        from stm32_substrate.errors import GDBError
+        from embedagents.stm32.errors import GDBError
 
         with pytest.raises(GDBError) as excinfo:
             parse_mi_record('^done,memory=[{begin="0x0"')

@@ -27,7 +27,7 @@ What's covered (per plan-windows.md F.6 + next-actions):
     "Control" alias and carries CFSR/HFSR/VTOR — the registers DIAG-008
     (NVIC), DIAG-009 (VTOR) and DIAG-001/decode-hardfault (SCB) depend on.
   - TestSessionTeardown: clean session.close() leaves gdbserver
-    process dead per stm32_substrate.platform.process_alive poll.
+    process dead per embedagents.stm32.platform.process_alive poll.
 
 Device-name resolution note: these used to need an ELF copy renamed to
 ``STM32L476.elf`` (the old ``_device_name_hint`` = ELF stem). The
@@ -41,14 +41,14 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.debug import Debug, PeripheralDump, RegisterDump, RegisterValue
-from stm32_substrate.debug.results import (
+from embedagents.stm32.debug import Debug, PeripheralDump, RegisterDump, RegisterValue
+from embedagents.stm32.debug.results import (
     Breakpoint,
     CallStack,
     DebugSnapshot,
     RunResult,
 )
-from stm32_substrate.platform import process_alive
+from embedagents.stm32.platform import process_alive
 
 
 # ---------------------------------------------------------------------------
@@ -472,9 +472,9 @@ class TestSnapshot:
 class TestSessionTeardown:
     def test_close_kills_gdbserver(self, l476rg_ctx, blinky_elf: Path) -> None:
         """Explicit session.close() (no context-manager) terminates the
-        gdbserver subprocess - verified via stm32_substrate.platform.
+        gdbserver subprocess - verified via embedagents.stm32.platform.
         process_alive on the captured pid. Mirrors the gdb-MI cleanup
-        contract in src/stm32_substrate/debug/session.py:_close path."""
+        contract in src/embedagents/stm32/debug/session.py:_close path."""
         debug = Debug(l476rg_ctx)
         session = debug.start_session(elf_path=blinky_elf, halt=True)
         gdbserver_pid = session.gdbserver_pid

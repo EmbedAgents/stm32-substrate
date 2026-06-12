@@ -10,24 +10,24 @@ from unittest.mock import patch
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.client import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.client import (
     _coerce_to_int,
     _is_rdp_level_2,
     _ob_values_equal,
     _render_ob_value,
 )
-from stm32_substrate.cubeprogrammer.results import (
+from embedagents.stm32.cubeprogrammer.results import (
     Confirmation,
     OptionByteDiffEntry,
     OptionBytesDiff,
 )
-from stm32_substrate.errors import (
+from embedagents.stm32.errors import (
     ProtocolError,
     UserAbortedError,
 )
-from stm32_substrate.subprocess_runner import ToolRunResult
+from embedagents.stm32.subprocess_runner import ToolRunResult
 
 
 OB = Path(__file__).resolve().parent / "fixtures" / "cubeprogrammer" / "option-bytes"
@@ -158,7 +158,7 @@ class TestIrreversibilityGate:
     def test_rdp_level_2_with_flag_proceeds(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=[_ok(), _ok(_ob("stm32l4-rdp2.txt"))],
         ) as run:
             result = client.write_option_bytes(
@@ -184,7 +184,7 @@ class TestIrreversibilityGate:
         """0x55 is RDP level 1 (reversible by mass-erase); no gate."""
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=[_ok(), _ok(_ob("stm32l4-rdp1.txt"))],
         ):
             result = client.write_option_bytes(
@@ -198,7 +198,7 @@ class TestIrreversibilityGate:
         client = CubeProgrammer(ctx)
         # No RDP key in the dict at all → irreversibility check passes.
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=[_ok(), _ok(_ob("stm32l4-default.txt"))],
         ):
             result = client.write_option_bytes(
@@ -230,7 +230,7 @@ class TestDestructiveGate:
     def test_explicit_true_proceeds(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=[_ok(), _ok(_ob("stm32l4-default.txt"))],
         ):
             result = client.write_option_bytes(
@@ -250,7 +250,7 @@ class TestDestructiveGate:
 
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=[_ok(), _ok(_ob("stm32l4-default.txt"))],
         ):
             client.write_option_bytes(
@@ -264,7 +264,7 @@ class TestDestructiveGate:
     ) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool"
+            "embedagents.stm32.cubeprogrammer.client.run_tool"
         ) as mocked:
             with pytest.raises(UserAbortedError):
                 client.write_option_bytes(
@@ -296,7 +296,7 @@ class TestWriteOptionBytesInvocation:
     def test_argv_includes_pairs(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=[_ok(), _ok(_ob("stm32l4-default.txt"))],
         ) as mocked:
             client.write_option_bytes(
@@ -313,7 +313,7 @@ class TestWriteOptionBytesInvocation:
     def test_bool_value_coerced_to_hex(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=[_ok(), _ok(_ob("stm32l4-default.txt"))],
         ) as mocked:
             client.write_option_bytes(
@@ -329,7 +329,7 @@ class TestWriteOptionBytesInvocation:
     ) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=[_ok(), _ok(_ob("stm32l4-default.txt"))],
         ) as mocked:
             client.write_option_bytes(
@@ -344,7 +344,7 @@ class TestWriteOptionBytesInvocation:
     ) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             side_effect=[_ok(), _ok(_ob("stm32l4-default.txt"))],
         ):
             result = client.write_option_bytes(
@@ -363,7 +363,7 @@ class TestWriteOptionBytesInvocation:
         the CLI when the gate fails — substrate never reaches subprocess."""
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool"
+            "embedagents.stm32.cubeprogrammer.client.run_tool"
         ) as mocked:
             with pytest.raises(UserAbortedError):
                 client.write_option_bytes({"IWDG_SW": 1})
@@ -383,7 +383,7 @@ class TestVerifyOptionBytes:
     def test_all_match(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_ok(_ob("stm32l4-default.txt")),
         ):
             result = client.verify_option_bytes(
@@ -395,7 +395,7 @@ class TestVerifyOptionBytes:
     def test_mismatch_reported(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_ok(_ob("stm32l4-default.txt")),
         ):
             # RDP is 0xAA in the fixture; expecting 0x55 (level 1).
@@ -412,7 +412,7 @@ class TestVerifyOptionBytes:
         normalisation reports no mismatch."""
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_ok(_ob("stm32l4-default.txt")),
         ):
             result = client.verify_option_bytes({"RDP": "0xAA"})
@@ -422,7 +422,7 @@ class TestVerifyOptionBytes:
         """``True`` matches stored int ``1``."""
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_ok(_ob("stm32l4-default.txt")),
         ):
             result = client.verify_option_bytes({"IWDG_SW": True})
@@ -432,7 +432,7 @@ class TestVerifyOptionBytes:
         """Caller expects a field that's not on the observed device."""
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_ok(_ob("stm32l4-default.txt")),
         ):
             result = client.verify_option_bytes(
@@ -447,7 +447,7 @@ class TestVerifyOptionBytes:
     def test_full_dicts_preserved(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_ok(_ob("stm32l4-default.txt")),
         ):
             result = client.verify_option_bytes(
@@ -466,7 +466,7 @@ class TestVerifyOptionBytes:
     def test_argv_uses_ob_displ(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_ok(_ob("stm32l4-default.txt")),
         ) as mocked:
             client.verify_option_bytes({"RDP": 0xAA})

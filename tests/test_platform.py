@@ -1,4 +1,4 @@
-"""Unit tests for ``stm32_substrate.platform`` wrappers.
+"""Unit tests for ``embedagents.stm32.platform`` wrappers.
 
 Process tests use ``subprocess`` to spawn a short-lived python interpreter as
 the test subject. Lock-contention tests use the same pattern: a sibling
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.platform import (
+from embedagents.stm32.platform import (
     acquire_exclusive_lock,
     is_lock_held,
     process_alive,
@@ -126,7 +126,7 @@ class TestTerminateProcessTree:
         """IMP-16/IMP-08: signalling only the direct child orphans the
         JVM grandchild that does the real work. The tree kill must take
         the whole group."""
-        from stm32_substrate.platform import terminate_process_tree
+        from embedagents.stm32.platform import terminate_process_tree
 
         script = (
             "import subprocess, sys, time\n"

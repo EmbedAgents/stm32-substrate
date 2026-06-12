@@ -13,9 +13,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from stm32_substrate.cli import main
-from stm32_substrate.errors import VCPError
-from stm32_substrate.vcp.results import (
+from embedagents.stm32.cli import main
+from embedagents.stm32.errors import VCPError
+from embedagents.stm32.vcp.results import (
     PriorVCPState,
     ReconnectResult,
     RequestResponse,
@@ -26,9 +26,9 @@ from stm32_substrate.vcp.results import (
 def mock_vcp(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     instance = MagicMock(name="VCP-instance")
     factory = MagicMock(return_value=instance)
-    # The CLI does `from stm32_substrate.vcp import VCP` at module load,
+    # The CLI does `from embedagents.stm32.vcp import VCP` at module load,
     # so the binding to patch is on `cli._vcp`.
-    monkeypatch.setattr("stm32_substrate.cli._vcp.VCP", factory)
+    monkeypatch.setattr("embedagents.stm32.cli._vcp.VCP", factory)
     return instance
 
 

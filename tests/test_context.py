@@ -1,4 +1,4 @@
-"""Unit tests for ``stm32_substrate.context``."""
+"""Unit tests for ``embedagents.stm32.context``."""
 
 from __future__ import annotations
 
@@ -10,14 +10,14 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.context import (
+from embedagents.stm32.context import (
     ProjectDescriptor,
     RuntimeDefaults,
     SessionState,
     SubstrateContext,
     ToolPaths,
 )
-from stm32_substrate.errors import ConfigurationError
+from embedagents.stm32.errors import ConfigurationError
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +114,7 @@ class TestPlatformGate:
     """
 
     def test_darwin_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from stm32_substrate import context as _ctx
+        from embedagents.stm32 import context as _ctx
 
         monkeypatch.setattr(_ctx.sys, "platform", "darwin")
         with pytest.raises(ConfigurationError) as excinfo:
@@ -124,7 +124,7 @@ class TestPlatformGate:
         assert "GitHub" in excinfo.value.hint or "issue" in excinfo.value.hint.lower()
 
     def test_unknown_platform_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from stm32_substrate import context as _ctx
+        from embedagents.stm32 import context as _ctx
 
         monkeypatch.setattr(_ctx.sys, "platform", "freebsd")
         with pytest.raises(ConfigurationError) as excinfo:
@@ -133,20 +133,20 @@ class TestPlatformGate:
         assert "freebsd" in excinfo.value.message
 
     def test_linux_accepted(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from stm32_substrate import context as _ctx
+        from embedagents.stm32 import context as _ctx
 
         monkeypatch.setattr(_ctx.sys, "platform", "linux")
         _ctx._enforce_supported_platform()  # must not raise
 
     def test_linux_variant_accepted(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """``sys.platform.startswith("linux")`` covers 'linux2' etc."""
-        from stm32_substrate import context as _ctx
+        from embedagents.stm32 import context as _ctx
 
         monkeypatch.setattr(_ctx.sys, "platform", "linux2")
         _ctx._enforce_supported_platform()  # must not raise
 
     def test_win32_accepted(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from stm32_substrate import context as _ctx
+        from embedagents.stm32 import context as _ctx
 
         monkeypatch.setattr(_ctx.sys, "platform", "win32")
         _ctx._enforce_supported_platform()  # must not raise
@@ -331,7 +331,7 @@ class TestSchemaValidation:
         proj = tmp_path / "stm32-project.jsonc"
         _write_jsonc(proj, bad)
 
-        with caplog.at_level(logging.WARNING, logger="stm32_substrate.context"):
+        with caplog.at_level(logging.WARNING, logger="embedagents.stm32.context"):
             ctx = SubstrateContext.from_environment(project_path=tmp_path)
 
         assert ctx.project is not None
@@ -399,7 +399,7 @@ class TestContextShape:
     def test_logger_attached(self, tmp_path: Path) -> None:
         ctx = SubstrateContext.from_environment(project_path=tmp_path)
         assert isinstance(ctx.logger, logging.Logger)
-        assert ctx.logger.name == "stm32_substrate"
+        assert ctx.logger.name == "embedagents.stm32"
 
     def test_session_state_present(self, tmp_path: Path) -> None:
         ctx = SubstrateContext.from_environment(project_path=tmp_path)

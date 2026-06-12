@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeide import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeide import (
     AmbiguousCallback,
     BuildResult,
     ConflictCallback,
@@ -22,7 +22,7 @@ from stm32_substrate.cubeide import (
     SettingChange,
     SettingsModification,
 )
-from stm32_substrate.errors import (
+from embedagents.stm32.errors import (
     ConfigurationError,
     CProjectEditError,
     ProjectAmbiguityError,
@@ -145,7 +145,7 @@ class TestClientSkeleton:
     def test_construct(self, ctx: SubstrateContext) -> None:
         client = CubeIDE(ctx)
         assert client.ctx is ctx
-        assert client._log.name == "stm32_substrate.cubeide"
+        assert client._log.name == "embedagents.stm32.cubeide"
 
     def test_unresolved_cubeide_raises_loudly(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

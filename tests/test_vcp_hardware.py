@@ -24,8 +24,8 @@ import time
 
 import pytest
 
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.vcp import ST_LINK_VID, VCP
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.vcp import ST_LINK_VID, VCP
 
 
 # ---------------------------------------------------------------------------

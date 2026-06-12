@@ -10,7 +10,7 @@
 // Cortex-M33 (STM32U5, TrustZone; BLE_AT_Client builds non-secure at
 // 0x08000000). HW-validated 27/1-skip (DMA1 absent — U5 uses GPDMA/LPDMA).
 {
-  "$schema": "../../../../src/stm32_substrate/schemas/stm32-project.schema.json",
+  "$schema": "../../../../src/embedagents/stm32/schemas/stm32-project.schema.json",
   "version": 1,
   "project_name": "BLE_AT_Client",
   "board": {

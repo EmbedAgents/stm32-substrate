@@ -10,9 +10,9 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeide import workspace
-from stm32_substrate.errors import WorkspaceLockedError
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeide import workspace
+from embedagents.stm32.errors import WorkspaceLockedError
 
 
 # ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ class TestAcquireWorkspaceLock:
         proc = _spawn_lock_holder(lock_path, hold_seconds=3.0)
         try:
             # Wait for the sibling to actually hold the lock.
-            from stm32_substrate.platform import is_lock_held
+            from embedagents.stm32.platform import is_lock_held
 
             deadline = time.monotonic() + 2.0
             while time.monotonic() < deadline:

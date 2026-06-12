@@ -4,6 +4,39 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-06-12
+
+Naming release: every identifier we publish is now brand-first — nothing
+leads with ST's mark. **STM32 remains a registered trademark of
+STMicroelectronics International N.V.; this project is independent and
+community-driven** (see the README disclaimer). Functionally identical to
+0.2.0 — no behavior changes.
+
+### Changed
+
+- **Distribution renamed `stm32-substrate` → `embedagents-stm32`**, and the
+  import package moved into a PEP 420 namespace:
+  `import stm32_substrate` → **`from embedagents import stm32`**. Future
+  sibling tools (e.g. `embedagents-esp32`) install into the same
+  `embedagents` namespace from their own distributions; `pip install
+  EmbedAgents` (the meta-package) pulls the whole family.
+- **Claude-plugin renamed `stm32-substrate` → `embedagents-stm32`** and the
+  marketplace renamed `stm32` → `embedagents`: the install line is now
+  `/plugin install embedagents-stm32@embedagents`. **Upgrading from an
+  earlier install:** `/plugin uninstall stm32-substrate`, then reinstall —
+  and if you pip-installed the old package, `pip uninstall stm32-substrate`
+  first (both distributions own the `stm32` console script).
+- **Unchanged on purpose:** the `stm32` CLI binary (every subcommand, flag,
+  and JSON contract), the five slash commands (`/stm32prog`, `/stm32build`,
+  `/stm32debug`, `/stm32project`, `/stm32agent`), the GitHub repo, the
+  project-descriptor format, and the `.stm32-substrate/` workspace
+  convention. How you *use* the tool is identical.
+- Log-record prefixes follow the package: `stm32_substrate.*` →
+  `embedagents.stm32.*`.
+- New `Release` workflow publishes to PyPI via Trusted Publishers (OIDC) on
+  GitHub Releases; CI and the release pipeline both assert the wheel ships
+  no `embedagents/__init__.py` (the namespace stays mergeable).
+
 ## [0.2.0] — 2026-06-12
 
 Hardening release. A comprehensive 10-dimension adversarial audit (129

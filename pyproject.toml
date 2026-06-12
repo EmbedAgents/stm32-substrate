@@ -3,8 +3,8 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "stm32-substrate"
-version = "0.2.0"
+name = "embedagents-stm32"
+version = "0.3.0"
 description = "Deterministic Python wrapper around the six ST vendor CLIs (CubeProgrammer, CubeIDE, CubeMX, ST-LINK gdbserver, arm-none-eabi-gdb, STM32_SigningTool_CLI) plus a USB virtual COM port reader. Surfaces a Python library, a `stm32` CLI, and five Claude-Code slash commands."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -48,16 +48,21 @@ eval = [
 ]
 
 [project.scripts]
-stm32 = "stm32_substrate.cli:main"
+stm32 = "embedagents.stm32.cli:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
 
+# PEP 420 namespace package: src/embedagents/ has NO __init__.py so that
+# sibling distributions (embedagents-esp32, ...) can merge into the same
+# `embedagents` namespace. find defaults namespaces=true; the include
+# filter keeps discovery scoped to this distribution's subtree.
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["embedagents.stm32", "embedagents.stm32.*"]
 
 [tool.setuptools.package-data]
-stm32_substrate = ["py.typed", "schemas/*.schema.json"]
+"embedagents.stm32" = ["py.typed", "schemas/*.schema.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

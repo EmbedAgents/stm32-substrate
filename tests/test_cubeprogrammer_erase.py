@@ -7,16 +7,16 @@ from unittest.mock import patch
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.codes import CubeProgrammerErrorCode
-from stm32_substrate.cubeprogrammer.results import EraseConfirmation
-from stm32_substrate.errors import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.codes import CubeProgrammerErrorCode
+from embedagents.stm32.cubeprogrammer.results import EraseConfirmation
+from embedagents.stm32.errors import (
     CubeProgrammerError,
     ToolError,
     UserAbortedError,
 )
-from stm32_substrate.subprocess_runner import ToolRunResult
+from embedagents.stm32.subprocess_runner import ToolRunResult
 
 
 ERRORS = Path(__file__).resolve().parent / "fixtures" / "cubeprogrammer" / "errors"
@@ -110,7 +110,7 @@ class TestEraseChip:
     def test_invokes_dash_e_all(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             result = client.erase_chip(confirm_destructive=True)
@@ -124,7 +124,7 @@ class TestEraseChip:
     def test_uses_atomic_timeout(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             client.erase_chip(confirm_destructive=True)
@@ -138,7 +138,7 @@ class TestEraseChip:
         )
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", side_effect=runner_err
+            "embedagents.stm32.cubeprogrammer.client.run_tool", side_effect=runner_err
         ):
             with pytest.raises(CubeProgrammerError) as excinfo:
                 client.erase_chip(confirm_destructive=True)
@@ -155,7 +155,7 @@ class TestEraseChip:
         ctx2 = SubstrateContext.from_environment(project_path=tmp_path)
         client = CubeProgrammer(ctx2)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             client.erase_chip(confirm_destructive=True)
@@ -172,7 +172,7 @@ class TestEraseAndReset:
     def test_invokes_dash_e_all_dash_rst(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             result = client.erase_and_reset(confirm_destructive=True)
@@ -194,7 +194,7 @@ class TestEraseDestructiveGate:
         """Bare ``erase_chip()`` must NOT touch the CLI — it aborts loud."""
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             with pytest.raises(UserAbortedError) as excinfo:
@@ -208,7 +208,7 @@ class TestEraseDestructiveGate:
     ) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             with pytest.raises(UserAbortedError):
@@ -227,7 +227,7 @@ class TestEraseDestructiveGate:
 
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             client.erase_chip(confirm_destructive=approve)
@@ -239,7 +239,7 @@ class TestEraseDestructiveGate:
     ) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             with pytest.raises(UserAbortedError):

@@ -10,12 +10,12 @@ from unittest.mock import patch
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.codes import CubeProgrammerErrorCode
-from stm32_substrate.cubeprogrammer.results import BooleanResult
-from stm32_substrate.errors import ToolError
-from stm32_substrate.subprocess_runner import ToolRunResult
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.codes import CubeProgrammerErrorCode
+from embedagents.stm32.cubeprogrammer.results import BooleanResult
+from embedagents.stm32.errors import ToolError
+from embedagents.stm32.subprocess_runner import ToolRunResult
 
 
 BANNERS = Path(__file__).resolve().parent / "fixtures" / "cubeprogrammer" / "banners"
@@ -38,7 +38,7 @@ class TestPingSwdHappy:
         good = (BANNERS / "nucleo-l476rg-good.txt").read_text()
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=ToolRunResult(
                 exit_code=0, stdout=good, stderr="", duration_s=0.05, timed_out=False
             ),
@@ -52,7 +52,7 @@ class TestPingSwdHappy:
         good = (BANNERS / "nucleo-l476rg-good.txt").read_text()
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=ToolRunResult(
                 exit_code=0, stdout=good, stderr="", duration_s=0.05, timed_out=False
             ),
@@ -86,7 +86,7 @@ class TestPingSwdFailureModes:
         )
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", side_effect=runner_err
+            "embedagents.stm32.cubeprogrammer.client.run_tool", side_effect=runner_err
         ):
             result = client.ping_swd()
         # ping_swd returns False with reason — never raises.
@@ -104,7 +104,7 @@ class TestPingSwdFailureModes:
         )
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", side_effect=runner_err
+            "embedagents.stm32.cubeprogrammer.client.run_tool", side_effect=runner_err
         ) as mocked:
             client.ping_swd()
         # Exactly one CLI call; no ladder.
@@ -121,9 +121,9 @@ class TestPingSwdLogging:
 
         good = (BANNERS / "nucleo-l476rg-good.txt").read_text()
         client = CubeProgrammer(ctx_with_cli)
-        with caplog.at_level(logging.INFO, logger="stm32_substrate.cubeprogrammer"):
+        with caplog.at_level(logging.INFO, logger="embedagents.stm32.cubeprogrammer"):
             with patch(
-                "stm32_substrate.cubeprogrammer.client.run_tool",
+                "embedagents.stm32.cubeprogrammer.client.run_tool",
                 return_value=ToolRunResult(
                     exit_code=0, stdout=good, stderr="", duration_s=0.05, timed_out=False
                 ),
@@ -145,9 +145,9 @@ class TestPingSwdLogging:
             tool_output=(ERRORS / "target-no-device.txt").read_text(),
         )
         client = CubeProgrammer(ctx_with_cli)
-        with caplog.at_level(logging.INFO, logger="stm32_substrate.cubeprogrammer"):
+        with caplog.at_level(logging.INFO, logger="embedagents.stm32.cubeprogrammer"):
             with patch(
-                "stm32_substrate.cubeprogrammer.client.run_tool", side_effect=runner_err
+                "embedagents.stm32.cubeprogrammer.client.run_tool", side_effect=runner_err
             ):
                 client.ping_swd()
         msgs = [r.message for r in caplog.records]

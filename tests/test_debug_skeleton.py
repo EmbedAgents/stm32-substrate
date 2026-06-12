@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.debug import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.debug import (
     Breakpoint,
     CallStack,
     ComparisonResult,
@@ -32,8 +32,8 @@ from stm32_substrate.debug import (
     ThreadInfo,
     VariableValue,
 )
-from stm32_substrate.debug.results import MemoryReadResult
-from stm32_substrate.errors import (
+from embedagents.stm32.debug.results import MemoryReadResult
+from embedagents.stm32.errors import (
     GDBError,
     GDBSessionLost,
     SVDLookupError,
@@ -151,7 +151,7 @@ class TestClassSkeletons:
     def test_debug_construct(self, ctx: SubstrateContext) -> None:
         client = Debug(ctx)
         assert client.ctx is ctx
-        assert client._log.name == "stm32_substrate.debug"
+        assert client._log.name == "embedagents.stm32.debug"
 
     # start_session() + attach_running() implemented in C4g;
     # verified in test_debug_start_session.py.

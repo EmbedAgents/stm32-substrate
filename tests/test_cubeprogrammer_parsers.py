@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.cubeprogrammer.parsers import parse_banner
-from stm32_substrate.cubeprogrammer.results import BannerResult
+from embedagents.stm32.cubeprogrammer.parsers import parse_banner
+from embedagents.stm32.cubeprogrammer.results import BannerResult
 
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "cubeprogrammer" / "banners"

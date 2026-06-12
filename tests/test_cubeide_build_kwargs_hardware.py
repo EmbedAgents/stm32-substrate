@@ -42,8 +42,8 @@ from typing import Iterator
 
 import pytest
 
-from stm32_substrate.cubeide import CubeIDE
-from stm32_substrate.cubeide.results import BuildResult
+from embedagents.stm32.cubeide import CubeIDE
+from embedagents.stm32.cubeide.results import BuildResult
 
 # ---------------------------------------------------------------------------
 # Project locations (relative to repo root)
@@ -82,8 +82,8 @@ def build_ctx(tmp_path: Path):
     any committed fixture descriptor. Skips the suite if the vendor CLIs
     don't resolve on this host.
     """
-    from stm32_substrate.context import SubstrateContext
-    from stm32_substrate.errors import ConfigurationError
+    from embedagents.stm32.context import SubstrateContext
+    from embedagents.stm32.errors import ConfigurationError
 
     # cwd=tmp_path isolates the workspace, but the repo's tool-paths config
     # lives under .claude/ — pass it explicitly (the upward search from

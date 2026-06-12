@@ -32,12 +32,12 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
-from stm32_substrate.context import SubstrateContext  # noqa: E402
-from stm32_substrate.debug.gdbserver import (  # noqa: E402
+from embedagents.stm32.context import SubstrateContext  # noqa: E402
+from embedagents.stm32.debug.gdbserver import (  # noqa: E402
     GDBServerOptions,
     spawn_gdbserver,
 )
-from stm32_substrate.debug.pipereader import PipeLineReader  # noqa: E402
+from embedagents.stm32.debug.pipereader import PipeLineReader  # noqa: E402
 
 FPROJ = REPO / "tests/fixtures/projects/F-PROJ-NUCLEO-L476RG"
 BLINKY_ELF = (

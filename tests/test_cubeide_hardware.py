@@ -25,8 +25,8 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.cubeide import CubeIDE
-from stm32_substrate.cubeide.results import BuildResult
+from embedagents.stm32.cubeide import CubeIDE
+from embedagents.stm32.cubeide.results import BuildResult
 
 
 # ---------------------------------------------------------------------------
@@ -181,10 +181,10 @@ int main(void) {
 _BROKEN_LINK_MAIN_C = """\
 /* substrate-test BROKEN-LINK firmware: extern reference to an
  * undefined symbol; compiles cleanly, fails at the link stage. */
-extern void _stm32_substrate_missing_symbol(void);
+extern void _embedagents.stm32_missing_symbol(void);
 
 int main(void) {
-    _stm32_substrate_missing_symbol();
+    _embedagents.stm32_missing_symbol();
     return 0;
 }
 """

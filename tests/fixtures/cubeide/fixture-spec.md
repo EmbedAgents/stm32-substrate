@@ -522,7 +522,7 @@ Real CubeIDE workspaces captured at specific states. The user generates these by
 # tests/fixtures/cubeide/helpers/hold_lock.py — sibling helper
 #!/usr/bin/env python3
 import sys, time
-from stm32_substrate.platform import acquire_exclusive_lock
+from embedagents.stm32.platform import acquire_exclusive_lock
 lock_path = sys.argv[1]
 with acquire_exclusive_lock(lock_path):
     sys.stdout.write("locked\n"); sys.stdout.flush()

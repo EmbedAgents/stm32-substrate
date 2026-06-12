@@ -22,7 +22,7 @@
     {
       "name": "Bash",
       "args": {
-        "command": "python3 - <<'PY'\nfrom stm32_substrate import SubstrateContext\nfrom stm32_substrate.debug import Debug\nctx = SubstrateContext.from_environment()\nwith Debug(ctx).start_session() as s:   # DebugSession\n    s.set_breakpoint('_sbrk')\n    s.run_until_breakpoint()\n    print(s.read_registers())\nPY",
+        "command": "python3 - <<'PY'\nfrom embedagents.stm32 import SubstrateContext\nfrom embedagents.stm32.debug import Debug\nctx = SubstrateContext.from_environment()\nwith Debug(ctx).start_session() as s:   # DebugSession\n    s.set_breakpoint('_sbrk')\n    s.run_until_breakpoint()\n    print(s.read_registers())\nPY",
         "description": "break at _sbrk + read program-break vs SP via a DebugSession"
       }
     },
@@ -51,7 +51,7 @@
     {
       "name": "Bash",
       "args": {
-        "command": "python3 - <<'PY'\nfrom stm32_substrate import SubstrateContext\nfrom stm32_substrate.debug import Debug\nctx = SubstrateContext.from_environment()\nwith Debug(ctx).start_session() as s:   # DebugSession\n    s.set_breakpoint('_sbrk')\n    s.run_until_breakpoint()\n    print(s.read_registers())\nPY",
+        "command": "python3 - <<'PY'\nfrom embedagents.stm32 import SubstrateContext\nfrom embedagents.stm32.debug import Debug\nctx = SubstrateContext.from_environment()\nwith Debug(ctx).start_session() as s:   # DebugSession\n    s.set_breakpoint('_sbrk')\n    s.run_until_breakpoint()\n    print(s.read_registers())\nPY",
         "description": "re-gather to confirm the allocation succeeds"
       }
     }

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate._jsonc import load_jsonc, load_jsonc_file
+from embedagents.stm32._jsonc import load_jsonc, load_jsonc_file
 
 
 class TestLineComments:

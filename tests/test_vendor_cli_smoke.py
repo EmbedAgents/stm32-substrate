@@ -35,7 +35,7 @@ from pathlib import Path
 import pytest
 
 if False:  # TYPE_CHECKING guard kept terse
-    from stm32_substrate.context import SubstrateContext
+    from embedagents.stm32.context import SubstrateContext
 
 
 _VERSION_TIMEOUT_S = 15.0
@@ -167,8 +167,8 @@ class TestCubeIDEHeadlessUsage:
     def test_headless_build_no_args_prints_usage(
         self, smoke_ctx: "SubstrateContext", tmp_path: Path
     ) -> None:
-        from stm32_substrate.cubeide.headless import resolve_headless_build
-        from stm32_substrate.errors import CubeIDEError
+        from embedagents.stm32.cubeide.headless import resolve_headless_build
+        from embedagents.stm32.errors import CubeIDEError
 
         try:
             cli = resolve_headless_build(ctx=smoke_ctx)

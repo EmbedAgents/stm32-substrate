@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.debug.svd import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.debug.svd import (
     SvdDb,
     SvdSourceRoots,
     _canonical_svd_filename,
@@ -18,8 +18,8 @@ from stm32_substrate.debug.svd import (
     _svd_int,
     resolve_svd_roots,
 )
-from stm32_substrate.debug.results import FieldValue, RegisterValue
-from stm32_substrate.errors import SVDLookupError
+from embedagents.stm32.debug.results import FieldValue, RegisterValue
+from embedagents.stm32.errors import SVDLookupError
 
 
 def _make_svd(

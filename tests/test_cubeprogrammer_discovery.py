@@ -8,15 +8,15 @@ from unittest.mock import patch
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.results import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.results import (
     BannerResult,
     CoresResult,
     MemoryLayoutResult,
 )
-from stm32_substrate.errors import ResolutionError
-from stm32_substrate.subprocess_runner import ToolRunResult
+from embedagents.stm32.errors import ResolutionError
+from embedagents.stm32.subprocess_runner import ToolRunResult
 
 
 BANNERS = Path(__file__).resolve().parent / "fixtures" / "cubeprogrammer" / "banners"
@@ -55,9 +55,9 @@ class TestRawConnect:
         import logging
 
         client = CubeProgrammer(ctx_with_cli)
-        with caplog.at_level(logging.INFO, logger="stm32_substrate.cubeprogrammer"):
+        with caplog.at_level(logging.INFO, logger="embedagents.stm32.cubeprogrammer"):
             with patch(
-                "stm32_substrate.cubeprogrammer.client.run_tool",
+                "embedagents.stm32.cubeprogrammer.client.run_tool",
                 return_value=_success(_banner("nucleo-l476rg-good.txt")),
             ):
                 banner = client._raw_connect()
@@ -72,7 +72,7 @@ class TestRawConnect:
     ) -> None:
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(_banner("nucleo-l476rg-under-reset.txt")),
         ) as mocked:
             client._raw_connect(mode="UR")
@@ -84,7 +84,7 @@ class TestRawConnect:
     ) -> None:
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(_banner("nucleo-l476rg-good.txt")),
         ) as mocked:
             client._raw_connect()
@@ -101,7 +101,7 @@ class TestConnectUnderReset:
     def test_uses_mode_ur(self, ctx_with_cli: SubstrateContext) -> None:
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(_banner("nucleo-l476rg-under-reset.txt")),
         ) as mocked:
             banner = client.connect_under_reset()
@@ -118,9 +118,9 @@ class TestConnectUnderReset:
         import logging
 
         client = CubeProgrammer(ctx_with_cli)
-        with caplog.at_level(logging.INFO, logger="stm32_substrate.cubeprogrammer"):
+        with caplog.at_level(logging.INFO, logger="embedagents.stm32.cubeprogrammer"):
             with patch(
-                "stm32_substrate.cubeprogrammer.client.run_tool",
+                "embedagents.stm32.cubeprogrammer.client.run_tool",
                 return_value=_success(_banner("nucleo-l476rg-under-reset.txt")),
             ):
                 client.connect_under_reset()
@@ -139,7 +139,7 @@ class TestBoardName:
     ) -> None:
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(_banner("nucleo-l476rg-good.txt")),
         ):
             name = client.board_name()
@@ -150,7 +150,7 @@ class TestBoardName:
     ) -> None:
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(_banner("custom-board-no-name.txt")),
         ):
             with pytest.raises(ResolutionError) as excinfo:
@@ -170,7 +170,7 @@ class TestMemoryLayout:
     def test_flash_size_from_banner(self, ctx_with_cli: SubstrateContext) -> None:
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(_banner("nucleo-l476rg-good.txt")),
         ):
             layout = client.memory_layout()
@@ -185,7 +185,7 @@ class TestMemoryLayout:
         rather than incorrect mini-table guesses per RES-020."""
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(_banner("nucleo-l476rg-good.txt")),
         ):
             layout = client.memory_layout()
@@ -195,7 +195,7 @@ class TestMemoryLayout:
     def test_flash_size_kbytes_unit(self, ctx_with_cli: SubstrateContext) -> None:
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(_banner("flash-size-kbytes.txt")),
         ):
             layout = client.memory_layout()
@@ -211,7 +211,7 @@ class TestCores:
     def test_primary_core_from_banner(self, ctx_with_cli: SubstrateContext) -> None:
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(_banner("nucleo-l476rg-good.txt")),
         ):
             result = client.cores()
@@ -222,7 +222,7 @@ class TestCores:
     def test_secondary_cores_empty_in_v1(self, ctx_with_cli: SubstrateContext) -> None:
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(_banner("nucleo-l476rg-good.txt")),
         ):
             result = client.cores()

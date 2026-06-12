@@ -59,7 +59,7 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.errors import GDBError, SVDLookupError
+from embedagents.stm32.errors import GDBError, SVDLookupError
 
 
 # Common-STM32 peripheral set the 21-scenario recipe surface reads. Core
@@ -89,8 +89,8 @@ def board_ctx(probe_lock: object):
             "the board recipe suite (one project per board)"
         )
 
-    from stm32_substrate.context import SubstrateContext
-    from stm32_substrate.errors import ConfigurationError
+    from embedagents.stm32.context import SubstrateContext
+    from embedagents.stm32.errors import ConfigurationError
 
     try:
         ctx = SubstrateContext.from_environment(project_path=Path(proj))
@@ -100,7 +100,7 @@ def board_ctx(probe_lock: object):
             f"{exc.message} (hint: {exc.hint or '(none)'})"
         )
 
-    from stm32_substrate.cubeprogrammer import CubeProgrammer
+    from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
     firmware = getattr(ctx.project, "firmware", None)
     board = getattr(ctx.project, "board", None)
@@ -134,7 +134,7 @@ def board_build(board_ctx):
     when the descriptor is prebuilt-only (no build section)."""
     if getattr(board_ctx.project, "build", None) is None:
         return None
-    from stm32_substrate.cubeide import CubeIDE
+    from embedagents.stm32.cubeide import CubeIDE
 
     return CubeIDE(board_ctx).build()
 
@@ -162,8 +162,8 @@ def board_session(board_ctx, board_elf):
     """One shared debug session for every read recipe — a single gdbserver
     spawn for the suite. Skips the read tests cleanly if the session can't
     start (e.g. ST-LINK firmware too old)."""
-    from stm32_substrate.debug import Debug
-    from stm32_substrate.errors import GDBError
+    from embedagents.stm32.debug import Debug
+    from embedagents.stm32.errors import GDBError
 
     debug = Debug(board_ctx)
     try:
@@ -191,7 +191,7 @@ class TestBoardRecipeSuite:
 
     def test_prog_connect(self, board_ctx) -> None:
         """D-001 — connect returns a banner with device id / CPU / flash."""
-        from stm32_substrate.cubeprogrammer import CubeProgrammer
+        from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
         banner = CubeProgrammer(board_ctx).connect()
         assert banner.device_id, "connect banner missing device_id"
@@ -200,7 +200,7 @@ class TestBoardRecipeSuite:
 
     def test_prog_cores(self, board_ctx) -> None:
         """D-007 — cores() reports the primary Cortex-M core."""
-        from stm32_substrate.cubeprogrammer import CubeProgrammer
+        from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
         result = CubeProgrammer(board_ctx).cores()
         assert result.primary_core, "cores() returned no primary_core"
@@ -208,20 +208,20 @@ class TestBoardRecipeSuite:
 
     def test_ping_swd(self, board_ctx) -> None:
         """D-006 — the SWD interface responds."""
-        from stm32_substrate.cubeprogrammer import CubeProgrammer
+        from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
         result = CubeProgrammer(board_ctx).ping_swd()
         assert result.value is True, f"SWD ping failed: {result.reason}"
 
     def test_board_name(self, board_ctx) -> None:
         """D-003 — the probe→board name resolves."""
-        from stm32_substrate.cubeprogrammer import CubeProgrammer
+        from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
         assert CubeProgrammer(board_ctx).board_name(), "board_name() returned empty"
 
     def test_memory_layout(self, board_ctx) -> None:
         """D-004 — the device DB recognises the part (flash size > 0)."""
-        from stm32_substrate.cubeprogrammer import CubeProgrammer
+        from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
         layout = CubeProgrammer(board_ctx).memory_layout()
         assert layout.flash_size_kb and layout.flash_size_kb > 0
@@ -231,7 +231,7 @@ class TestBoardRecipeSuite:
         chip. A miss here means peripheral decode can't work, so this
         FAILS loudly (rather than letting the read-peripheral tests skip
         silently) — it guards the device-name-resolution bug class."""
-        from stm32_substrate.cubeprogrammer import CubeProgrammer
+        from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
         svd = CubeProgrammer(board_ctx).svd_for_attached()
         assert svd.svd_path is not None, (
@@ -242,7 +242,7 @@ class TestBoardRecipeSuite:
 
     def test_read_option_bytes(self, board_ctx) -> None:
         """D-009 — non-destructive option-byte read."""
-        from stm32_substrate.cubeprogrammer import CubeProgrammer
+        from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
         ob = CubeProgrammer(board_ctx).read_option_bytes()
         assert ob.observed, "read_option_bytes() returned no option bytes"
@@ -258,7 +258,7 @@ class TestBoardRecipeSuite:
 
     def test_prog_flash_elf(self, board_ctx, board_elf: Path) -> None:
         """F-003 — flash the built ELF via CubeProgrammer."""
-        from stm32_substrate.cubeprogrammer import CubeProgrammer
+        from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
         result = CubeProgrammer(board_ctx).flash_file(board_elf)
         # flash_file returns a FlashConfirmation on success (failures raise).
@@ -266,14 +266,14 @@ class TestBoardRecipeSuite:
 
     def test_reset(self, board_ctx) -> None:
         """F-016 — software reset issues cleanly."""
-        from stm32_substrate.cubeprogrammer import CubeProgrammer
+        from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
         result = CubeProgrammer(board_ctx).reset()
         assert result.reset_issued is True
 
     def test_halt_resume_round_trip(self, board_ctx) -> None:
         """F-017/F-018 — halt then resume both confirm (basic run-control)."""
-        from stm32_substrate.cubeprogrammer import CubeProgrammer
+        from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
         client = CubeProgrammer(board_ctx)
         halt_result = client.halt()
@@ -358,7 +358,7 @@ class TestBoardRecipeSuite:
 
     def test_vcp_discovery(self, board_ctx) -> None:
         """VCP-001 input — discover the board's ST-LINK CDC (VCP) port."""
-        from stm32_substrate.vcp import VCP
+        from embedagents.stm32.vcp import VCP
 
         ports = VCP(board_ctx).discover_vcp_ports()
         assert isinstance(ports, (list, tuple)), "discover_vcp_ports() returned non-sequence"

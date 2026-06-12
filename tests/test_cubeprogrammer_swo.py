@@ -13,14 +13,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.parsers import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.parsers import (
     is_swv_dropped_bytes_warning,
     parse_itm_line,
 )
-from stm32_substrate.cubeprogrammer.results import ITMRecord
-from stm32_substrate.subprocess_runner import ToolRunResult
+from embedagents.stm32.cubeprogrammer.results import ITMRecord
+from embedagents.stm32.subprocess_runner import ToolRunResult
 
 
 SWV = Path(__file__).resolve().parent / "fixtures" / "cubeprogrammer" / "swv"
@@ -197,7 +197,7 @@ class TestTailSwoArgvShape:
         client = CubeProgrammer(ctx)
         fake = _make_fake_popen([])
         with patch(
-            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
             return_value=fake,
         ) as popen:
             list(client.tail_swo(freq_mhz=80.0, port_number=2))
@@ -217,7 +217,7 @@ class TestTailSwoArgvShape:
         client = CubeProgrammer(ctx)
         fake = _make_fake_popen([])
         with patch(
-            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
             return_value=fake,
         ) as popen:
             list(client.tail_swo(freq_mhz=80.0))
@@ -231,7 +231,7 @@ class TestTailSwoArgvShape:
         fake = _make_fake_popen([])
         log = tmp_path / "swv.log"
         with patch(
-            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
             return_value=fake,
         ) as popen:
             list(client.tail_swo(freq_mhz=80.0, log_path=log))
@@ -242,7 +242,7 @@ class TestTailSwoArgvShape:
         client = CubeProgrammer(ctx)
         fake = _make_fake_popen([])
         with patch(
-            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
             return_value=fake,
         ) as popen:
             list(client.tail_swo(freq_mhz=80.0))
@@ -258,7 +258,7 @@ class TestTailSwoArgvShape:
         client = CubeProgrammer(ctx)
         fake = _make_fake_popen([])
         with patch(
-            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
             return_value=fake,
         ) as popen:
             list(client.tail_swo(freq_mhz=80.0))
@@ -280,7 +280,7 @@ class TestTailSwoStreaming:
         client = CubeProgrammer(ctx)
         fake = _make_fake_popen(lines)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
             return_value=fake,
         ):
             records = list(client.tail_swo(freq_mhz=80.0))
@@ -299,7 +299,7 @@ class TestTailSwoStreaming:
         client = CubeProgrammer(ctx)
         fake = _make_fake_popen(lines)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
             return_value=fake,
         ):
             records = list(client.tail_swo(freq_mhz=80.0))
@@ -317,7 +317,7 @@ class TestTailSwoStreaming:
         client = CubeProgrammer(ctx)
         fake = _make_fake_popen(lines)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
             return_value=fake,
         ):
             records = list(client.tail_swo(freq_mhz=80.0))
@@ -337,9 +337,9 @@ class TestTailSwoStreaming:
         ]
         client = CubeProgrammer(ctx)
         fake = _make_fake_popen(lines)
-        with caplog.at_level(logging.WARNING, logger="stm32_substrate.cubeprogrammer"):
+        with caplog.at_level(logging.WARNING, logger="embedagents.stm32.cubeprogrammer"):
             with patch(
-                "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+                "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
                 return_value=fake,
             ):
                 records = list(client.tail_swo(freq_mhz=80.0))
@@ -359,7 +359,7 @@ class TestTailSwoCleanup:
         client = CubeProgrammer(ctx)
         fake = _make_fake_popen(lines)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
             return_value=fake,
         ):
             list(client.tail_swo(freq_mhz=80.0))
@@ -379,7 +379,7 @@ class TestTailSwoCleanup:
         client = CubeProgrammer(ctx)
         fake = _make_fake_popen(lines)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
             return_value=fake,
         ):
             gen = client.tail_swo(freq_mhz=80.0)
@@ -396,7 +396,7 @@ class TestTailSwoCleanup:
         # Pretend the process exited on its own before cleanup.
         fake.poll = MagicMock(return_value=0)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
             return_value=fake,
         ):
             list(client.tail_swo(freq_mhz=80.0))
@@ -414,9 +414,9 @@ class TestTailSwoLogging:
 
         client = CubeProgrammer(ctx)
         fake = _make_fake_popen([])
-        with caplog.at_level(logging.INFO, logger="stm32_substrate.cubeprogrammer"):
+        with caplog.at_level(logging.INFO, logger="embedagents.stm32.cubeprogrammer"):
             with patch(
-                "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+                "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
                 return_value=fake,
             ):
                 list(client.tail_swo(freq_mhz=80.0, port_number=1))
@@ -434,7 +434,7 @@ class TestTailSwoFixtureIntegration:
         client = CubeProgrammer(ctx)
         fake = _make_fake_popen(lines)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
             return_value=fake,
         ):
             records = list(client.tail_swo(freq_mhz=80.0))
@@ -453,7 +453,7 @@ class TestTailSwoFixtureIntegration:
         client = CubeProgrammer(ctx)
         fake = _make_fake_popen(lines)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
             return_value=fake,
         ):
             records = list(client.tail_swo(freq_mhz=80.0))
@@ -471,9 +471,9 @@ class TestTailSwoFixtureIntegration:
         lines = _swv("dropped-bytes-marker.txt").splitlines(keepends=True)
         client = CubeProgrammer(ctx)
         fake = _make_fake_popen(lines)
-        with caplog.at_level(logging.WARNING, logger="stm32_substrate.cubeprogrammer"):
+        with caplog.at_level(logging.WARNING, logger="embedagents.stm32.cubeprogrammer"):
             with patch(
-                "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+                "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
                 return_value=fake,
             ):
                 records = list(client.tail_swo(freq_mhz=80.0))
@@ -492,7 +492,7 @@ class TestTailSwoFailure:
     def test_cli_error_exit_raises_instead_of_empty_stream(
         self, ctx: SubstrateContext
     ) -> None:
-        from stm32_substrate.errors import CubeProgrammerError
+        from embedagents.stm32.errors import CubeProgrammerError
 
         client = CubeProgrammer(ctx)
         fake = _make_fake_popen(
@@ -505,7 +505,7 @@ class TestTailSwoFailure:
         )
         fake.wait = MagicMock(return_value=1)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
             return_value=fake,
         ):
             with pytest.raises(CubeProgrammerError) as excinfo:
@@ -522,7 +522,7 @@ class TestTailSwoFailure:
         fake = _make_fake_popen(["[port 0] hello\n"])
         fake.wait = MagicMock(return_value=0)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
             return_value=fake,
         ):
             records = list(client.tail_swo(freq_mhz=80.0))
@@ -534,7 +534,7 @@ class TestTailSwoFailure:
         client = CubeProgrammer(ctx)
         fake = _make_fake_popen([])
         with patch(
-            "stm32_substrate.cubeprogrammer.client.subprocess.Popen",
+            "embedagents.stm32.cubeprogrammer.client.subprocess.Popen",
             return_value=fake,
         ) as popen:
             list(client.tail_swo(freq_mhz=80.0))

@@ -19,9 +19,9 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubemx import CubeMX, CubeMXResult
-from stm32_substrate.errors import ConfigurationError
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubemx import CubeMX, CubeMXResult
+from embedagents.stm32.errors import ConfigurationError
 
 
 # ---------------------------------------------------------------------------

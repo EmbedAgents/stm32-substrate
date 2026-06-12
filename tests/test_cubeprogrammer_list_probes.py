@@ -7,13 +7,13 @@ from unittest.mock import patch
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.codes import CubeProgrammerErrorCode
-from stm32_substrate.cubeprogrammer.parsers import parse_probe_list
-from stm32_substrate.cubeprogrammer.results import ProbeRecord
-from stm32_substrate.errors import CubeProgrammerError, ToolError
-from stm32_substrate.subprocess_runner import ToolRunResult
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.codes import CubeProgrammerErrorCode
+from embedagents.stm32.cubeprogrammer.parsers import parse_probe_list
+from embedagents.stm32.cubeprogrammer.results import ProbeRecord
+from embedagents.stm32.errors import CubeProgrammerError, ToolError
+from embedagents.stm32.subprocess_runner import ToolRunResult
 
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "cubeprogrammer" / "probe-lists"
@@ -126,7 +126,7 @@ class TestListProbesEmpty:
         result = _success_result(_load("empty.txt"))
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", return_value=result
+            "embedagents.stm32.cubeprogrammer.client.run_tool", return_value=result
         ):
             probes = client.list_probes()
         assert probes == []
@@ -135,7 +135,7 @@ class TestListProbesEmpty:
         result = _success_result(_load("empty.txt"))
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", return_value=result
+            "embedagents.stm32.cubeprogrammer.client.run_tool", return_value=result
         ) as mocked:
             client.list_probes()
         args = mocked.call_args[0][1]
@@ -149,7 +149,7 @@ class TestListProbesSingle:
         result = _success_result(_load("single-stlink-v3.txt"))
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", return_value=result
+            "embedagents.stm32.cubeprogrammer.client.run_tool", return_value=result
         ):
             probes = client.list_probes()
         assert len(probes) == 1
@@ -170,7 +170,7 @@ class TestListProbesErrors:
         )
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", return_value=result
+            "embedagents.stm32.cubeprogrammer.client.run_tool", return_value=result
         ):
             with pytest.raises(CubeProgrammerError) as excinfo:
                 client.list_probes()
@@ -189,7 +189,7 @@ class TestListProbesErrors:
         )
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", side_effect=runner_err
+            "embedagents.stm32.cubeprogrammer.client.run_tool", side_effect=runner_err
         ):
             with pytest.raises(CubeProgrammerError) as excinfo:
                 client.list_probes()
@@ -209,9 +209,9 @@ class TestListProbesLogging:
 
         result = _success_result(_load("two-stlinks.txt"))
         client = CubeProgrammer(ctx_with_cli)
-        with caplog.at_level(logging.INFO, logger="stm32_substrate.cubeprogrammer"):
+        with caplog.at_level(logging.INFO, logger="embedagents.stm32.cubeprogrammer"):
             with patch(
-                "stm32_substrate.cubeprogrammer.client.run_tool", return_value=result
+                "embedagents.stm32.cubeprogrammer.client.run_tool", return_value=result
             ):
                 client.list_probes()
         msgs = [r.message for r in caplog.records]

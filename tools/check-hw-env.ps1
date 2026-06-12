@@ -48,7 +48,7 @@ function Resolve-StInfo {
 
 function Parse-Boards-Cubeprog {
     param([string[]]$Lines)
-    # Block-scoped parser - mirrors src/stm32_substrate/cubeprogrammer/
+    # Block-scoped parser - mirrors src/embedagents/stm32/cubeprogrammer/
     # parsers.py:parse_probe_list. Open a new probe block on
     # "ST-Link Probe N :"; close it on the next "===== ... =====" section
     # heading. Only consider "Board" / "Board Name" lines INSIDE a probe

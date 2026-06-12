@@ -8,12 +8,12 @@ from unittest.mock import patch
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.codes import CubeProgrammerErrorCode
-from stm32_substrate.cubeprogrammer.results import FlashConfirmation
-from stm32_substrate.errors import CubeProgrammerError, ToolError
-from stm32_substrate.subprocess_runner import ToolRunResult
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.codes import CubeProgrammerErrorCode
+from embedagents.stm32.cubeprogrammer.results import FlashConfirmation
+from embedagents.stm32.errors import CubeProgrammerError, ToolError
+from embedagents.stm32.subprocess_runner import ToolRunResult
 
 
 ERRORS = Path(__file__).resolve().parent / "fixtures" / "cubeprogrammer" / "errors"
@@ -57,7 +57,7 @@ class TestFlashFile:
     def test_with_explicit_address(self, ctx: SubstrateContext, elf_file: Path) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             result = client.flash_file(elf_file, address="0x08000000")
@@ -79,7 +79,7 @@ class TestFlashFile:
         """For ELF / HEX the CLI infers the load address."""
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             result = client.flash_file(elf_file)
@@ -104,7 +104,7 @@ class TestFlashFile:
         )
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", side_effect=runner_err
+            "embedagents.stm32.cubeprogrammer.client.run_tool", side_effect=runner_err
         ):
             with pytest.raises(CubeProgrammerError) as excinfo:
                 client.flash_file(elf_file, address="0x08000000")
@@ -120,7 +120,7 @@ class TestFlashBin:
     def test_happy_path(self, ctx: SubstrateContext, bin_file: Path) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             result = client.flash_bin(bin_file, "0x08000000")
@@ -157,7 +157,7 @@ class TestFlashBin:
         upper.write_bytes(b"\x00" * 64)
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ):
             result = client.flash_bin(upper, "0x08000000")
@@ -179,7 +179,7 @@ class TestFlashData:
         blob.write_bytes(b"\x00" * 512)
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             result = client.flash_data(blob, "0x080F0000")
@@ -200,7 +200,7 @@ class TestFlashSigned:
     def test_sets_signed_true(self, ctx: SubstrateContext, bin_file: Path) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ):
             result = client.flash_signed(bin_file, address="0x70000000")
@@ -216,7 +216,7 @@ class TestFlashSigned:
         client = CubeProgrammer(ctx)
         # No connect() / banner check happens before flash_signed.
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             client.flash_signed(bin_file, address="0x70000000")
@@ -237,7 +237,7 @@ class TestFlashTimeoutScaling:
         big.write_bytes(b"\x00" * (2 * 1024 * 1024))  # 2 MB
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_success(),
         ) as mocked:
             client.flash_bin(big, "0x08000000")

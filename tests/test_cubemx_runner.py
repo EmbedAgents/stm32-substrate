@@ -15,9 +15,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubemx import ProgressEvent
-from stm32_substrate.cubemx.runner import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubemx import ProgressEvent
+from embedagents.stm32.cubemx.runner import (
     RunnerPolicy,
     policy_from_ctx,
     run_cubemx,
@@ -133,7 +133,7 @@ def _patch_tree_kill(
         fake.terminate()  # mark the fake exited, as the kill would
 
     monkeypatch.setattr(
-        "stm32_substrate.cubemx.runner.terminate_process_tree",
+        "embedagents.stm32.cubemx.runner.terminate_process_tree",
         fake_tree_kill,
     )
     return calls

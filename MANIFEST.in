@@ -1,8 +1,8 @@
 include LICENSE
 include README.md
 include CHANGELOG.md
-recursive-include src/stm32_substrate/schemas *.schema.json
-include src/stm32_substrate/py.typed
+recursive-include src/embedagents/stm32/schemas *.schema.json
+include src/embedagents/stm32/py.typed
 
 # sdist is package source + metadata only (SEC-08): no test tree, no
 # repo plumbing — the wheel was always clean; this aligns the sdist.

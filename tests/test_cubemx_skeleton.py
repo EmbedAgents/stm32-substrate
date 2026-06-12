@@ -8,15 +8,15 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubemx import CubeMX, CubeMXResult, ProgressEvent
-from stm32_substrate.cubemx.client import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubemx import CubeMX, CubeMXResult, ProgressEvent
+from embedagents.stm32.cubemx.client import (
     EXIT_COMMAND,
     _FORBIDDEN_SCRIPT_CHARS,
     _quote,
 )
-from stm32_substrate.cubemx.launcher import resolve_cubemx_launcher
-from stm32_substrate.errors import CubeMXError, CubeMXLauncherError
+from embedagents.stm32.cubemx.launcher import resolve_cubemx_launcher
+from embedagents.stm32.errors import CubeMXError, CubeMXLauncherError
 
 
 # ---------------------------------------------------------------------------
@@ -212,6 +212,6 @@ class TestCubeMXSkeleton:
     def test_construct(self, ctx_with_cubemx: SubstrateContext) -> None:
         client = CubeMX(ctx_with_cubemx)
         assert client.ctx is ctx_with_cubemx
-        assert client._log.name == "stm32_substrate.cubemx"
+        assert client._log.name == "embedagents.stm32.cubemx"
 
     # generate() implemented in C3c → tests in test_cubemx_generate.py.

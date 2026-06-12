@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import pytest
 
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.results import (
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.results import (
     BannerResult,
     BooleanResult,
     Confirmation,

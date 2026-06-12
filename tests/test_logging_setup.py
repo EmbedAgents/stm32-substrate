@@ -1,4 +1,4 @@
-"""Unit tests for ``stm32_substrate.logging_setup``."""
+"""Unit tests for ``embedagents.stm32.logging_setup``."""
 
 from __future__ import annotations
 
@@ -6,31 +6,31 @@ import logging
 
 import pytest
 
-from stm32_substrate.logging_setup import get_logger
+from embedagents.stm32.logging_setup import get_logger
 
 
 class TestNamespace:
     def test_default_returns_root(self) -> None:
         log = get_logger()
-        assert log.name == "stm32_substrate"
+        assert log.name == "embedagents.stm32"
 
     def test_short_name_gets_prefixed(self) -> None:
         log = get_logger("cubeprogrammer")
-        assert log.name == "stm32_substrate.cubeprogrammer"
+        assert log.name == "embedagents.stm32.cubeprogrammer"
 
     def test_already_namespaced_passes_through(self) -> None:
-        log = get_logger("stm32_substrate.debug.session")
-        assert log.name == "stm32_substrate.debug.session"
+        log = get_logger("embedagents.stm32.debug.session")
+        assert log.name == "embedagents.stm32.debug.session"
 
     def test_root_name_passes_through(self) -> None:
-        log = get_logger("stm32_substrate")
-        assert log.name == "stm32_substrate"
+        log = get_logger("embedagents.stm32")
+        assert log.name == "embedagents.stm32"
 
 
 class TestStructuredFields:
     def test_extra_attached_to_record(self, caplog: pytest.LogCaptureFixture) -> None:
         log = get_logger("cubeprogrammer")
-        with caplog.at_level(logging.INFO, logger="stm32_substrate.cubeprogrammer"):
+        with caplog.at_level(logging.INFO, logger="embedagents.stm32.cubeprogrammer"):
             log.info(
                 "flash done",
                 extra={"tool": "cubeprogrammer", "duration_s": 1.234, "marker": "ok"},

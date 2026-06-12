@@ -11,7 +11,7 @@
 // Cortex-M0+ (STM32U0). HW-validated 28/0. svd_for_attached resolves via
 // the board.mcu fallback (U0 banner is the family-only wildcard STM32U0xx).
 {
-  "$schema": "../../../../src/stm32_substrate/schemas/stm32-project.schema.json",
+  "$schema": "../../../../src/embedagents/stm32/schemas/stm32-project.schema.json",
   "version": 1,
   "project_name": "Tx_Thread_Creation",
   "board": {

@@ -1,6 +1,6 @@
 // stm32-project.jsonc — NUCLEO-L476RG RTC IOC fixture descriptor.
 //
-// Validated against src/stm32_substrate/schemas/stm32-project.schema.json
+// Validated against src/embedagents/stm32/schemas/stm32-project.schema.json
 // at SubstrateContext.from_environment() load time (M-016).
 //
 // Single-IOC fixture used by:
@@ -11,7 +11,7 @@
 // autodiscover the IOC from cwd per the recipe-flow autodiscovery
 // rule documented in .claude/commands/stm32project.md.
 {
-  "$schema": "../../../../src/stm32_substrate/schemas/stm32-project.schema.json",
+  "$schema": "../../../../src/embedagents/stm32/schemas/stm32-project.schema.json",
   "version": 1,
   "project_name": "nucleo-l476rg-rtc",
   "board": {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test-release-linux.sh — validate a published stm32-substrate release on Linux,
+# test-release-linux.sh — validate a published embedagents-stm32 release on Linux,
 # no hardware. Bash mirror of tools/test-release-windows.ps1.
 #
 #   Tier 1 — published install (as a brand-new user would experience it):
@@ -103,7 +103,7 @@ else
             fi
             cat >"$WORKDIR/schema_check.py" <<'PY'
 import json, importlib.resources as r
-p = r.files("stm32_substrate.schemas").joinpath("stm32-project.schema.json")
+p = r.files("embedagents.stm32.schemas").joinpath("stm32-project.schema.json")
 d = json.loads(p.read_text(encoding="utf-8"))
 assert str(d.get("$id", "")).endswith("stm32-project.schema.json"), "unexpected $id"
 print("SCHEMA_OK")
@@ -176,7 +176,7 @@ These need a human / hardware and aren't covered above:
 
   Plugin registration (interactive):
     claude plugin marketplace add EmbedAgents/stm32-substrate
-    claude plugin install stm32-substrate@stm32
+    claude plugin install embedagents-stm32@embedagents
     # restart Claude Code, type '/', confirm /stm32prog /stm32build /stm32debug
     # /stm32project /stm32agent all appear.
 

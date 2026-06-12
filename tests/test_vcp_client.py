@@ -14,16 +14,16 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer.results import ProbeRecord
-from stm32_substrate.errors import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer.results import ProbeRecord
+from embedagents.stm32.errors import (
     VCPAmbiguousProbe,
     VCPNotEnumerated,
     VCPReaderAlreadyActive,
 )
-from stm32_substrate.vcp import VCP
-from stm32_substrate.vcp.reader import _VcpReader
-from stm32_substrate.vcp.results import VCPPortCandidate
+from embedagents.stm32.vcp import VCP
+from embedagents.stm32.vcp.reader import _VcpReader
+from embedagents.stm32.vcp.results import VCPPortCandidate
 
 
 # ---------------------------------------------------------------------------
@@ -102,7 +102,7 @@ def ctx(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SubstrateContext:
 
 
 def _patch_discover(monkeypatch: pytest.MonkeyPatch, candidates: list) -> None:
-    import stm32_substrate.vcp.client as client_mod
+    import embedagents.stm32.vcp.client as client_mod
 
     def _fake(*, probe_sn=None):
         if probe_sn is None:
@@ -416,7 +416,7 @@ class TestReconnectFreshProcess:
         port_path: str,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        import stm32_substrate.vcp.client as client_mod
+        import embedagents.stm32.vcp.client as client_mod
 
         cand = VCPPortCandidate(
             port=port_path, vid=0x0483, pid=0x374B, serial_number="ABC"
@@ -441,7 +441,7 @@ class TestReconnectFreshProcess:
         ctx: SubstrateContext,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        from stm32_substrate.errors import VCPError
+        from embedagents.stm32.errors import VCPError
 
         _patch_discover(monkeypatch, [])
         vcp = VCP(ctx)

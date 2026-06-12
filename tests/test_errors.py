@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.errors import (
+from embedagents.stm32.errors import (
     ConfigurationError,
     CubeIDEError,
     CubeMXError,

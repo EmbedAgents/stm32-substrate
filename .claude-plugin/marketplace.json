@@ -1,5 +1,5 @@
 {
-  "name": "stm32",
+  "name": "embedagents",
   "description": "STM32 development by talking to Claude — wraps ST's vendor tools (CubeMX, CubeIDE, CubeProgrammer, ST-LINK gdbserver, Signing Tool) plus a USB serial reader, as five slash commands and the `stm32` CLI they drive.",
   "owner": {
     "name": "EmbedAgents",
@@ -7,7 +7,7 @@
   },
   "plugins": [
     {
-      "name": "stm32-substrate",
+      "name": "embedagents-stm32",
       "source": "./",
       "description": "STM32 development by talking to Claude — wraps ST's vendor tools (CubeMX, CubeIDE, CubeProgrammer, ST-LINK gdbserver, Signing Tool) plus a USB serial reader, as five slash commands and the `stm32` CLI they drive.",
       "license": "MIT"

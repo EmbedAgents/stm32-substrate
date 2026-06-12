@@ -7,16 +7,16 @@ from unittest.mock import patch
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.codes import CubeProgrammerErrorCode
-from stm32_substrate.cubeprogrammer.parsers import parse_error
-from stm32_substrate.errors import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.codes import CubeProgrammerErrorCode
+from embedagents.stm32.cubeprogrammer.parsers import parse_error
+from embedagents.stm32.errors import (
     ConfigurationError,
     CubeProgrammerError,
     ToolError,
 )
-from stm32_substrate.subprocess_runner import ToolRunResult
+from embedagents.stm32.subprocess_runner import ToolRunResult
 
 
 FIXTURE_BANNERS = Path(__file__).resolve().parent / "fixtures" / "cubeprogrammer" / "banners"
@@ -118,7 +118,7 @@ class TestConnectHappyPath:
         )
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", return_value=result
+            "embedagents.stm32.cubeprogrammer.client.run_tool", return_value=result
         ) as mocked:
             banner = client.connect()
         assert banner.board_name == "NUCLEO-L476RG"
@@ -137,7 +137,7 @@ class TestConnectHappyPath:
         )
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", return_value=result
+            "embedagents.stm32.cubeprogrammer.client.run_tool", return_value=result
         ) as mocked:
             client.connect()
         # Inspect call args.
@@ -157,7 +157,7 @@ class TestConnectHappyPath:
         )
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", return_value=result
+            "embedagents.stm32.cubeprogrammer.client.run_tool", return_value=result
         ) as mocked:
             client.connect(freq_khz=1800)
         _, args = mocked.call_args[0][0], mocked.call_args[0][1]
@@ -182,7 +182,7 @@ class TestConnectHappyPath:
             timed_out=False,
         )
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", return_value=result
+            "embedagents.stm32.cubeprogrammer.client.run_tool", return_value=result
         ) as mocked:
             client.connect()
         args = mocked.call_args[0][1]
@@ -200,7 +200,7 @@ class TestConnectErrorPaths:
         )
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", side_effect=runner_err
+            "embedagents.stm32.cubeprogrammer.client.run_tool", side_effect=runner_err
         ):
             with pytest.raises(CubeProgrammerError) as excinfo:
                 client.connect()
@@ -218,7 +218,7 @@ class TestConnectErrorPaths:
         )
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", side_effect=runner_err
+            "embedagents.stm32.cubeprogrammer.client.run_tool", side_effect=runner_err
         ):
             with pytest.raises(CubeProgrammerError) as excinfo:
                 client.connect()
@@ -236,7 +236,7 @@ class TestConnectErrorPaths:
         )
         client = CubeProgrammer(ctx_with_cli)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", side_effect=runner_err
+            "embedagents.stm32.cubeprogrammer.client.run_tool", side_effect=runner_err
         ):
             with pytest.raises(CubeProgrammerError) as excinfo:
                 client.connect()
@@ -274,9 +274,9 @@ class TestConnectLogging:
             timed_out=False,
         )
         client = CubeProgrammer(ctx_with_cli)
-        with caplog.at_level(logging.INFO, logger="stm32_substrate.cubeprogrammer"):
+        with caplog.at_level(logging.INFO, logger="embedagents.stm32.cubeprogrammer"):
             with patch(
-                "stm32_substrate.cubeprogrammer.client.run_tool", return_value=result
+                "embedagents.stm32.cubeprogrammer.client.run_tool", return_value=result
             ):
                 client.connect()
         msgs = [r.message for r in caplog.records]
@@ -295,9 +295,9 @@ class TestConnectLogging:
             timed_out=False,
         )
         client = CubeProgrammer(ctx_with_cli)
-        with caplog.at_level(logging.WARNING, logger="stm32_substrate.cubeprogrammer"):
+        with caplog.at_level(logging.WARNING, logger="embedagents.stm32.cubeprogrammer"):
             with patch(
-                "stm32_substrate.cubeprogrammer.client.run_tool", return_value=result
+                "embedagents.stm32.cubeprogrammer.client.run_tool", return_value=result
             ):
                 client.connect()
         warnings = [r for r in caplog.records if r.levelname == "WARNING"]
@@ -330,7 +330,7 @@ class TestRuntimeDefaultsHonored:
             timed_out=False,
         )
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool", return_value=result
+            "embedagents.stm32.cubeprogrammer.client.run_tool", return_value=result
         ) as mocked:
             client.connect()
         assert mocked.call_args[1]["timeout_s"] == 90.0

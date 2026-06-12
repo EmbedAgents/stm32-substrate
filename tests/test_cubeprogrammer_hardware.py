@@ -25,9 +25,9 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.cubeide import CubeIDE
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.results import (
+from embedagents.stm32.cubeide import CubeIDE
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.results import (
     BannerResult,
     BooleanResult,
     Confirmation,
@@ -41,7 +41,7 @@ from stm32_substrate.cubeprogrammer.results import (
     ProbeRecord,
     ResetConfirmation,
 )
-from stm32_substrate.errors import CubeProgrammerError
+from embedagents.stm32.errors import CubeProgrammerError
 
 
 # ---------------------------------------------------------------------------
@@ -222,7 +222,7 @@ class TestMemoryReads:
         currently distinguishable from a legitimate all-zero read.
         TODO(v1+): expand the heuristic to also flag all-0x00 reads
         from regions outside the known flash/RAM map."""
-        from stm32_substrate.errors import CubeProgrammerError
+        from embedagents.stm32.errors import CubeProgrammerError
 
         client = CubeProgrammer(l476rg_ctx)
         try:

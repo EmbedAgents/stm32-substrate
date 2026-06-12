@@ -12,7 +12,7 @@
 //
 // Cortex-M0+ (STM32G0). HW-validated 27/1-skip (DBGMCU absent from SVD).
 {
-  "$schema": "../../../../src/stm32_substrate/schemas/stm32-project.schema.json",
+  "$schema": "../../../../src/embedagents/stm32/schemas/stm32-project.schema.json",
   "version": 1,
   "project_name": "FreeRTOS_Mail",
   "board": {

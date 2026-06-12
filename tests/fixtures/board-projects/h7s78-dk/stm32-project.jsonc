@@ -25,7 +25,7 @@
 // [V3J17M10], not a wedged probe [power-cycled], not reset-mode [-g/-k
 // both fail]). HW-blocked, deferred — see [[project_h7s78_dk_gdbserver_blocked]].
 {
-  "$schema": "../../../../src/stm32_substrate/schemas/stm32-project.schema.json",
+  "$schema": "../../../../src/embedagents/stm32/schemas/stm32-project.schema.json",
   "version": 1,
   "project_name": "MSC_Standalone_Boot",
   "board": {

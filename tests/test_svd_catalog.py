@@ -35,12 +35,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from stm32_substrate.debug.svd import _FAMILY_CORE, _core_for_device
-from stm32_substrate.errors import SVDLookupError
+from embedagents.stm32.debug.svd import _FAMILY_CORE, _core_for_device
+from embedagents.stm32.errors import SVDLookupError
 
 if TYPE_CHECKING:
-    from stm32_substrate.context import SubstrateContext
-    from stm32_substrate.debug.svd import SvdDb
+    from embedagents.stm32.context import SubstrateContext
+    from embedagents.stm32.debug.svd import SvdDb
 
 
 @pytest.fixture(scope="module")

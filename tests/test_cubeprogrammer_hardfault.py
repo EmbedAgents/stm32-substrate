@@ -7,11 +7,11 @@ from unittest.mock import patch
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.parsers import parse_hardfault
-from stm32_substrate.cubeprogrammer.results import HardFaultDecode
-from stm32_substrate.subprocess_runner import ToolRunResult
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.parsers import parse_hardfault
+from embedagents.stm32.cubeprogrammer.results import HardFaultDecode
+from embedagents.stm32.subprocess_runner import ToolRunResult
 
 
 HF = Path(__file__).resolve().parent / "fixtures" / "cubeprogrammer" / "hardfaults"
@@ -247,7 +247,7 @@ class TestAnalyzeHardfaultIntegration:
     def test_argv_uses_dash_hf(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_ok(_hf("no-fault.txt")),
         ) as mocked:
             result = client.analyze_hardfault()
@@ -261,7 +261,7 @@ class TestAnalyzeHardfaultIntegration:
     def test_uses_atomic_timeout(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_ok(_hf("no-fault.txt")),
         ) as mocked:
             client.analyze_hardfault()
@@ -271,7 +271,7 @@ class TestAnalyzeHardfaultIntegration:
         """No-fault is a valid result, not an exception."""
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_ok(_hf("no-fault.txt")),
         ):
             result = client.analyze_hardfault()
@@ -281,7 +281,7 @@ class TestAnalyzeHardfaultIntegration:
     def test_detected_fault_returns_decode(self, ctx: SubstrateContext) -> None:
         client = CubeProgrammer(ctx)
         with patch(
-            "stm32_substrate.cubeprogrammer.client.run_tool",
+            "embedagents.stm32.cubeprogrammer.client.run_tool",
             return_value=_ok(_hf("usagefault-undefinstr.txt")),
         ):
             result = client.analyze_hardfault()
@@ -298,9 +298,9 @@ class TestAnalyzeHardfaultIntegration:
         import logging
 
         client = CubeProgrammer(ctx)
-        with caplog.at_level(logging.WARNING, logger="stm32_substrate.cubeprogrammer"):
+        with caplog.at_level(logging.WARNING, logger="embedagents.stm32.cubeprogrammer"):
             with patch(
-                "stm32_substrate.cubeprogrammer.client.run_tool",
+                "embedagents.stm32.cubeprogrammer.client.run_tool",
                 return_value=_ok(_hf("memmanage-mpu-violation.txt")),
             ):
                 client.analyze_hardfault()
@@ -317,9 +317,9 @@ class TestAnalyzeHardfaultIntegration:
         import logging
 
         client = CubeProgrammer(ctx)
-        with caplog.at_level(logging.INFO, logger="stm32_substrate.cubeprogrammer"):
+        with caplog.at_level(logging.INFO, logger="embedagents.stm32.cubeprogrammer"):
             with patch(
-                "stm32_substrate.cubeprogrammer.client.run_tool",
+                "embedagents.stm32.cubeprogrammer.client.run_tool",
                 return_value=_ok(_hf("no-fault.txt")),
             ):
                 client.analyze_hardfault()

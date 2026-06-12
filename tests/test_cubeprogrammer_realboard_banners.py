@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.cubeprogrammer.parsers import parse_banner
+from embedagents.stm32.cubeprogrammer.parsers import parse_banner
 
 REALBOARDS = (
     Path(__file__).resolve().parent

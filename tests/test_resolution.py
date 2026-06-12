@@ -10,9 +10,9 @@ from pathlib import Path
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.errors import ConfigurationError
-from stm32_substrate.resolution import coerce_path, resolve_file
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.errors import ConfigurationError
+from embedagents.stm32.resolution import coerce_path, resolve_file
 
 
 @pytest.fixture()
@@ -120,7 +120,7 @@ class TestStrToleranceAcrossModules:
     def test_debug_resolve_elf_accepts_str(
         self, ctx: SubstrateContext, tmp_path: Path
     ) -> None:
-        from stm32_substrate.debug.client import Debug
+        from embedagents.stm32.debug.client import Debug
 
         elf = tmp_path / "demo.elf"
         elf.write_bytes(b"")
@@ -130,14 +130,14 @@ class TestStrToleranceAcrossModules:
     def test_cubemx_resolve_ioc_accepts_str(
         self, ctx: SubstrateContext, tmp_path: Path
     ) -> None:
-        from stm32_substrate.cubemx.client import CubeMX
+        from embedagents.stm32.cubemx.client import CubeMX
 
         ioc = tmp_path / "demo.ioc"
         ioc.write_text("")
         assert CubeMX(ctx)._resolve_ioc_path(str(ioc)) == ioc.resolve()
 
     def test_flash_bin_accepts_str(self, ctx: SubstrateContext) -> None:
-        from stm32_substrate.cubeprogrammer import CubeProgrammer
+        from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
         # Reaching the .bin extension check (not AttributeError) proves
         # the string was coerced before any Path-attribute access.
@@ -147,7 +147,7 @@ class TestStrToleranceAcrossModules:
     def test_cubeide_explicit_project_accepts_str(
         self, ctx: SubstrateContext, tmp_path: Path
     ) -> None:
-        from stm32_substrate.cubeide import CubeIDE
+        from embedagents.stm32.cubeide import CubeIDE
 
         # Nonexistent str path → the resolver's loud ConfigurationError,
         # not an AttributeError off the string.
@@ -155,8 +155,8 @@ class TestStrToleranceAcrossModules:
             CubeIDE(ctx)._resolve_explicit_project(str(tmp_path / "nope"))
 
     def test_signing_accepts_str(self, ctx: SubstrateContext, tmp_path: Path) -> None:
-        from stm32_substrate.errors import SigningToolError
-        from stm32_substrate.signing.client import SigningTool
+        from embedagents.stm32.errors import SigningToolError
+        from embedagents.stm32.signing.client import SigningTool
 
         # Missing-file str input → the typed input-file-not-found error,
         # not an AttributeError.

@@ -415,7 +415,7 @@ Substrate-side state captures for lifecycle tests.
 
 Fixtures covering the file-based CLI session registry at `<workspace>/.stm32-substrate/sessions/active.jsonc` introduced by ADR-002 §"CLI session continuity". Each fixture is a workspace-shaped directory containing a registry file in a specific state, plus an `expected.json` describing the expected post-read result.
 
-All registry-touching test code routes through `stm32_substrate.platform.process_alive` / `terminate_process` / `acquire_exclusive_lock` (per ADR-005); tests inject fakes/mocks at the platform layer rather than calling `os.kill` directly. This keeps the fixture catalogue OS-agnostic.
+All registry-touching test code routes through `embedagents.stm32.platform.process_alive` / `terminate_process` / `acquire_exclusive_lock` (per ADR-005); tests inject fakes/mocks at the platform layer rather than calling `os.kill` directly. This keeps the fixture catalogue OS-agnostic.
 
 ### F-SREG-CLEAN — Empty registry
 

@@ -15,14 +15,14 @@ from unittest.mock import patch
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeide import BuildResult, CubeIDE
-from stm32_substrate.errors import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeide import BuildResult, CubeIDE
+from embedagents.stm32.errors import (
     CProjectEditError,
     CubeIDEError,
     WorkspaceLockedError,
 )
-from stm32_substrate.subprocess_runner import ToolRunResult
+from embedagents.stm32.subprocess_runner import ToolRunResult
 
 
 # ---------------------------------------------------------------------------
@@ -207,7 +207,7 @@ class TestKwargValidation:
     def test_no_project_no_descriptor_raises(self, ctx: SubstrateContext) -> None:
         client = CubeIDE(ctx)
         # No project= kwarg AND no stm32-project.jsonc → ConfigurationError.
-        from stm32_substrate.errors import ConfigurationError
+        from embedagents.stm32.errors import ConfigurationError
 
         with pytest.raises(ConfigurationError):
             client.build()
@@ -247,7 +247,7 @@ class TestKwargValidation:
         # (contains ".value.") bypasses the alias table verbatim.
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             result = client.build(
@@ -275,7 +275,7 @@ class TestHappyBuild:
     ) -> None:
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             result = client.build(project=project_dir)
@@ -298,7 +298,7 @@ class TestHappyBuild:
     ) -> None:
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ) as mocked:
             client.build(project=project_dir, clean=True)
@@ -311,7 +311,7 @@ class TestHappyBuild:
     ) -> None:
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ) as mocked:
             client.build(project=project_dir, configuration="Release")
@@ -330,7 +330,7 @@ class TestHappyBuild:
         H747I-DISCO FPU_Fractal CM7."""
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ) as mocked:
             client.build(project=project_dir)
@@ -400,9 +400,9 @@ class TestExplicitPathResolution:
 
         root = _make_repo_root(tmp_path)
         client = CubeIDE(_ctx_for(root, tmp_path, monkeypatch))
-        caplog.set_level(logging.INFO, logger="stm32_substrate")
+        caplog.set_level(logging.INFO, logger="embedagents.stm32")
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ) as mocked:
             result = client.build(project=root)
@@ -415,7 +415,7 @@ class TestExplicitPathResolution:
     def test_no_descriptor_raises_with_hint(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from stm32_substrate.errors import ConfigurationError
+        from embedagents.stm32.errors import ConfigurationError
 
         root = _make_repo_root(tmp_path, descriptor=False)
         client = CubeIDE(_ctx_for(root, tmp_path, monkeypatch))
@@ -427,7 +427,7 @@ class TestExplicitPathResolution:
     ) -> None:
         """Descriptor resolves to a project that is NOT under the explicit
         path → no silent redirect; raise, hint names the descriptor path."""
-        from stm32_substrate.errors import ConfigurationError
+        from embedagents.stm32.errors import ConfigurationError
 
         root = _make_repo_root(tmp_path)
         unrelated = tmp_path / "unrelated"
@@ -440,7 +440,7 @@ class TestExplicitPathResolution:
     def test_nonexistent_path_raises(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from stm32_substrate.errors import ConfigurationError
+        from embedagents.stm32.errors import ConfigurationError
 
         root = _make_repo_root(tmp_path)
         client = CubeIDE(_ctx_for(root, tmp_path, monkeypatch))
@@ -453,7 +453,7 @@ class TestExplicitPathResolution:
         """Descriptor nests under the explicit path but its target has no
         .project either → raise (the descriptor itself is wrong); never
         hand Eclipse an unimportable directory."""
-        from stm32_substrate.errors import ConfigurationError
+        from embedagents.stm32.errors import ConfigurationError
 
         root = _make_repo_root(tmp_path, project_files=False)
         client = CubeIDE(_ctx_for(root, tmp_path, monkeypatch))
@@ -467,7 +467,7 @@ class TestExplicitPathResolution:
         descriptor never overrides a valid explicit path."""
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             result = client.build(project=project_dir)
@@ -485,7 +485,7 @@ class TestBuildFailure:
     ) -> None:
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_failure(),
         ):
             result = client.build(project=project_dir)
@@ -501,7 +501,7 @@ class TestBuildFailure:
         client = CubeIDE(ctx)
         original_xml = (project_dir / ".cproject").read_bytes()
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_failure(),
         ):
             result = client.build(project=project_dir, debug_level="-g1")
@@ -525,7 +525,7 @@ class TestSettingsEdits:
     ) -> None:
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             result = client.build(project=project_dir, debug_level="-g3")
@@ -549,7 +549,7 @@ class TestSettingsEdits:
     ) -> None:
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             client.build(
@@ -570,7 +570,7 @@ class TestSettingsEdits:
     ) -> None:
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             client.build(
@@ -595,7 +595,7 @@ class TestSettingsEdits:
         (-l<name>); a non-prefixed ``.a`` becomes ``:<file>`` (-l:<file>)."""
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             client.build(
@@ -628,7 +628,7 @@ class TestSettingsEdits:
         src.write_text("int helper(void){return 1;}\n", encoding="utf-8")
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             client.build(project=project_dir, add_sources=[src])
@@ -641,7 +641,7 @@ class TestSettingsEdits:
     ) -> None:
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             client.build(
@@ -672,7 +672,7 @@ class TestPreset:
     ) -> None:
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             result = client.build(project=project_dir, preset="size")
@@ -689,9 +689,9 @@ class TestPreset:
         import logging
 
         client = CubeIDE(ctx)
-        with caplog.at_level(logging.WARNING, logger="stm32_substrate.cubeide"):
+        with caplog.at_level(logging.WARNING, logger="embedagents.stm32.cubeide"):
             with patch(
-                "stm32_substrate.cubeide.headless.run_tool",
+                "embedagents.stm32.cubeide.headless.run_tool",
                 return_value=_build_run_tool_success(),
             ):
                 client.build(project=project_dir, preset="fast")
@@ -727,7 +727,7 @@ class TestPreset:
         ctx2 = SubstrateContext.from_environment(project_path=tmp_path)
         client = CubeIDE(ctx2)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             client.build(project=proj, preset="fast")
@@ -774,7 +774,7 @@ class TestProtocolFailureRollback:
         # build() doesn't expose this directly, we test via the
         # CProjectEditor public surface in test_cubeide_cproject.py.
         # Here we verify build() forwards the error if it bubbles:
-        from stm32_substrate.cubeide import cproject as cproject_module
+        from embedagents.stm32.cubeide import cproject as cproject_module
 
         def boom_snapshot(self):  # noqa: ARG001
             raise CProjectEditError(
@@ -787,7 +787,7 @@ class TestProtocolFailureRollback:
             cproject_module.CProjectEditor, "snapshot", boom_snapshot
         ):
             with patch(
-                "stm32_substrate.cubeide.headless.run_tool",
+                "embedagents.stm32.cubeide.headless.run_tool",
                 return_value=_build_run_tool_success(),
             ):
                 with pytest.raises(CProjectEditError):
@@ -809,11 +809,11 @@ class TestWorkspaceLock:
         # Patch detect_workspace_lock to return True (GUI holds lock).
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.client.workspace.detect_workspace_lock",
+            "embedagents.stm32.cubeide.client.workspace.detect_workspace_lock",
             return_value=True,
         ):
             with patch(
-                "stm32_substrate.cubeide.headless.run_tool",
+                "embedagents.stm32.cubeide.headless.run_tool",
                 return_value=_build_run_tool_success(),
             ) as mocked:
                 with pytest.raises(WorkspaceLockedError) as excinfo:
@@ -844,7 +844,7 @@ class TestArtifactDetection:
 
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             result = client.build(project=project_dir)
@@ -856,7 +856,7 @@ class TestArtifactDetection:
     ) -> None:
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             result = client.build(project=project_dir)
@@ -875,7 +875,7 @@ class TestNothingToBuild:
     ) -> None:
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_nothing_built(),
         ):
             result = client.build(project=project_dir)
@@ -894,7 +894,7 @@ class TestNothingToBuild:
         (debug_dir / "demo.elf").write_bytes(b"\x7fELF")
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_nothing_built(),
         ):
             result = client.build(project=project_dir)
@@ -917,7 +917,7 @@ class TestResolveHeadlessBuild:
 
     @pytest.mark.skipif(sys.platform == "win32", reason="Linux-only filename")
     def test_resolves_sh_on_linux(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from stm32_substrate.cubeide.headless import resolve_headless_build
+        from embedagents.stm32.cubeide.headless import resolve_headless_build
 
         cubeide_bin = tmp_path / "stm32cubeide"
         cubeide_bin.write_text("#!/bin/sh\nexit 0\n")
@@ -932,7 +932,7 @@ class TestResolveHeadlessBuild:
 
     @pytest.mark.skipif(sys.platform != "win32", reason="Windows-only filename")
     def test_resolves_bat_on_windows(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from stm32_substrate.cubeide.headless import resolve_headless_build
+        from embedagents.stm32.cubeide.headless import resolve_headless_build
 
         cubeide_bin = tmp_path / "stm32cubeide.exe"
         cubeide_bin.write_bytes(b"")
@@ -949,7 +949,7 @@ class TestResolveHeadlessBuild:
     ) -> None:
         """On Windows, the error message + hint name headless-build.bat
         (not headless-build.sh) so the user knows what to set."""
-        from stm32_substrate.cubeide.headless import resolve_headless_build
+        from embedagents.stm32.cubeide.headless import resolve_headless_build
 
         cubeide_bin = tmp_path / "stm32cubeide.exe"
         cubeide_bin.write_bytes(b"")
@@ -974,7 +974,7 @@ class TestResolveHeadlessBuild:
         ``resolve_headless_build`` is reachable today only via programmatic
         injection — this test confirms it works when the field is set.
         """
-        from stm32_substrate.cubeide.headless import resolve_headless_build
+        from embedagents.stm32.cubeide.headless import resolve_headless_build
 
         override = tmp_path / "my-headless.whatever"
         override.write_text("dummy\n")
@@ -1002,7 +1002,7 @@ class TestWorkspaceMutationOrdering:
         the lock."""
         import contextlib as _ctxlib
 
-        from stm32_substrate.cubeide import workspace as ws_mod
+        from embedagents.stm32.cubeide import workspace as ws_mod
 
         events: list[str] = []
         real_lock = ws_mod.acquire_workspace_lock
@@ -1030,7 +1030,7 @@ class TestWorkspaceMutationOrdering:
 
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             result = client.build(project=project_dir)
@@ -1073,7 +1073,7 @@ class TestAlreadyExistsRetry:
 
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool", side_effect=record
+            "embedagents.stm32.cubeide.headless.run_tool", side_effect=record
         ):
             result = client.build(project=project_dir)
         assert result.success is True
@@ -1094,7 +1094,7 @@ class TestAlreadyExistsRetry:
 
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool", side_effect=record
+            "embedagents.stm32.cubeide.headless.run_tool", side_effect=record
         ):
             result = client.build(project=project_dir)
         assert result.success is False
@@ -1111,7 +1111,7 @@ class TestAlreadyExistsRetry:
 
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool", side_effect=record
+            "embedagents.stm32.cubeide.headless.run_tool", side_effect=record
         ):
             result = client.build(project=project_dir)
         assert result.success is False
@@ -1137,7 +1137,7 @@ class TestAddSourcesExistingGate:
         (project_dir / "helper.c").write_text("ORIGINAL\n", encoding="utf-8")
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             with pytest.raises(CProjectEditError, match="already exists"):
@@ -1152,7 +1152,7 @@ class TestAddSourcesExistingGate:
         (project_dir / "helper.c").write_text("ORIGINAL\n", encoding="utf-8")
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             client.build(
@@ -1171,7 +1171,7 @@ class TestAddSourcesExistingGate:
         (project_dir / "helper.c").write_text("ORIGINAL\n", encoding="utf-8")
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             result = client.build(
@@ -1189,7 +1189,7 @@ class TestAddSourcesExistingGate:
         (project_dir / "helper.c").write_text("ORIGINAL\n", encoding="utf-8")
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             client.build(
@@ -1206,7 +1206,7 @@ class TestAddSourcesExistingGate:
         # IMP-09: was a raw FileNotFoundError straight through build().
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             with pytest.raises(CProjectEditError, match="copy failed"):
@@ -1220,7 +1220,7 @@ class TestAddSymbolsConflictGate:
     def _build(self, ctx: SubstrateContext, project_dir: Path, **kwargs):
         client = CubeIDE(ctx)
         with patch(
-            "stm32_substrate.cubeide.headless.run_tool",
+            "embedagents.stm32.cubeide.headless.run_tool",
             return_value=_build_run_tool_success(),
         ):
             return client.build(project=project_dir, **kwargs)

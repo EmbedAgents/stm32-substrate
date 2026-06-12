@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 if TYPE_CHECKING:
-    from stm32_substrate.context import SubstrateContext
+    from embedagents.stm32.context import SubstrateContext
 
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -36,7 +36,7 @@ _L476RG_PROJECT_PATH = _REPO_ROOT / "tests" / "fixtures" / "projects" / "F-PROJ-
 def probe_lock() -> object:
     """Session-scoped exclusive lock on the singleton ST-LINK probe.
 
-    Implemented via ``stm32_substrate.platform.acquire_exclusive_lock`` —
+    Implemented via ``embedagents.stm32.platform.acquire_exclusive_lock`` —
     cross-platform per ADR-007 (fcntl on Linux, msvcrt on Windows). Raises
     ``BlockingIOError`` immediately when another pytest session is already
     holding the probe (no long waits per HIL M-019). Two concurrent
@@ -45,7 +45,7 @@ def probe_lock() -> object:
 
     Released when the test session ends.
     """
-    from stm32_substrate.platform import acquire_exclusive_lock
+    from embedagents.stm32.platform import acquire_exclusive_lock
 
     cm = acquire_exclusive_lock(_PROBE_LOCK_PATH)
     cm.__enter__()
@@ -67,8 +67,8 @@ def hardware_ctx(probe_lock: object) -> "SubstrateContext":
     session-scoped ``probe_lock`` so a concurrent pytest run can't snipe
     the probe mid-test.
     """
-    from stm32_substrate.context import SubstrateContext
-    from stm32_substrate.errors import ConfigurationError
+    from embedagents.stm32.context import SubstrateContext
+    from embedagents.stm32.errors import ConfigurationError
 
     try:
         return SubstrateContext.from_environment(project_path=_L476RG_PROJECT_PATH)
@@ -101,7 +101,7 @@ def attached_boards(hardware_ctx: "SubstrateContext") -> frozenset[str]:
         boards = {b.strip() for b in override.split(",") if b.strip()}
         return frozenset(boards)
 
-    from stm32_substrate.cubeprogrammer import CubeProgrammer
+    from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
     try:
         client = CubeProgrammer(hardware_ctx)
@@ -128,7 +128,7 @@ def l476rg_ctx(
             f"NUCLEO-L476RG not attached (detected: {sorted(attached_boards) or 'none'})"
         )
 
-    from stm32_substrate.cubeprogrammer import CubeProgrammer
+    from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
     client = CubeProgrammer(hardware_ctx)
     probes = client.list_probes()
@@ -154,8 +154,8 @@ def smoke_ctx() -> "SubstrateContext":
     (e.g. unsupported platform); per-test skips handle missing
     individual tools.
     """
-    from stm32_substrate.context import SubstrateContext
-    from stm32_substrate.errors import ConfigurationError
+    from embedagents.stm32.context import SubstrateContext
+    from embedagents.stm32.errors import ConfigurationError
 
     try:
         return SubstrateContext.from_environment()
@@ -190,8 +190,8 @@ def f401re_ctx(
     """
     import os
 
-    from stm32_substrate.cubeprogrammer import CubeProgrammer
-    from stm32_substrate.errors import CubeProgrammerError
+    from embedagents.stm32.cubeprogrammer import CubeProgrammer
+    from embedagents.stm32.errors import CubeProgrammerError
 
     client = CubeProgrammer(hardware_ctx)
     try:
@@ -269,7 +269,7 @@ def h7s78_dk_ctx(
             f"STM32H7S78-DK not attached (detected: {sorted(attached_boards) or 'none'})"
         )
 
-    from stm32_substrate.cubeprogrammer import CubeProgrammer
+    from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
     client = CubeProgrammer(hardware_ctx)
     probes = client.list_probes()
@@ -309,7 +309,7 @@ def h747i_disco_ctx(
             f"DISCO-H747XI not attached (detected: {sorted(attached_boards) or 'none'})"
         )
 
-    from stm32_substrate.cubeprogrammer import CubeProgrammer
+    from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
     client = CubeProgrammer(hardware_ctx)
     probes = client.list_probes()
@@ -347,7 +347,7 @@ def n6dk_ctx(
             f"STM32N6570-DK not attached (detected: {sorted(attached_boards) or 'none'})"
         )
 
-    from stm32_substrate.cubeprogrammer import CubeProgrammer
+    from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
     client = CubeProgrammer(hardware_ctx)
     probes = client.list_probes()
@@ -426,8 +426,8 @@ def faulting_firmware_flashed(l476rg_ctx, blinky_elf: Path):
     BLINKY's source is never touched.
 
     Yields the flashed FAULTING.elf path."""
-    from stm32_substrate.cubeide import CubeIDE
-    from stm32_substrate.cubeprogrammer import CubeProgrammer
+    from embedagents.stm32.cubeide import CubeIDE
+    from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
     proj_root = (l476rg_ctx.cwd / _FAULTING_PROJECT).resolve()
     main_c = proj_root / "Src" / "main.c"

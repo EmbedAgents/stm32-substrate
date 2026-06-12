@@ -10,11 +10,11 @@ from typing import Any
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.debug import Debug, DebugSession
-from stm32_substrate.errors import ConfigurationError, GDBError
-from stm32_substrate.subprocess_runner import ToolRunResult
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.debug import Debug, DebugSession
+from embedagents.stm32.errors import ConfigurationError, GDBError
+from embedagents.stm32.subprocess_runner import ToolRunResult
 
 
 @pytest.fixture()
@@ -190,10 +190,10 @@ class TestSpawnHappyPath:
         gdb_mock.pid = 22222
 
         with patch(
-            "stm32_substrate.debug.client.spawn_gdbserver",
+            "embedagents.stm32.debug.client.spawn_gdbserver",
             return_value=gdbserver_mock,
         ) as spawn_gdbs, patch(
-            "stm32_substrate.debug.client.spawn_gdb",
+            "embedagents.stm32.debug.client.spawn_gdb",
             return_value=gdb_mock,
         ) as spawn_gdb_mock:
             session = debug.start_session(elf, halt=True)
@@ -226,10 +226,10 @@ class TestSpawnHappyPath:
         gdb_mock.pid = 2
 
         with patch(
-            "stm32_substrate.debug.client.spawn_gdbserver",
+            "embedagents.stm32.debug.client.spawn_gdbserver",
             return_value=gdbserver_mock,
         ), patch(
-            "stm32_substrate.debug.client.spawn_gdb",
+            "embedagents.stm32.debug.client.spawn_gdb",
             return_value=gdb_mock,
         ):
             session = debug.attach_running(elf)
@@ -262,9 +262,9 @@ class TestPortFallback:
         gdb_mock = MagicMock(pid=2)
 
         with patch(
-            "stm32_substrate.debug.client.spawn_gdbserver", spawn_gdbs
+            "embedagents.stm32.debug.client.spawn_gdbserver", spawn_gdbs
         ), patch(
-            "stm32_substrate.debug.client.spawn_gdb", return_value=gdb_mock
+            "embedagents.stm32.debug.client.spawn_gdb", return_value=gdb_mock
         ):
             session = debug.start_session(elf, halt=False)
         assert session.gdb_port == 61236
@@ -284,7 +284,7 @@ class TestPortFallback:
             ]
         )
         with patch(
-            "stm32_substrate.debug.client.spawn_gdbserver", spawn_gdbs
+            "embedagents.stm32.debug.client.spawn_gdbserver", spawn_gdbs
         ):
             with pytest.raises(GDBError) as excinfo:
                 debug.start_session(elf)
@@ -303,7 +303,7 @@ class TestPortFallback:
             side_effect=GDBError(message="no probe", gdb_marker="probe-not-found")
         )
         with patch(
-            "stm32_substrate.debug.client.spawn_gdbserver", spawn_gdbs
+            "embedagents.stm32.debug.client.spawn_gdbserver", spawn_gdbs
         ):
             with pytest.raises(GDBError) as excinfo:
                 debug.start_session(elf)
@@ -325,10 +325,10 @@ class TestSpawnTeardown:
         debug = Debug(ctx)
         gdbserver_mock = MagicMock(pid=1, port=61234)
         with patch(
-            "stm32_substrate.debug.client.spawn_gdbserver",
+            "embedagents.stm32.debug.client.spawn_gdbserver",
             return_value=gdbserver_mock,
         ), patch(
-            "stm32_substrate.debug.client.spawn_gdb",
+            "embedagents.stm32.debug.client.spawn_gdb",
             side_effect=RuntimeError("boom"),
         ):
             with pytest.raises(RuntimeError):
@@ -345,10 +345,10 @@ class TestSpawnTeardown:
         gdb_mock = MagicMock(pid=2)
         gdb_mock.send_console.side_effect = RuntimeError("boom")
         with patch(
-            "stm32_substrate.debug.client.spawn_gdbserver",
+            "embedagents.stm32.debug.client.spawn_gdbserver",
             return_value=gdbserver_mock,
         ), patch(
-            "stm32_substrate.debug.client.spawn_gdb", return_value=gdb_mock
+            "embedagents.stm32.debug.client.spawn_gdb", return_value=gdb_mock
         ):
             with pytest.raises(RuntimeError):
                 debug.start_session(elf, halt=True)
@@ -374,10 +374,10 @@ class TestSessionStartTimeoutKnobs:
         gdbserver_mock = MagicMock(pid=1, port=61234)
         gdb_mock = MagicMock(pid=2)
         with patch(
-            "stm32_substrate.debug.client.spawn_gdbserver",
+            "embedagents.stm32.debug.client.spawn_gdbserver",
             return_value=gdbserver_mock,
         ) as spawn_gdbs, patch(
-            "stm32_substrate.debug.client.spawn_gdb", return_value=gdb_mock
+            "embedagents.stm32.debug.client.spawn_gdb", return_value=gdb_mock
         ):
             debug.start_session(elf, halt=False)
         assert spawn_gdbs.call_args.kwargs["handshake_timeout_s"] == 3.0
@@ -391,10 +391,10 @@ class TestSessionStartTimeoutKnobs:
         gdbserver_mock = MagicMock(pid=1, port=61234)
         gdb_mock = MagicMock(pid=2)
         with patch(
-            "stm32_substrate.debug.client.spawn_gdbserver",
+            "embedagents.stm32.debug.client.spawn_gdbserver",
             return_value=gdbserver_mock,
         ), patch(
-            "stm32_substrate.debug.client.spawn_gdb", return_value=gdb_mock
+            "embedagents.stm32.debug.client.spawn_gdb", return_value=gdb_mock
         ) as spawn_gdb_mock:
             debug.start_session(elf, halt=False)
         # Per-step cap of 10 s, clipped to the (barely-touched) 30 s
@@ -417,14 +417,14 @@ class TestSessionStartTimeoutKnobs:
         # the second loop iteration sees the budget blown.
         clock = iter([0.0, 0.6, 1.2, 1.8, 2.4, 3.0])
         monkeypatch.setattr(
-            "stm32_substrate.debug.client.time",
+            "embedagents.stm32.debug.client.time",
             SimpleNamespace(monotonic=lambda: next(clock)),
         )
         spawn_gdbs = MagicMock(
             side_effect=GDBError(message="busy", gdb_marker="port-busy")
         )
         with patch(
-            "stm32_substrate.debug.client.spawn_gdbserver", spawn_gdbs
+            "embedagents.stm32.debug.client.spawn_gdbserver", spawn_gdbs
         ):
             with pytest.raises(GDBError) as excinfo:
                 debug.start_session(elf)
@@ -471,7 +471,7 @@ class TestSvdForAttached:
             ctx2 = SubstrateContext.from_environment(project_path=tmp_path)
             client = CubeProgrammer(ctx2)
             # Mock connect() to return a banner with device_name=STM32L476RG.
-            from stm32_substrate.cubeprogrammer.results import BannerResult
+            from embedagents.stm32.cubeprogrammer.results import BannerResult
 
             fake_banner = BannerResult(
                 stlink_sn="X",
@@ -505,7 +505,7 @@ class TestSvdForAttached:
         import os
         from unittest.mock import patch
 
-        from stm32_substrate.cubeprogrammer.results import BannerResult
+        from embedagents.stm32.cubeprogrammer.results import BannerResult
 
         plugin = (
             tmp_path
@@ -563,7 +563,7 @@ class TestSvdForAttached:
     ) -> None:
         # ctx.svd_db is non-None (default empty roots) but find_for returns None.
         client = CubeProgrammer(ctx)
-        from stm32_substrate.cubeprogrammer.results import BannerResult
+        from embedagents.stm32.cubeprogrammer.results import BannerResult
         from unittest.mock import patch
 
         fake_banner = BannerResult(
@@ -593,7 +593,7 @@ class TestCLI:
     def test_svd_path_no_match(
         self, ctx: SubstrateContext, capsys: pytest.CaptureFixture
     ) -> None:
-        from stm32_substrate.cli import main
+        from embedagents.stm32.cli import main
 
         code = main(["debug", "svd-path", "STM32UNKNOWN"])
         captured = capsys.readouterr()
@@ -605,7 +605,7 @@ class TestCLI:
     def test_help_lists_subcommands(
         self, ctx: SubstrateContext, capsys: pytest.CaptureFixture
     ) -> None:
-        from stm32_substrate.cli import main
+        from embedagents.stm32.cli import main
 
         with pytest.raises(SystemExit):
             main(["debug", "--help"])

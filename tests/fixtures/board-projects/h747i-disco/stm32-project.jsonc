@@ -13,7 +13,7 @@
 // CM7 is the primary core). The probe enumerates as "DISCO-H747XI" (not
 // "STM32H747I-DISCO") — that's what firmware.board must match.
 {
-  "$schema": "../../../../src/stm32_substrate/schemas/stm32-project.schema.json",
+  "$schema": "../../../../src/embedagents/stm32/schemas/stm32-project.schema.json",
   "version": 1,
   "project_name": "MSC_Standalone_CM7",
   "board": {

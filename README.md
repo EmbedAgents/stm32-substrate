@@ -1,4 +1,4 @@
-# stm32-substrate
+# embedagents-stm32
 
 **STM32 development, by talking to Claude.**
 
@@ -100,13 +100,13 @@ Open Claude Code and paste this. Claude does the rest.
 
 > Install the STM32 substrate: run `pip install git+https://github.com/EmbedAgents/stm32-substrate.git` to get the `stm32` CLI, then register the plugin with `claude plugin marketplace add EmbedAgents/stm32-substrate` and `claude plugin install stm32-substrate@stm32`. Then ask me which ST tools I have installed (STM32CubeProgrammer, CubeIDE, CubeMX, the ST-LINK GDB server, arm-none-eabi-gdb, the Signing Tool) and write a `.claude/stm32-tools.local.jsonc` that points at them.
 
-That installs the `stm32` CLI + `stm32_substrate` library and registers the five `/stm32*` slash commands. Restart Claude Code if the commands don't show up right away.
+That installs the `stm32` CLI + `embedagents.stm32` library and registers the five `/stm32*` slash commands. Restart Claude Code if the commands don't show up right away.
 
-Prefer to do the plugin half by hand? Run `/plugin marketplace add EmbedAgents/stm32-substrate` then `/plugin install stm32-substrate@stm32`. And once it's on PyPI, the package step is simply `pip install stm32-substrate`.
+Prefer to do the plugin half by hand? Run `/plugin marketplace add EmbedAgents/stm32-substrate` then `/plugin install embedagents-stm32@embedagents`. And once it's on PyPI, the package step is simply `pip install embedagents-stm32`.
 
 ### Step 2: Point it at your ST tools
 
-The substrate finds each tool by **environment variable → `.claude/stm32-tools.local.jsonc` → your `PATH`**, and fails loud — naming the exact key to set — if it can't. Claude can write that file for you in Step 1; the [schema](src/stm32_substrate/schemas/stm32-tools.local.schema.json) lists every key. Set it once and you're done.
+The substrate finds each tool by **environment variable → `.claude/stm32-tools.local.jsonc` → your `PATH`**, and fails loud — naming the exact key to set — if it can't. Claude can write that file for you in Step 1; the [schema](src/embedagents/stm32/schemas/stm32-tools.local.schema.json) lists every key. Set it once and you're done.
 
 Then just talk:
 
@@ -176,8 +176,8 @@ the same operations, so anything you can ask for in chat you can also script.
 ### As a Python library
 
 ```python
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
 
 ctx = SubstrateContext.from_environment()
 prog = CubeProgrammer(ctx)
@@ -200,11 +200,11 @@ Remove the plugin and the package — nothing else is left behind.
 
 ```bash
 # Remove the Claude Code plugin + its marketplace entry
-claude plugin uninstall stm32-substrate
+claude plugin uninstall embedagents-stm32
 claude plugin marketplace remove stm32
 
 # Uninstall the Python package / `stm32` CLI
-pip uninstall stm32-substrate
+pip uninstall embedagents-stm32
 ```
 
 If you created one, delete your `.claude/stm32-tools.local.jsonc`. The substrate

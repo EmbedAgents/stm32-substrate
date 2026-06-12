@@ -12,16 +12,16 @@ from unittest.mock import patch
 
 import pytest
 
-from stm32_substrate.context import SubstrateContext
-from stm32_substrate.cubeprogrammer import CubeProgrammer
-from stm32_substrate.cubeprogrammer.codes import CubeProgrammerErrorCode
-from stm32_substrate.cubeprogrammer.diagnose import (
+from embedagents.stm32.context import SubstrateContext
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
+from embedagents.stm32.cubeprogrammer.codes import CubeProgrammerErrorCode
+from embedagents.stm32.cubeprogrammer.diagnose import (
     LADDER_FREQS_KHZ,
     LADDER_MODES,
     run_diagnose,
 )
-from stm32_substrate.cubeprogrammer.results import BannerResult, RecoveryResult
-from stm32_substrate.errors import CubeProgrammerError
+from embedagents.stm32.cubeprogrammer.results import BannerResult, RecoveryResult
+from embedagents.stm32.errors import CubeProgrammerError
 
 
 @pytest.fixture()
@@ -192,7 +192,7 @@ class TestOverallTimeout:
         client = CubeProgrammer(ctx)
         with patch.object(client, "_raw_connect", side_effect=side_effects):
             with patch(
-                "stm32_substrate.cubeprogrammer.diagnose.time.monotonic",
+                "embedagents.stm32.cubeprogrammer.diagnose.time.monotonic",
                 side_effect=lambda: next(clock_values),
             ):
                 result = run_diagnose(client, timeout_s=30.0)
@@ -275,7 +275,7 @@ class TestDiagnoseMicroMethod:
         client = CubeProgrammer(ctx2)
 
         with patch(
-            "stm32_substrate.cubeprogrammer.client.diagnose.run_diagnose"
+            "embedagents.stm32.cubeprogrammer.client.diagnose.run_diagnose"
         ) as mocked:
             mocked.return_value = RecoveryResult(
                 target_responsive=True,
