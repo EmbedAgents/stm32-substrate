@@ -250,3 +250,11 @@ network surface of its own.
 ## License
 
 [MIT](LICENSE) © 2026 EmbedAgents
+
+## Disclaimer
+
+This project is an independent, community-driven tool and is not an official
+release by STMicroelectronics. STM32 is a registered trademark of
+STMicroelectronics International N.V. This software is provided free of charge
+for educational and development purposes, and its use of the trademark is
+strictly descriptive to help developers identify hardware compatibility.
