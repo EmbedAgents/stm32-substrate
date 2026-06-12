@@ -98,11 +98,11 @@ and NPU-equipped silicon.
 
 Open Claude Code and paste this. Claude does the rest.
 
-> Install the STM32 substrate: run `pip install git+https://github.com/EmbedAgents/stm32-substrate.git` to get the `stm32` CLI, then register the plugin with `claude plugin marketplace add EmbedAgents/stm32-substrate` and `claude plugin install stm32-substrate@stm32`. Then ask me which ST tools I have installed (STM32CubeProgrammer, CubeIDE, CubeMX, the ST-LINK GDB server, arm-none-eabi-gdb, the Signing Tool) and write a `.claude/stm32-tools.local.jsonc` that points at them.
+> Install the STM32 substrate: run `pip install embedagents-stm32` to get the `stm32` CLI, then register the plugin with `claude plugin marketplace add EmbedAgents/stm32-substrate` and `claude plugin install embedagents-stm32@embedagents`. Then ask me which ST tools I have installed (STM32CubeProgrammer, CubeIDE, CubeMX, the ST-LINK GDB server, arm-none-eabi-gdb, the Signing Tool) and write a `.claude/stm32-tools.local.jsonc` that points at them.
 
 That installs the `stm32` CLI + `embedagents.stm32` library and registers the five `/stm32*` slash commands. Restart Claude Code if the commands don't show up right away.
 
-Prefer to do the plugin half by hand? Run `/plugin marketplace add EmbedAgents/stm32-substrate` then `/plugin install embedagents-stm32@embedagents`. And once it's on PyPI, the package step is simply `pip install embedagents-stm32`.
+Prefer to do the plugin half by hand? Run `/plugin marketplace add EmbedAgents/stm32-substrate` then `/plugin install embedagents-stm32@embedagents`. Want the whole EmbedAgents tool family in one step? `pip install EmbedAgents` (a meta-package that pulls `embedagents-stm32` and future siblings). Upgrading from a pre-0.3.0 install: `pip uninstall stm32-substrate` and `/plugin uninstall stm32-substrate` first — the distribution and plugin were renamed (the `stm32` CLI and all slash commands are unchanged).
 
 ### Step 2: Point it at your ST tools
 
