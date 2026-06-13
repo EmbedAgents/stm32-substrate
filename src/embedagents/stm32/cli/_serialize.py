@@ -81,7 +81,7 @@ def serialise_unexpected(err: BaseException) -> str:
             "error_type": type(err).__name__,
             "message": str(err) or repr(err),
             "hint": (
-                "the substrate could not complete this request — the message "
+                "the substrate could not complete this request - the message "
                 "above says what to fix (usually a bad argument). If it looks "
                 "like a substrate bug rather than your input, please report it."
             ),

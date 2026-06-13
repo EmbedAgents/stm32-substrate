@@ -232,6 +232,11 @@ These need a human / hardware and aren't covered above:
     3. attach a NUCLEO + ST-LINK, then in Claude (in a folder with a
        stm32-project.jsonc):  "list the connected probe"  then  "build it and
        flash my Nucleo."
+
+  Note (PowerShell 5.1): inline 'python -c' and here-strings are unreliable -
+  PowerShell re-quoting strips the inner quotes, so r"C:\path" reaches Python as
+  rC:\path and it dies with a SyntaxError. Write any ad-hoc validation snippet to
+  a temp .py file and run 'python file.py' instead (as the schema check above does).
 "@ -ForegroundColor Gray
 
 exit $(if ($fails -eq 0) { 0 } else { 1 })

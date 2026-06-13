@@ -146,7 +146,7 @@ def _add_session_args(p: argparse.ArgumentParser) -> None:
 def _add_start(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
         "start",
-        help="DBG-001 / DBG-003 / DBG-012 — spawn gdbserver + arm-gdb and emit the SessionHandle.",
+        help="DBG-001 / DBG-003 / DBG-012 - spawn gdbserver + arm-gdb and emit the SessionHandle.",
     )
     p.add_argument(
         "elf",
@@ -172,7 +172,7 @@ def _add_start(sub: argparse._SubParsersAction) -> None:
 def _add_svd_path(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
         "svd-path",
-        help="D-008 input — resolve the SVD file path for a device name via ctx.svd_db.",
+        help="D-008 input - resolve the SVD file path for a device name via ctx.svd_db.",
     )
     p.add_argument("device_name", help="banner device_name (e.g. STM32L476RG)")
     p.set_defaults(debug_fn=_cmd_svd_path)
@@ -181,7 +181,7 @@ def _add_svd_path(sub: argparse._SubParsersAction) -> None:
 def _add_check_variable(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
         "check-variable",
-        help="DBG-004 — set breakpoint, run until hit, read variable, compare against expected.",
+        help="DBG-004 - set breakpoint, run until hit, read variable, compare against expected.",
     )
     p.add_argument(
         "--at", dest="at_location", required=True,
@@ -208,7 +208,7 @@ def _add_check_variable(sub: argparse._SubParsersAction) -> None:
 def _add_check_register(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
         "check-register",
-        help="DBG-005 — set breakpoint, run until hit, read register, compare against expected.",
+        help="DBG-005 - set breakpoint, run until hit, read register, compare against expected.",
     )
     p.add_argument(
         "--at", dest="at_location", required=True,
@@ -237,7 +237,7 @@ def _add_check_register(sub: argparse._SubParsersAction) -> None:
 def _add_read_registers(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
         "read-registers",
-        help="DBG-006 — read CPU registers from a halted target.",
+        help="DBG-006 - read CPU registers from a halted target.",
     )
     _add_session_args(p)
     p.set_defaults(debug_fn=_cmd_read_registers)
@@ -246,7 +246,7 @@ def _add_read_registers(sub: argparse._SubParsersAction) -> None:
 def _add_read_peripheral(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
         "read-peripheral",
-        help="DBG-007 — SVD-decoded peripheral dump from a halted target.",
+        help="DBG-007 - SVD-decoded peripheral dump from a halted target.",
     )
     p.add_argument("peripheral_name", help="peripheral name (e.g. RCC, GPIOA, USART1, SCB)")
     p.add_argument(
@@ -289,7 +289,7 @@ def _add_callstack(sub: argparse._SubParsersAction) -> None:
 def _add_snapshot(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
         "snapshot",
-        help="DIAG-021 — composite registers + callstack + named peripherals + disasm.",
+        help="DIAG-021 - composite registers + callstack + named peripherals + disasm.",
     )
     p.add_argument(
         "--include-peripheral",
@@ -306,7 +306,7 @@ def _add_decode_hardfault(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
         "decode-hardfault",
         help=(
-            "DIAG-001 gdb path — compose the raw SCB + registers + callstack "
+            "DIAG-001 gdb path - compose the raw SCB + registers + callstack "
             "bundle (a DebugSnapshot); Claude classifies the fault."
         ),
     )

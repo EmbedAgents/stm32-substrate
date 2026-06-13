@@ -96,36 +96,36 @@ def dispatch(args: argparse.Namespace) -> int:
 
 def _register_subcommands(sub: argparse._SubParsersAction) -> None:
     # ------- discovery (D-*) -------
-    p = sub.add_parser("connect", help="D-001 — connect via SWD and return banner")
+    p = sub.add_parser("connect", help="D-001 - connect via SWD and return banner")
     p.add_argument("--ur", action="store_true", help="connect under reset (D-011)")
     p.add_argument("--freq", type=int, default=None, help="SWD frequency in kHz")
     p.set_defaults(prog_fn=_cmd_connect)
 
-    p = sub.add_parser("diagnose-micro", help="D-002 — run the SWD recovery ladder")
+    p = sub.add_parser("diagnose-micro", help="D-002 - run the SWD recovery ladder")
     p.set_defaults(prog_fn=_cmd_diagnose_micro)
 
     p = sub.add_parser(
-        "list-probes", help="D-005 — enumerate attached ST-LINK probes"
+        "list-probes", help="D-005 - enumerate attached ST-LINK probes"
     )
     p.set_defaults(prog_fn=_cmd_list_probes)
 
     p = sub.add_parser(
         "ping-swd",
-        help="D-006 — quick SWD-responsiveness probe (exit 0 / 1)",
+        help="D-006 - quick SWD-responsiveness probe (exit 0 / 1)",
     )
     p.set_defaults(prog_fn=_cmd_ping_swd)
 
-    p = sub.add_parser("cores", help="D-007 — primary / secondary cores")
+    p = sub.add_parser("cores", help="D-007 - primary / secondary cores")
     p.set_defaults(prog_fn=_cmd_cores)
 
     p = sub.add_parser(
         "svd",
-        help="D-008 — SVD file for the attached device (banner + svd_db lookup)",
+        help="D-008 - SVD file for the attached device (banner + svd_db lookup)",
     )
     p.set_defaults(prog_fn=_cmd_svd)
 
     p = sub.add_parser(
-        "read-ob", help="D-009 — read option bytes via ``-ob displ``"
+        "read-ob", help="D-009 - read option bytes via ``-ob displ``"
     )
     p.set_defaults(prog_fn=_cmd_read_ob)
 
@@ -133,7 +133,7 @@ def _register_subcommands(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
         "write-ob",
         help=(
-            "F-021 — write option bytes. Pairs are NAME=VALUE arguments; "
+            "F-021 - write option bytes. Pairs are NAME=VALUE arguments; "
             "values accept hex (0x..) / decimal / true / false / strings."
         ),
     )
@@ -151,13 +151,13 @@ def _register_subcommands(sub: argparse._SubParsersAction) -> None:
     p.set_defaults(prog_fn=_cmd_write_ob)
 
     p = sub.add_parser(
-        "verify-ob", help="DIAG-018 — diff observed OB against expected"
+        "verify-ob", help="DIAG-018 - diff observed OB against expected"
     )
     p.add_argument("pairs", nargs="+", help="NAME=VALUE")
     p.set_defaults(prog_fn=_cmd_verify_ob)
 
     # ------- atomic target control (F-001/002/016/017/018) -------
-    p = sub.add_parser("erase", help="F-001 / F-002 — mass erase chip")
+    p = sub.add_parser("erase", help="F-001 / F-002 - mass erase chip")
     p.add_argument(
         "--with-reset",
         action="store_true",
@@ -167,13 +167,13 @@ def _register_subcommands(sub: argparse._SubParsersAction) -> None:
         "--confirm-destructive",
         action="store_true",
         help=(
-            "grant the destructive gate — mass erase wipes the entire flash "
+            "grant the destructive gate - mass erase wipes the entire flash "
             "and is irreversible (HIL rule; required)"
         ),
     )
     p.set_defaults(prog_fn=_cmd_erase)
 
-    p = sub.add_parser("reset", help="F-016 — software / hardware reset")
+    p = sub.add_parser("reset", help="F-016 - software / hardware reset")
     p.add_argument(
         "--hard",
         action="store_true",
@@ -181,18 +181,18 @@ def _register_subcommands(sub: argparse._SubParsersAction) -> None:
     )
     p.set_defaults(prog_fn=_cmd_reset)
 
-    p = sub.add_parser("halt", help="F-017 — halt the target CPU")
+    p = sub.add_parser("halt", help="F-017 - halt the target CPU")
     p.set_defaults(prog_fn=_cmd_halt)
 
-    p = sub.add_parser("resume", help="F-018 — resume the target CPU")
+    p = sub.add_parser("resume", help="F-018 - resume the target CPU")
     p.set_defaults(prog_fn=_cmd_resume)
 
     # ------- flash family -------
     p = sub.add_parser(
         "flash",
         help=(
-            "CP-001 — extension-based router: .elf/.hex → flash_file, "
-            ".bin → flash_bin (with --address) / flash_bin_no_address (without)"
+            "CP-001 - extension-based router: .elf/.hex -> flash_file, "
+            ".bin -> flash_bin (with --address) / flash_bin_no_address (without)"
         ),
     )
     p.add_argument("file", type=Path)
@@ -207,18 +207,18 @@ def _register_subcommands(sub: argparse._SubParsersAction) -> None:
     )
     p.set_defaults(prog_fn=_cmd_flash)
 
-    p = sub.add_parser("flash-data", help="F-007 — flash a non-firmware payload")
+    p = sub.add_parser("flash-data", help="F-007 - flash a non-firmware payload")
     p.add_argument("file", type=Path)
     p.add_argument("--address", required=True)
     p.set_defaults(prog_fn=_cmd_flash_data)
 
-    p = sub.add_parser("flash-signed", help="F-006 — flash a signed binary")
+    p = sub.add_parser("flash-signed", help="F-006 - flash a signed binary")
     p.add_argument("file", type=Path)
     p.add_argument("--address", default=None)
     p.set_defaults(prog_fn=_cmd_flash_signed)
 
     p = sub.add_parser(
-        "flash-pair", help="F-008 / F-009 — sequential bootloader + app flash"
+        "flash-pair", help="F-008 / F-009 - sequential bootloader + app flash"
     )
     p.add_argument("bootloader", type=Path)
     p.add_argument("application", type=Path)
@@ -265,7 +265,7 @@ def _register_subcommands(sub: argparse._SubParsersAction) -> None:
     p.set_defaults(prog_fn=_cmd_flash_pair)
 
     p = sub.add_parser(
-        "flash-external", help="F-010 — external loader (``-el``) flash"
+        "flash-external", help="F-010 - external loader (``-el``) flash"
     )
     p.add_argument("file", type=Path)
     p.add_argument("--address", required=True)
@@ -277,20 +277,20 @@ def _register_subcommands(sub: argparse._SubParsersAction) -> None:
     )
     p.set_defaults(prog_fn=_cmd_flash_external)
 
-    p = sub.add_parser("flash-bank", help="F-011 — flash a specific bank (1 or 2)")
+    p = sub.add_parser("flash-bank", help="F-011 - flash a specific bank (1 or 2)")
     p.add_argument("bank", type=int, choices=(1, 2))
     p.add_argument("file", type=Path)
     p.add_argument("--address", required=True)
     p.set_defaults(prog_fn=_cmd_flash_bank)
 
     # ------- read family -------
-    p = sub.add_parser("read-flash", help="F-019 — dump flash to file")
+    p = sub.add_parser("read-flash", help="F-019 - dump flash to file")
     p.add_argument("--address", default=None)
     p.add_argument("--size", type=int, default=None)
     p.add_argument("--output", type=Path, default=None)
     p.set_defaults(prog_fn=_cmd_read_flash)
 
-    p = sub.add_parser("read-mem", help="F-020 — peek at memory")
+    p = sub.add_parser("read-mem", help="F-020 - peek at memory")
     p.add_argument("--address", required=True)
     p.add_argument("--size", type=int, default=None)
     p.set_defaults(prog_fn=_cmd_read_mem)
@@ -298,7 +298,7 @@ def _register_subcommands(sub: argparse._SubParsersAction) -> None:
     # ------- diagnostic (DIAG-001 binary path) -------
     p = sub.add_parser(
         "hardfault",
-        help="DIAG-001 binary-only path — ``-hf`` Hard Fault Analyzer",
+        help="DIAG-001 binary-only path - ``-hf`` Hard Fault Analyzer",
     )
     p.set_defaults(prog_fn=_cmd_hardfault)
 
@@ -306,7 +306,7 @@ def _register_subcommands(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
         "swo",
         help=(
-            "VCP-007 — tail SWO/ITM stream as newline-delimited JSON. "
+            "VCP-007 - tail SWO/ITM stream as newline-delimited JSON. "
             "Press Ctrl-C to stop."
         ),
     )
@@ -323,7 +323,7 @@ def _register_subcommands(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
         "sign",
         help=(
-            "F-013 — sign a .bin via STM32_SigningTool_CLI (N6 / MP1 / MP2). "
+            "F-013 - sign a .bin via STM32_SigningTool_CLI (N6 / MP1 / MP2). "
             "Substrate doesn't pre-check device family; vendor reports."
         ),
     )

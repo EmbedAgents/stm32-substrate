@@ -25,11 +25,16 @@ from embedagents.stm32 import __version__
 from embedagents.stm32.cli import _build, _debug, _mx, _prog, _vcp
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
+    """Construct the full `stm32` argument parser (all subcommand groups).
+
+    Kept separate from `main()` so tests can introspect the parser tree
+    without invoking dispatch.
+    """
     parser = argparse.ArgumentParser(
         prog="stm32",
         description=(
-            "STM32 substrate CLI — wraps STM32_Programmer_CLI / CubeIDE / "
+            "STM32 substrate CLI - wraps STM32_Programmer_CLI / CubeIDE / "
             "CubeMX / ST-LINK_gdbserver / arm-none-eabi-gdb / "
             "STM32_SigningTool_CLI behind a unified surface."
         ),
@@ -61,6 +66,11 @@ def main(argv: list[str] | None = None) -> int:
     _mx.add_subparser(subparsers)
     _debug.add_subparser(subparsers)
     _vcp.add_subparser(subparsers)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
 
     if argv is None:
         argv = sys.argv[1:]

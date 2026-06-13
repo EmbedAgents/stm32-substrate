@@ -102,6 +102,8 @@ Open Claude Code and paste this. Claude does the rest.
 
 That installs the `stm32` CLI + `embedagents.stm32` library and registers the five `/stm32*` slash commands. Restart Claude Code if the commands don't show up right away.
 
+**On Windows:** a bare `pip install` often resolves to a per-user install, which drops `stm32.exe` into `%APPDATA%\Python\Python3xx\Scripts` — a directory that isn't on `PATH` by default, so `stm32` won't be found in a new terminal. The simplest fix is `pipx install embedagents-stm32` (or install into a virtualenv); otherwise add that Scripts folder to your user `PATH`. pip prints the exact path in its "installed in ... which is not on PATH" warning during install.
+
 Prefer to do the plugin half by hand? Run `/plugin marketplace add EmbedAgents/stm32-substrate` then `/plugin install embedagents-stm32@embedagents`. Want the whole EmbedAgents tool family in one step? `pip install EmbedAgents` (a meta-package that pulls `embedagents-stm32` and future siblings). Upgrading from a pre-0.3.0 install: `pip uninstall stm32-substrate` and `/plugin uninstall stm32-substrate` first — the distribution and plugin were renamed (the `stm32` CLI and all slash commands are unchanged).
 
 ### Step 2: Point it at your ST tools

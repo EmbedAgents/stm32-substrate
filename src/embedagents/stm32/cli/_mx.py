@@ -38,7 +38,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> None:
 
     p = sub.add_parser(
         "generate",
-        help="MX-001 — open IOC, generate project code into output_path.",
+        help="MX-001 - open IOC, generate project code into output_path.",
     )
     p.add_argument(
         "ioc",

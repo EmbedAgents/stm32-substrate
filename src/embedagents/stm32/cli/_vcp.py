@@ -40,7 +40,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> None:
     )
 
     # ---- tail ---------------------------------------------------------
-    p = sub.add_parser("tail", help="VCP-001 — yield serial lines as text.")
+    p = sub.add_parser("tail", help="VCP-001 - yield serial lines as text.")
     p.add_argument("--port", default=None, help="explicit /dev/ttyACMx override")
     p.add_argument("--baud", type=int, default=None, help="baud rate (default 115200)")
     p.add_argument(
@@ -67,7 +67,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> None:
     p.set_defaults(vcp_fn=_cmd_tail)
 
     # ---- send ---------------------------------------------------------
-    p = sub.add_parser("send", help="VCP-002 — write a line, collect reply.")
+    p = sub.add_parser("send", help="VCP-002 - write a line, collect reply.")
     p.add_argument("line", help="line to send (terminator appended automatically)")
     p.add_argument("--port", default=None)
     p.add_argument("--baud", type=int, default=None)
@@ -96,7 +96,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> None:
     p.set_defaults(vcp_fn=_cmd_send)
 
     # ---- reconnect ----------------------------------------------------
-    p = sub.add_parser("reconnect", help="VCP-003 — force-reconnect after reset.")
+    p = sub.add_parser("reconnect", help="VCP-003 - force-reconnect after reset.")
     p.add_argument("--port", default=None, help="explicit port override")
     p.add_argument(
         "--max-wait",

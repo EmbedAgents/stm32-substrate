@@ -88,7 +88,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> None:
     # ---- add-symbol ----
     p = sub.add_parser(
         "add-symbol",
-        help="B-011 — append preprocessor symbols (one or more NAME[=VALUE]).",
+        help="B-011 - append preprocessor symbols (one or more NAME[=VALUE]).",
     )
     p.add_argument("symbols", nargs="+", help="NAME or NAME=VALUE")
     _add_common_flags(p, include_edit_flags=False)
@@ -97,7 +97,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> None:
     # ---- add-lib ----
     p = sub.add_parser(
         "add-lib",
-        help="B-012 — append linker libraries (paths).",
+        help="B-012 - append linker libraries (paths).",
     )
     p.add_argument("libs", nargs="+", type=Path)
     _add_common_flags(p, include_edit_flags=False)
@@ -106,7 +106,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> None:
     # ---- add-source ----
     p = sub.add_parser(
         "add-source",
-        help="B-013 — append source files. v1 records only (tracks aux).",
+        help="B-013 - append source files. v1 records only (tracks aux).",
     )
     p.add_argument("sources", nargs="+", type=Path)
     p.add_argument(
@@ -121,7 +121,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> None:
     # ---- add-include ----
     p = sub.add_parser(
         "add-include",
-        help="B-014 — append compiler include paths.",
+        help="B-014 - append compiler include paths.",
     )
     p.add_argument("includes", nargs="+")
     _add_common_flags(p, include_edit_flags=False)
@@ -130,7 +130,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> None:
     # ---- in-folder ----
     p = sub.add_parser(
         "in-folder",
-        help="B-018 — discover a project under FOLDER (one match) then build.",
+        help="B-018 - discover a project under FOLDER (one match) then build.",
     )
     p.add_argument(
         "folder",
@@ -146,7 +146,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> None:
     # ---- named ----
     p = sub.add_parser(
         "named",
-        help="B-019 — discover by name (exact > substring) then build.",
+        help="B-019 - discover by name (exact > substring) then build.",
     )
     p.add_argument("name")
     p.add_argument("--folder", type=Path, default=None)
