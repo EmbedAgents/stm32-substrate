@@ -1,8 +1,10 @@
 ---
 description: STM32 project generation — STM32CubeMX IOC-to-CubeIDE-project
 argument-hint: <subcommand> [args...]
-allowed-tools: Bash(stm32 mx:*), Bash(.venv/bin/stm32 mx:*)
+allowed-tools: Bash(stm32 mx:*), Bash(.venv/bin/stm32 mx:*), Bash(python -m embedagents.stm32 mx:*)
 ---
+
+> **Invoking the CLI:** run `stm32 <subcommand> ...`. If `stm32` is not on PATH (common after a Windows per-user `pip install`, where it lands in a Scripts dir not on PATH), use the PATH-independent form `python -m embedagents.stm32 <subcommand> ...` instead (or `py -m embedagents.stm32 ...` if `python` itself isn't found).
 
 The user wants to regenerate the CubeIDE project from a `.ioc` file or otherwise work with the CubeMX side of the project. Map the request to a `stm32 mx` subcommand.
 

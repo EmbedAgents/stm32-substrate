@@ -19,8 +19,9 @@ Public surface:
 - ``SessionState`` — mutable session-scope state (active debug session,
   active VCP reader, T3 fields).
 
-The Linux-only platform check is the first thing ``from_environment()``
-does, per ADR-005.
+The supported-platform check is the first thing ``from_environment()``
+does, per ADR-007 (supersedes ADR-005): Linux and Windows are first-class
+v1 hosts; macOS is deferred pending demand.
 """
 
 from __future__ import annotations

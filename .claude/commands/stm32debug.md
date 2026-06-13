@@ -1,8 +1,10 @@
 ---
 description: STM32 debug session — gdbserver + arm-gdb start, attach, SVD lookup
 argument-hint: <subcommand> [args...]
-allowed-tools: Bash(stm32 debug:*), Bash(.venv/bin/stm32 debug:*)
+allowed-tools: Bash(stm32 debug:*), Bash(.venv/bin/stm32 debug:*), Bash(python -m embedagents.stm32 debug:*)
 ---
+
+> **Invoking the CLI:** run `stm32 <subcommand> ...`. If `stm32` is not on PATH (common after a Windows per-user `pip install`, where it lands in a Scripts dir not on PATH), use the PATH-independent form `python -m embedagents.stm32 <subcommand> ...` instead (or `py -m embedagents.stm32 ...` if `python` itself isn't found).
 
 Map the user's debug request to a `stm32 debug` recipe subcommand.
 

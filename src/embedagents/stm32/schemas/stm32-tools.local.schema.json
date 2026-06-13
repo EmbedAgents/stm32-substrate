@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/EmbedAgents/stm32-substrate/schemas/stm32-tools.local.schema.json",
   "title": "STM32 substrate — local host tool discovery",
-  "description": "Machine-local tool path discovery for the six ST vendor CLIs plus the STM32CubeCLT umbrella install. Loaded by SubstrateContext.from_environment() and validated at load time (M-016). v1 is Linux-only per ADR-005; the windows / darwin candidate blocks are reserved for v2 forward-compat and ignored on v1 Linux hosts.",
+  "description": "Machine-local tool path discovery for the six ST vendor CLIs plus the STM32CubeCLT umbrella install. Loaded by SubstrateContext.from_environment() and validated at load time (M-016). v1 supports Linux and Windows as first-class hosts per ADR-007 (supersedes ADR-005); the loader reads the linux or windows candidate block keyed on sys.platform. The darwin block is reserved (macOS deferred pending demand).",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "tools"],
@@ -33,7 +33,7 @@
       }
     },
     "tools": {
-      "description": "Machine-local tool discovery overrides keyed by supported tool name. Resolution order per ADR-005: env var -> configured candidates -> shutil.which against executable_name -> loud ConfigurationError naming the JSON key.",
+      "description": "Machine-local tool discovery overrides keyed by supported tool name. Resolution order per ADR-007: env var -> configured candidates -> shutil.which against executable_name -> loud ConfigurationError naming the JSON key.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -82,20 +82,20 @@
           "type": "string"
         },
         "candidates": {
-          "description": "Per-platform candidate paths checked before generic PATH fallback. v1 reads `linux` only; `windows` and `darwin` are reserved for v2 forward-compat (ADR-005).",
+          "description": "Per-platform candidate paths checked before generic PATH fallback. v1 reads `linux` and `windows`, keyed on sys.platform, per ADR-007; `darwin` is reserved (macOS deferred pending demand).",
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "linux": {
-              "description": "Ordered candidate paths checked on Linux hosts (v1 primary).",
+              "description": "Ordered candidate paths checked on Linux hosts (v1 first-class per ADR-007).",
               "$ref": "#/$defs/pathList"
             },
             "windows": {
-              "description": "Ordered candidate paths checked on Windows hosts (reserved for v2; ignored in v1).",
+              "description": "Ordered candidate paths checked on Windows hosts (v1 first-class per ADR-007).",
               "$ref": "#/$defs/pathList"
             },
             "darwin": {
-              "description": "Ordered candidate paths checked on macOS hosts (reserved for v2; ignored in v1).",
+              "description": "Ordered candidate paths checked on macOS hosts (reserved; macOS deferred pending demand).",
               "$ref": "#/$defs/pathList"
             }
           }

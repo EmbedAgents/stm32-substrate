@@ -1,8 +1,10 @@
 ---
 description: STM32CubeIDE headless build — preset, options, .cproject edits
 argument-hint: [PATH] [--preset fast|size|balanced] [--config NAME] [flags...]
-allowed-tools: Bash(stm32 build:*), Bash(.venv/bin/stm32 build:*)
+allowed-tools: Bash(stm32 build:*), Bash(.venv/bin/stm32 build:*), Bash(python -m embedagents.stm32 build:*)
 ---
+
+> **Invoking the CLI:** run `stm32 <subcommand> ...`. If `stm32` is not on PATH (common after a Windows per-user `pip install`, where it lands in a Scripts dir not on PATH), use the PATH-independent form `python -m embedagents.stm32 <subcommand> ...` instead (or `py -m embedagents.stm32 ...` if `python` itself isn't found).
 
 The user wants to build a CubeIDE project. Map the request to a `stm32 build` invocation and run it.
 

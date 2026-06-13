@@ -8,7 +8,7 @@ version = "0.3.0"
 description = "Deterministic Python wrapper around the six ST vendor CLIs (CubeProgrammer, CubeIDE, CubeMX, ST-LINK gdbserver, arm-none-eabi-gdb, STM32_SigningTool_CLI) plus a USB virtual COM port reader. Surfaces a Python library, a `stm32` CLI, and five Claude-Code slash commands."
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [{ name = "anup das", email = "akd.jls@gmail.com" }]
+authors = [{ name = "anup das" }, { email = "akd.jls@gmail.com" }]
 license = { file = "LICENSE" }
 keywords = ["stm32", "embedded", "microcontroller", "arm", "cortex-m", "claude", "claude-code", "stlink", "cubeprogrammer", "cubeide", "gdb", "firmware"]
 classifiers = [
