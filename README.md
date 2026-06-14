@@ -203,11 +203,18 @@ Remove the plugin and the package — nothing else is left behind.
 ```bash
 # Remove the Claude Code plugin + its marketplace entry
 claude plugin uninstall embedagents-stm32
-claude plugin marketplace remove stm32
+claude plugin marketplace remove embedagents
 
 # Uninstall the Python package / `stm32` CLI
-pip uninstall embedagents-stm32
+pip uninstall embedagents-stm32      # or: pipx uninstall embedagents-stm32
 ```
+
+The marketplace is named `embedagents` (the name it registered under when you
+ran `claude plugin marketplace add EmbedAgents/stm32-substrate`), not `stm32`.
+If you installed the `stm32` CLI with `pipx` — the route the install section
+recommends for Windows, and the one a PEP 668 "externally-managed" Python on
+Linux forces — remove it with `pipx uninstall embedagents-stm32`; a plain
+`pip uninstall` won't find a pipx-managed package.
 
 If you created one, delete your `.claude/stm32-tools.local.jsonc`. The substrate
 leaves nothing else on your machine — no caches, no dotfiles, no daemons.
