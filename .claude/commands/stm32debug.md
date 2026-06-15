@@ -35,7 +35,7 @@ For "is X configured / enabled / stuck?" diagnostics, prefer `read-peripheral <g
 
 ## Stateful workflows
 
-Multi-step sessions (several breakpoints, observe, adapt) have no CLI surface — use the Python `DebugSession` context manager. `python` is intentionally not pre-authorized (arbitrary code in a device-output context, RES-047): the one permission prompt per heredoc is expected — it's the user's HIL approval of the script.
+Multi-step sessions (several breakpoints, observe, adapt) have no CLI surface — use the Python `DebugSession` context manager. `python` is intentionally not pre-authorized (arbitrary code in a device-output context): the one permission prompt per heredoc is expected — it's the user's HIL approval of the script.
 
 ```bash
 python - <<'PY'
