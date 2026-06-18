@@ -259,13 +259,22 @@ class TestAcquireWorkspaceLock:
 
 
 class TestHeadlessLogPath:
-    def test_default_under_cwd(self, tmp_path: Path) -> None:
+    def test_default_follows_workspace(self, tmp_path: Path) -> None:
         ctx = SubstrateContext.from_environment(project_path=tmp_path)
-        path = workspace.headless_log_path(ctx)
-        assert path.parent == tmp_path / ".stm32-substrate-workspace" / "logs"
+        ws = tmp_path / "ws"
+        path = workspace.headless_log_path(ctx, workspace=ws)
+        assert path.parent == ws / "logs"
         assert path.name.startswith("build-")
         assert path.name.endswith(".log")
         assert path.parent.is_dir()
+
+    def test_default_without_workspace_falls_back_under_cwd(
+        self, tmp_path: Path
+    ) -> None:
+        # No workspace passed and no configured log_dir → legacy in-cwd path.
+        ctx = SubstrateContext.from_environment(project_path=tmp_path)
+        path = workspace.headless_log_path(ctx)
+        assert path.parent == tmp_path / ".stm32-substrate-workspace" / "logs"
 
     def test_custom_log_dir_from_defaults(
         self, tmp_path: Path
@@ -290,6 +299,123 @@ class TestHeadlessLogPath:
         time.sleep(1.05)
         p2 = workspace.headless_log_path(ctx)
         assert p1 != p2
+
+
+# ---------------------------------------------------------------------------
+# default_workspace_root / workspace_nested_in_project (RES-050)
+# ---------------------------------------------------------------------------
+
+
+class TestDefaultWorkspace:
+    def test_out_of_tree_under_user_cache(self, tmp_path: Path) -> None:
+        from embedagents.stm32.platform import user_cache_root
+
+        proj = tmp_path / "STM32CubeIDE"
+        proj.mkdir()
+        ws = workspace.default_workspace_root(proj)
+        # Lives under the per-OS user cache, never inside the project tree.
+        assert user_cache_root() in ws.parents
+        assert not workspace.workspace_nested_in_project(ws, proj)
+        assert proj not in ws.parents
+
+    def test_deterministic_and_project_keyed(self, tmp_path: Path) -> None:
+        a = tmp_path / "a" / "STM32CubeIDE"
+        b = tmp_path / "b" / "STM32CubeIDE"
+        a.mkdir(parents=True)
+        b.mkdir(parents=True)
+        # Same project path → same workspace across calls (stable cache key).
+        assert workspace.default_workspace_root(a) == workspace.default_workspace_root(a)
+        # Different project paths (same basename) → distinct workspaces.
+        assert workspace.default_workspace_root(a) != workspace.default_workspace_root(b)
+
+    def test_name_segment_is_basename_and_hash(self, tmp_path: Path) -> None:
+        proj = tmp_path / "STM32CubeIDE"
+        proj.mkdir()
+        name = workspace.default_workspace_root(proj).name
+        assert name.startswith("STM32CubeIDE-")
+        # 8 lowercase-hex digest suffix.
+        suffix = name.rsplit("-", 1)[1]
+        assert len(suffix) == 8 and all(c in "0123456789abcdef" for c in suffix)
+
+
+class TestWorkspaceNesting:
+    def test_descendant_is_nested(self, tmp_path: Path) -> None:
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        assert workspace.workspace_nested_in_project(proj / ".ws", proj)
+        assert workspace.workspace_nested_in_project(proj, proj)  # equal
+
+    def test_sibling_not_nested(self, tmp_path: Path) -> None:
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        # A sibling whose name shares a prefix must NOT count as nested.
+        assert not workspace.workspace_nested_in_project(tmp_path / "proj-ws", proj)
+        assert not workspace.workspace_nested_in_project(tmp_path / "other", proj)
+
+    def test_case_insensitive_match_on_normcase(self) -> None:
+        # Logic-level proof that the compare goes through os.path.normcase:
+        # on a case-insensitive OS the two spellings collapse; on a
+        # case-sensitive OS they stay distinct. Either way the helper must
+        # agree with normcase rather than do a raw case-sensitive compare.
+        import os
+
+        proj = Path("/Tmp/Proj")
+        ws = Path("/tmp/proj/.ws")
+        expected = os.path.normcase("/tmp/proj/.ws").startswith(
+            os.path.normcase("/Tmp/Proj") + os.sep
+        )
+        assert workspace.workspace_nested_in_project(ws, proj) == expected
+
+
+# ---------------------------------------------------------------------------
+# CubeIDE._resolve_workspace — default + explicit build.workspace (RES-050)
+# ---------------------------------------------------------------------------
+
+
+def _ctx_with_workspace(root: Path, configured: str | None) -> "SubstrateContext":
+    import json
+
+    descriptor: dict = {"version": 1, "build": {}}
+    if configured is not None:
+        descriptor["build"]["workspace"] = configured
+    (root / "stm32-project.jsonc").write_text(json.dumps(descriptor))
+    return SubstrateContext.from_environment(project_path=root)
+
+
+class TestResolveWorkspace:
+    def test_default_is_out_of_tree(self, tmp_path: Path) -> None:
+        from embedagents.stm32.cubeide.client import CubeIDE
+
+        proj = tmp_path / "STM32CubeIDE"
+        proj.mkdir()
+        ctx = _ctx_with_workspace(proj, configured=None)
+        ws = CubeIDE(ctx)._resolve_workspace(proj)
+        assert ws == workspace.default_workspace_root(proj)
+        assert not workspace.workspace_nested_in_project(ws, proj)
+
+    def test_explicit_in_tree_raises(self, tmp_path: Path) -> None:
+        from embedagents.stm32.cubeide.client import CubeIDE
+        from embedagents.stm32.errors import ConfigurationError
+
+        proj = tmp_path / "STM32CubeIDE"
+        proj.mkdir()
+        # Relative "." anchors to the project root → equals project_path.
+        ctx = _ctx_with_workspace(proj, configured=".")
+        with pytest.raises(
+            ConfigurationError, match=r"inside the project tree"
+        ) as excinfo:
+            CubeIDE(ctx)._resolve_workspace(proj)
+        assert "OUTSIDE the project" in (excinfo.value.hint or "")
+
+    def test_explicit_out_of_tree_honored(self, tmp_path: Path) -> None:
+        from embedagents.stm32.cubeide.client import CubeIDE
+
+        proj = tmp_path / "STM32CubeIDE"
+        proj.mkdir()
+        external = tmp_path / "external_ws"
+        ctx = _ctx_with_workspace(proj, configured=str(external))
+        ws = CubeIDE(ctx)._resolve_workspace(proj)
+        assert ws == external.resolve()
 
 
 # ---------------------------------------------------------------------------

@@ -19,7 +19,40 @@ from embedagents.stm32.platform import (
     is_lock_held,
     process_alive,
     terminate_process,
+    user_cache_root,
 )
+
+
+# ---------------------------------------------------------------------------
+# user_cache_root — per-OS persistent cache base (RES-050)
+# ---------------------------------------------------------------------------
+
+
+class TestUserCacheRoot:
+    def test_suffix_is_stm32_substrate(self) -> None:
+        assert user_cache_root().name == "stm32-substrate"
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="POSIX base")
+    def test_honors_xdg_cache_home(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+        assert user_cache_root() == tmp_path / "stm32-substrate"
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="POSIX base")
+    def test_falls_back_to_dot_cache(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        assert user_cache_root() == tmp_path / ".cache" / "stm32-substrate"
+
+    @pytest.mark.skipif(sys.platform != "win32", reason="Windows base")
+    def test_honors_localappdata(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+        assert user_cache_root() == tmp_path / "stm32-substrate"
 
 
 # ---------------------------------------------------------------------------

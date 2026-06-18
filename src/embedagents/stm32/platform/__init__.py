@@ -20,6 +20,9 @@ Public surface:
   whole process tree (Linux: ``killpg`` on the ``start_new_session``
   group; Windows: ``taskkill /T``). For vendor bootstrap launchers whose
   JVM child does the real work.
+- ``user_cache_root()`` — persistent per-user cache base
+  (``<base>/stm32-substrate``; ``$XDG_CACHE_HOME``/``~/.cache`` on Linux,
+  ``%LOCALAPPDATA%`` on Windows) for substrate scratch state.
 """
 
 from __future__ import annotations
@@ -28,6 +31,7 @@ from embedagents.stm32.platform.locking import (
     acquire_exclusive_lock,
     is_lock_held,
 )
+from embedagents.stm32.platform.paths import user_cache_root
 from embedagents.stm32.platform.process import (
     process_alive,
     terminate_process,
@@ -40,4 +44,5 @@ __all__ = [
     "process_alive",
     "terminate_process",
     "terminate_process_tree",
+    "user_cache_root",
 ]

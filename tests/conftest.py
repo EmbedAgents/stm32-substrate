@@ -13,6 +13,7 @@ Tests opt in via fixtures here. The default ``pytest`` invocation
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -25,6 +26,29 @@ if TYPE_CHECKING:
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _PROBE_LOCK_PATH = _REPO_ROOT / ".stm32-substrate" / "probe.lock"
 _L476RG_PROJECT_PATH = _REPO_ROOT / "tests" / "fixtures" / "projects" / "F-PROJ-NUCLEO-L476RG"
+
+
+# ---------------------------------------------------------------------------
+# Cache isolation (autouse) — keep the substrate user-cache out of the real
+# home dir during tests. The default Eclipse workspace now resolves under
+# ``platform.user_cache_root()`` (RES-050), and ``build()`` mkdirs it, so the
+# mocked build suite would otherwise litter ``~/.cache/stm32-substrate``.
+# Point the per-OS base env vars at a session temp dir for the whole run.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _isolate_user_cache(tmp_path_factory: pytest.TempPathFactory) -> object:
+    cache = tmp_path_factory.mktemp("user-cache")
+    saved = {k: os.environ.get(k) for k in ("XDG_CACHE_HOME", "LOCALAPPDATA")}
+    os.environ["XDG_CACHE_HOME"] = str(cache)  # Linux base
+    os.environ["LOCALAPPDATA"] = str(cache)  # Windows base
+    yield cache
+    for key, value in saved.items():
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
 
 
 # ---------------------------------------------------------------------------

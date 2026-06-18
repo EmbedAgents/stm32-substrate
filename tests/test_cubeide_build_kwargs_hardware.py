@@ -76,11 +76,12 @@ _DEVICE_SYMBOL = "STM32L476xx"
 def build_ctx(tmp_path: Path):
     """Isolated SubstrateContext for headless builds.
 
-    Rooted at a fresh ``tmp_path`` with no project descriptor, so the
-    resolved Eclipse workspace is ``tmp_path/.stm32-substrate-workspace``
-    — unique per test (no cross-test import collisions) and independent of
-    any committed fixture descriptor. Skips the suite if the vendor CLIs
-    don't resolve on this host.
+    Rooted at a fresh ``tmp_path`` with no project descriptor. The resolved
+    Eclipse workspace is a deterministic per-project dir under the per-OS
+    user cache (``<user-cache>/stm32-substrate/workspaces/<name>-<hash>``,
+    keyed on the built project's path — RES-050), out of the project tree
+    and independent of any committed fixture descriptor. Skips the suite if
+    the vendor CLIs don't resolve on this host.
     """
     from embedagents.stm32.context import SubstrateContext
     from embedagents.stm32.errors import ConfigurationError

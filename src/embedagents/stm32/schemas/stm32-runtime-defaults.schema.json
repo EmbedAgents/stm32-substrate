@@ -103,13 +103,13 @@
           }
         },
         "workspace_strategy": {
-          "description": "Workspace allocation strategy. v1 supports 'shared' only (TODO(v1+): ephemeral per-project).",
+          "description": "Workspace allocation strategy. v1 supports 'shared' only — a single deterministic per-project workspace whose plugin state persists across runs.",
           "type": "string",
           "enum": ["shared"],
           "default": "shared"
         },
         "log_dir": {
-          "description": "Directory under which build console captures land; substrate default <repo>/.stm32-substrate-workspace/logs/.",
+          "description": "Directory under which build console captures land; substrate default: a logs/ dir under the resolved Eclipse workspace.",
           "type": "string"
         }
       }

@@ -98,7 +98,7 @@ and NPU-equipped silicon.
 
 Open Claude Code and paste this. Claude does the rest.
 
-> Install the STM32 substrate: run `pip install embedagents-stm32` to get the `stm32` CLI, then register the plugin with `claude plugin marketplace add EmbedAgents/stm32-substrate` and `claude plugin install embedagents-stm32@embedagents`. Then ask me which ST tools I have installed (STM32CubeProgrammer, CubeIDE, CubeMX, the ST-LINK GDB server, arm-none-eabi-gdb, the Signing Tool) and write a `.claude/stm32-tools.local.jsonc` that points at them.
+> Install the STM32 substrate: run `pip install embedagents-stm32` to get the `stm32` CLI, then register the plugin with `claude plugin marketplace add EmbedAgents/stm32-substrate` and `claude plugin install embedagents-stm32@embedagents`. Then ask me which ST tools I have installed (STM32CubeProgrammer, STM32CubeIDE, STM32CubeMX, the ST-LINK_gdbserver, arm-none-eabi-gdb, the STM32_SigningTool_CLI) and write a `.claude/stm32-tools.local.jsonc` that points at them.
 
 That installs the `stm32` CLI + `embedagents.stm32` library and registers the five `/stm32*` slash commands. Restart Claude Code if the commands don't show up right away.
 

@@ -203,7 +203,7 @@ class CubeIDE:
         # ---- resolve project + configuration ----
         project_path = self._resolve_project_path(project)
         config_name = self._resolve_configuration(configuration)
-        workspace_path = self._resolve_workspace()
+        workspace_path = self._resolve_workspace(project_path)
         project_name = self._resolve_project_name(project_path)
         all_configs = self._resolve_all_configurations(modify_all_configurations)
 
@@ -521,7 +521,7 @@ class CubeIDE:
         )
         return default or "Debug"
 
-    def _resolve_workspace(self) -> Path:
+    def _resolve_workspace(self, project_path: Path) -> Path:
         descriptor = self.ctx.project
         build_block = getattr(descriptor, "build", None) if descriptor else None
         configured = (
@@ -534,8 +534,36 @@ class CubeIDE:
             workspace_path = Path(configured)
             if not workspace_path.is_absolute():
                 workspace_path = self.ctx.cwd / workspace_path
-            return workspace_path.resolve()
-        return (self.ctx.cwd / ".stm32-substrate-workspace").resolve()
+            workspace_path = workspace_path.resolve()
+        else:
+            # Default to a deterministic per-project workspace OUTSIDE the
+            # project tree. The old <ctx.cwd>/.stm32-substrate-workspace
+            # default nested the Eclipse -data dir inside the very project
+            # passed to CDT's headless -import when ctx.cwd == project root
+            # (the no-descriptor "build this folder" case), which CDT
+            # rejects ("URI ... is not valid in the workspace!").
+            workspace_path = workspace.default_workspace_root(project_path)
+
+        # The default never nests, so this guard only fires on an explicit
+        # in-tree build.workspace — raise with a hint rather than silently
+        # overriding the user's stated choice (HIL mode).
+        if workspace.workspace_nested_in_project(workspace_path, project_path):
+            raise ConfigurationError(
+                message=(
+                    f"Eclipse build workspace {workspace_path} is inside the "
+                    f"project tree {project_path}; CDT's headless -import "
+                    "rejects a project whose location contains the workspace "
+                    "-data dir"
+                ),
+                hint=(
+                    "set build.workspace in stm32-project.jsonc to a path "
+                    "OUTSIDE the project directory (an absolute path, or a "
+                    "sibling/parent dir); the substrate default already lives "
+                    "outside the tree, so this only triggers on an explicit "
+                    "in-tree build.workspace"
+                ),
+            )
+        return workspace_path
 
     def _resolve_project_name(self, project_path: Path) -> Path:
         """Extract ``<name>`` from the project's ``.project`` XML file."""

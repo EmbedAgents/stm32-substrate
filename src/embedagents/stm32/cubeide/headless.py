@@ -38,8 +38,11 @@ def resolve_headless_build(*, ctx: "SubstrateContext") -> Path:
     Order:
 
     1. ``ctx.tools.cubeide_headless_build`` (explicit override, any extension).
-    2. ``<cubeide_path>/headless-build.sh`` on Linux, ``…\\headless-build.bat``
-       on Windows.
+    2. ``headless-build.sh`` on Linux / ``headless-build.bat`` on Windows,
+       inside the CubeIDE install directory. ``cubeide.path`` / ``STM32CUBEIDE``
+       may point at either the launcher binary or the install directory itself
+       — both are accepted (the wrapper is a sibling of the binary, i.e.
+       directly inside the install dir). Mirrors ``debug/svd.py``'s tolerance.
     3. Loud ``CubeIDEError(cubeide_marker="headless-script-missing")``.
 
     TODO(v1+): direct ``-application`` invocation if wrapper missing on
@@ -49,30 +52,35 @@ def resolve_headless_build(*, ctx: "SubstrateContext") -> Path:
     if explicit is not None and explicit.is_file():
         return explicit
 
-    cubeide_bin = ctx.tools.cubeide_path
-    if cubeide_bin is None:
+    cubeide_path = ctx.tools.cubeide_path
+    if cubeide_path is None:
         raise CubeIDEError(
             message="STM32CubeIDE path not configured",
             cubeide_marker="headless-script-missing",
             hint=(
                 "set cubeide.path in .claude/stm32-tools.local.jsonc or "
-                "STM32CUBEIDE env var; the headless build script "
-                f"({_headless_script_name()}) is then auto-resolved next to "
-                "the binary"
+                "STM32CUBEIDE env var (the launcher binary or its install "
+                "directory); the headless build script "
+                f"({_headless_script_name()}) is then auto-resolved inside "
+                "the install directory"
             ),
         )
     script_name = _headless_script_name()
-    candidate = cubeide_bin.parent / script_name
+    # cubeide.path / STM32CUBEIDE may be the launcher binary or the install
+    # directory; the wrapper lives directly in the install dir either way.
+    install_dir = cubeide_path if cubeide_path.is_dir() else cubeide_path.parent
+    candidate = install_dir / script_name
     if candidate.is_file():
         return candidate
 
     raise CubeIDEError(
-        message=f"{script_name} not found next to {cubeide_bin}",
+        message=f"{script_name} not found in {install_dir}",
         cubeide_marker="headless-script-missing",
         hint=(
-            "set cubeide.cubeide_headless_build in "
-            ".claude/stm32-tools.local.jsonc to override; expected default is "
-            f"<cubeide_install>/{script_name}"
+            f"point cubeide.path / STM32CUBEIDE at the CubeIDE launcher binary "
+            f"or its install directory (expected {script_name} inside the "
+            "install dir), or set cubeide.cubeide_headless_build to the script "
+            "path directly in .claude/stm32-tools.local.jsonc"
         ),
     )
 
@@ -125,7 +133,7 @@ def run_headless_build(
     args.append(f"{inv.project_name}/{inv.configuration}")
     args.extend(inv.extra_args)
 
-    log_path = headless_log_path(ctx)
+    log_path = headless_log_path(ctx, workspace=inv.workspace)
     timeout_s = _headless_timeout_s(ctx)
 
     log.info(

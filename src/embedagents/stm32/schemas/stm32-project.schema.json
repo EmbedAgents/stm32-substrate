@@ -110,7 +110,7 @@
       "properties": {
         "_comment": { "type": "string" },
         "workspace": {
-          "description": "Eclipse workspace location; substrate default: <repo>/.stm32-substrate-workspace/.",
+          "description": "Eclipse workspace location; substrate default: a deterministic per-project dir under the per-OS user cache (~/.cache or %LOCALAPPDATA%), outside the project tree. An in-tree value is rejected (CDT's headless -import refuses a project that contains its workspace).",
           "type": "string"
         },
         "project_path": {

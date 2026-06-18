@@ -930,6 +930,46 @@ class TestResolveHeadlessBuild:
 
         assert resolve_headless_build(ctx=ctx) == script
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="Linux-only filename")
+    def test_resolves_when_cubeide_path_is_install_dir(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """cubeide.path / STM32CUBEIDE may point at the install DIRECTORY,
+        not just the launcher binary — the wrapper is found inside it
+        (mirrors debug/svd.py's dir-tolerant cubeide_path handling)."""
+        from embedagents.stm32.cubeide.headless import resolve_headless_build
+
+        install_dir = tmp_path / "stm32cubeide_2.1.1"
+        install_dir.mkdir()
+        (install_dir / "stm32cubeide").write_text("#!/bin/sh\nexit 0\n")
+        script = install_dir / "headless-build.sh"
+        script.write_text("#!/bin/sh\nexit 0\n")
+        script.chmod(0o755)
+        # Point the env var at the directory, not the binary.
+        monkeypatch.setenv("STM32CUBEIDE", str(install_dir))
+        ctx = SubstrateContext.from_environment(project_path=tmp_path)
+
+        assert resolve_headless_build(ctx=ctx) == script
+
+    @pytest.mark.skipif(sys.platform != "win32", reason="Windows-only filename")
+    def test_resolves_when_cubeide_path_is_install_dir_windows(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Install-directory tolerance holds on Windows too (the resolution
+        logic is OS-agnostic; only the wrapper filename differs)."""
+        from embedagents.stm32.cubeide.headless import resolve_headless_build
+
+        install_dir = tmp_path / "STM32CubeIDE_2.1.1"
+        install_dir.mkdir()
+        (install_dir / "stm32cubeidec.exe").write_bytes(b"")
+        script = install_dir / "headless-build.bat"
+        script.write_text("@echo off\r\nexit /b 0\r\n")
+        # Point the env var at the directory, not the .exe.
+        monkeypatch.setenv("STM32CUBEIDE", str(install_dir))
+        ctx = SubstrateContext.from_environment(project_path=tmp_path)
+
+        assert resolve_headless_build(ctx=ctx) == script
+
     @pytest.mark.skipif(sys.platform != "win32", reason="Windows-only filename")
     def test_resolves_bat_on_windows(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         from embedagents.stm32.cubeide.headless import resolve_headless_build

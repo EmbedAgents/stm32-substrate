@@ -15,14 +15,22 @@ Public surface:
   ``.lock``; logs WARNING enumerating deletions.
 - ``acquire_workspace_lock(workspace)`` — context manager; raises
   ``WorkspaceLockedError`` immediately on contention (HIL-mode M-019).
-- ``headless_log_path(ctx)`` — generates a timestamped log path under
-  ``cubeide.log_dir`` for ``run_headless_build`` capture.
+- ``default_workspace_root(project_path)`` — deterministic per-project
+  Eclipse workspace under the persistent user-cache, out of the project
+  tree (CDT's headless ``-import`` rejects an in-tree ``-data`` dir).
+- ``workspace_nested_in_project(workspace, project_path)`` — ``True`` when
+  the workspace is the project dir or a descendant (case-insensitive).
+- ``headless_log_path(ctx, *, workspace=)`` — generates a timestamped log
+  path under ``cubeide.log_dir`` (else ``<workspace>/logs``) for
+  ``run_headless_build`` capture.
 """
 
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import logging
+import os
 import re
 import shutil
 from datetime import datetime, timezone
@@ -34,6 +42,7 @@ from embedagents.stm32.errors import WorkspaceLockedError
 from embedagents.stm32.platform import (
     acquire_exclusive_lock,
     is_lock_held,
+    user_cache_root,
 )
 
 if TYPE_CHECKING:
@@ -198,12 +207,46 @@ def acquire_workspace_lock(workspace: Path) -> Iterator[None]:
         ) from ex
 
 
-def headless_log_path(ctx: "SubstrateContext") -> Path:
+def default_workspace_root(project_path: Path) -> Path:
+    """Deterministic per-project Eclipse workspace, out of the project tree.
+
+    ``<user-cache>/stm32-substrate/workspaces/<basename>-<8 hex>`` keyed on
+    the resolved (case-normalised) project path. Never inside the project
+    tree, so CDT's headless ``-import`` is never asked to import a project
+    whose location contains its own ``-data`` dir. Deterministic → the
+    workspace's plugin state (and thus incremental-build speed) persists
+    across runs; the short ``-<hash>`` suffix keeps the segment compact
+    (Windows MAX_PATH) and neutralises reserved device names (CON/NUL/…).
+    """
+    resolved = project_path.resolve()
+    key = os.path.normcase(str(resolved))
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:8]
+    base = re.sub(r"[^A-Za-z0-9._-]", "_", resolved.name) or "project"
+    return user_cache_root() / "workspaces" / f"{base}-{digest}"
+
+
+def workspace_nested_in_project(workspace_path: Path, project_path: Path) -> bool:
+    """``True`` when the workspace is the project dir or a descendant.
+
+    Compared on ``os.path.normcase`` of the resolved paths so the check is
+    case-insensitive and separator-normalised on Windows (``Path`` /
+    ``is_relative_to`` compare case-sensitively even there). CDT rejects a
+    headless ``-import`` whose project location encloses the ``-data`` dir.
+    """
+    ws = os.path.normcase(str(workspace_path.resolve()))
+    proj = os.path.normcase(str(project_path.resolve()))
+    return ws == proj or ws.startswith(proj + os.sep)
+
+
+def headless_log_path(
+    ctx: "SubstrateContext", *, workspace: "Path | None" = None
+) -> Path:
     """Build a fresh timestamped log path under ``cubeide.log_dir``.
 
-    Default ``log_dir`` (when ``ctx.defaults.cubeide.log_dir`` is unset)
-    is ``<ctx.cwd>/.stm32-substrate-workspace/logs/``. Directory is
-    created if missing.
+    When ``ctx.defaults.cubeide.log_dir`` is unset the logs follow the
+    resolved Eclipse ``workspace`` (``<workspace>/logs/``); if no workspace
+    is given they fall back to ``<ctx.cwd>/.stm32-substrate-workspace/logs/``.
+    Directory is created if missing.
     """
     cubeide_defaults = getattr(ctx.defaults, "cubeide", None)
     raw_dir = (
@@ -213,6 +256,8 @@ def headless_log_path(ctx: "SubstrateContext") -> Path:
     )
     if raw_dir:
         log_dir = Path(raw_dir)
+    elif workspace is not None:
+        log_dir = workspace / "logs"
     else:
         log_dir = ctx.cwd / ".stm32-substrate-workspace" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
