@@ -20,7 +20,7 @@ the time you just talk.
 
 ## Demo
 
-![Claude Code building and flashing an STM32 project from one plain-language request](docs/media/demo-v2.gif)
+![Claude Code building and flashing an STM32 project from one plain-language request](docs/media/demo.gif)
 
 *Real session, real hardware: a NUCLEO-L476RG (Cortex-M4), built and flashed
 end-to-end from one sentence — first try.*
