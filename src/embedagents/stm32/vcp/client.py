@@ -357,7 +357,7 @@ class VCP:
         if len(matches) == 1:
             picked = matches[0]
             self._log.info(
-                "multi-probe auto-match: board=%r → probe SN=%s port=%s",
+                "multi-probe auto-match: board=%r -> probe SN=%s port=%s",
                 board,
                 picked.serial_number,
                 picked.port,

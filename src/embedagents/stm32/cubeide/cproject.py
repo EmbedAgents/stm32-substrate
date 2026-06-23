@@ -473,7 +473,7 @@ class CProjectEditor:
             # observe the empty SettingChange in the audit trail.
             self._log.warning(
                 "%s no-op: no <option superClass=...> matched regex %r "
-                "(value=%r); list-shaped option absent — CubeIDE only "
+                "(value=%r); list-shaped option absent - CubeIDE only "
                 "plants it after a manual GUI edit",
                 kind, superclass, value,
             )

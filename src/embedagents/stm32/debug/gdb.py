@@ -139,7 +139,7 @@ class GDBClient:
                         ),
                         gdb_marker="command-error",
                         hint=(
-                            "gdb rejected the command — check the "
+                            "gdb rejected the command - check the "
                             "address/symbol/location argument"
                         ),
                     )

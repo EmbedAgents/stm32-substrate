@@ -92,11 +92,12 @@ class TestErrorHierarchy:
     def test_project_ambiguity_carries_candidates(self) -> None:
         err = ProjectAmbiguityError(
             message="multiple .cproject found",
-            cubeide_marker="ambiguous",
             candidates=(Path("/a/.cproject"), Path("/b/.cproject")),
         )
         assert err.candidates == (Path("/a/.cproject"), Path("/b/.cproject"))
-        assert err.cubeide_marker == "ambiguous"
+        # Live raisers (cubeide/client.py) differentiate this by class
+        # identity and set no cubeide_marker -> defaults to None (RES-056).
+        assert err.cubeide_marker is None
 
     def test_project_ambiguity_default_empty(self) -> None:
         err = ProjectAmbiguityError(message="boom")

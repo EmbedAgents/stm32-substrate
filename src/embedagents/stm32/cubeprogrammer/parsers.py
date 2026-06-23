@@ -416,7 +416,7 @@ def _parse_probe_block(block_lines: list[str]) -> ProbeRecord | None:
 _OB_LINE_RE = re.compile(
     r"""
     ^\s+                          # leading indent
-    ([A-Za-z][A-Za-z0-9_]*)       # identifier — mixed-case, no spaces
+    ([A-Za-z][A-Za-z0-9_]*)       # identifier - mixed-case, no spaces
     \s*:\s*                       # colon separator
     (\S+)                         # value (the first whitespace-delimited token)
     (?:\s*\(.*\))?                # optional " (description)" tail
@@ -509,7 +509,7 @@ def _classify_rdp(value: int | str | bool | None) -> int | None:
 _HEX_DUMP_LINE_RE = re.compile(
     r"""
     ^\s*
-    0x[0-9A-Fa-f]+               # row address (discarded — we rebuild from caller-supplied start)
+    0x[0-9A-Fa-f]+               # row address (discarded - we rebuild from caller-supplied start)
     \s*:\s*
     ((?:[0-9A-Fa-f]{2}\s*)+)     # one or more hex bytes
     \s*$

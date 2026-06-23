@@ -270,7 +270,7 @@ class Debug:
                 hint=(
                     "Set programmer.cube_programmer_path in "
                     ".claude/stm32-tools.local.jsonc; gdbserver delegates "
-                    "flash writes through CubeProgrammer (UM2576 §1)."
+                    "flash writes through CubeProgrammer (UM2576 section 1)."
                 ),
             )
         return cli.parent

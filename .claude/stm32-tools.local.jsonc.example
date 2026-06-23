@@ -18,7 +18,7 @@
 // tool you need — substrate works without it. Substrate also falls
 // back to a built-in tool-defaults table when this file is absent.
 {
-  "$schema": "../src/stm32_substrate/schemas/stm32-tools.local.schema.json",
+  "$schema": "../src/embedagents/stm32/schemas/stm32-tools.local.schema.json",
   "version": 1,
   "programmer": {
     // Default ST-LINK serial used when caller doesn't override; honors

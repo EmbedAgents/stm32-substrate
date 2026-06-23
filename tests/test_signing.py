@@ -532,3 +532,57 @@ class TestTimeoutKnob:
                 header_version="2",
             )
         assert mocked.call_args.kwargs["timeout_s"] == 120.0
+
+
+# ---------------------------------------------------------------------------
+# Security tripwire (S4: signing-key material is a named threat surface).
+#
+# sign_binary takes NO key/password/keystore parameter -- key material is
+# provisioned out-of-band, so the vendor argv + logs structurally cannot
+# carry a secret today. This guards that property: if a future signing
+# parameter ever threads a credential into the argv or a log line, the flag
+# whitelist + marker scan below fail loudly.
+# ---------------------------------------------------------------------------
+
+
+class TestSecretTripwire:
+    # The complete UM2543 argv surface sign_binary may emit.
+    _ALLOWED_FLAGS = {"-bin", "-la", "-t", "-hv", "-ep", "-of", "-nk", "--align", "-o"}
+    # Markers that would never appear in a legitimate path/flag/address but
+    # would in leaked key material -- safe to substring-scan.
+    _CREDENTIAL_MARKERS = ("-----begin", "passphrase", "password", "secret=")
+
+    def test_signing_argv_and_logs_carry_no_credentials(
+        self,
+        ctx: SubstrateContext,
+        input_bin: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        tool = SigningTool(ctx)
+        with caplog.at_level(logging.DEBUG, logger="embedagents.stm32"):
+            with patch(
+                "embedagents.stm32.signing.client.run_tool",
+                return_value=_success(),
+            ) as mocked:
+                tool.sign_binary(
+                    input_bin,
+                    load_address="0x70000000",
+                    image_type="copro",
+                    header_version="2",
+                    no_key=True,
+                )
+        argv = mocked.call_args[0][1]
+        flags = {tok for tok in argv if tok.startswith("-")}
+        assert flags <= self._ALLOWED_FLAGS, (
+            "unexpected flag(s) in signing argv (possible credential leak): "
+            f"{sorted(flags - self._ALLOWED_FLAGS)}"
+        )
+        haystack = (
+            "\n".join(argv)
+            + "\n"
+            + "\n".join(r.getMessage() for r in caplog.records)
+        ).lower()
+        for marker in self._CREDENTIAL_MARKERS:
+            assert marker not in haystack, (
+                f"credential marker {marker!r} leaked into signing argv/logs"
+            )

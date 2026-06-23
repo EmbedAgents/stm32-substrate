@@ -461,3 +461,74 @@ fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 time.sleep({hold_seconds!r})
 """
     return subprocess.Popen([sys.executable, "-c", script])
+
+
+# ---------------------------------------------------------------------------
+# RES-054 — reset_workspace_for_import + missing_linked_folders
+# ---------------------------------------------------------------------------
+
+
+def _linked_project_xml(folders: tuple[str, ...]) -> bytes:
+    import xml.etree.ElementTree as ET
+
+    root = ET.Element("projectDescription")
+    ET.SubElement(root, "name").text = "demo"
+    linked = ET.SubElement(root, "linkedResources")
+    for folder in folders:
+        link = ET.SubElement(linked, "link")
+        ET.SubElement(link, "name").text = f"{folder}/{folder.lower()}_file.c"
+        ET.SubElement(link, "type").text = "1"
+        ET.SubElement(link, "locationURI").text = (
+            f"PARENT-1-PROJECT_LOC/Src/{folder.lower()}_file.c"
+        )
+    return ET.tostring(root)
+
+
+class TestResetWorkspaceForImport:
+    def test_preserves_only_the_substrate_lock(self, tmp_path: Path) -> None:
+        ws = tmp_path / "ws"
+        meta = ws / ".metadata"
+        meta.mkdir(parents=True)
+        (meta / ".substrate-lock").write_bytes(b"\0")
+        (meta / ".lock").write_bytes(b"")
+        (meta / ".plugins" / "org.eclipse.core.resources").mkdir(parents=True)
+        (ws / "demo").mkdir()
+        (ws / "logs").mkdir()
+
+        workspace.reset_workspace_for_import(ws)
+
+        # .as_posix() so the expected paths compare equal on Windows too
+        # (str(WindowsPath) uses backslashes).
+        survivors = sorted(p.relative_to(ws).as_posix() for p in ws.rglob("*"))
+        assert survivors == [".metadata", ".metadata/.substrate-lock"]
+
+    def test_missing_workspace_is_noop(self, tmp_path: Path) -> None:
+        workspace.reset_workspace_for_import(tmp_path / "nope")  # no raise
+
+
+class TestMissingLinkedFolders:
+    def test_all_present(self, tmp_path: Path) -> None:
+        proj = tmp_path / "demo"
+        proj.mkdir()
+        (proj / ".project").write_bytes(_linked_project_xml(("Drivers", "Doc")))
+        (proj / "Drivers").mkdir()
+        (proj / "Doc").mkdir()
+        assert workspace.missing_linked_folders(proj) == []
+
+    def test_reports_deleted_folders(self, tmp_path: Path) -> None:
+        proj = tmp_path / "demo"
+        proj.mkdir()
+        (proj / ".project").write_bytes(
+            _linked_project_xml(("Drivers", "Doc", "Example"))
+        )
+        (proj / "Example").mkdir()  # only Example survives
+        assert sorted(workspace.missing_linked_folders(proj)) == ["Doc", "Drivers"]
+
+    def test_no_project_file_returns_empty(self, tmp_path: Path) -> None:
+        assert workspace.missing_linked_folders(tmp_path) == []
+
+    def test_unparseable_project_returns_empty(self, tmp_path: Path) -> None:
+        proj = tmp_path / "demo"
+        proj.mkdir()
+        (proj / ".project").write_text("<not valid xml")
+        assert workspace.missing_linked_folders(proj) == []

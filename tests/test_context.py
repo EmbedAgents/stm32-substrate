@@ -17,6 +17,7 @@ from embedagents.stm32.context import (
     SubstrateContext,
     ToolPaths,
 )
+from embedagents.stm32.cubeprogrammer import CubeProgrammer
 from embedagents.stm32.errors import ConfigurationError
 
 
@@ -43,6 +44,59 @@ _PROJECT_MIN: dict = {
 
 def _write_jsonc(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data), encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Shipped tools-config example
+# ---------------------------------------------------------------------------
+
+
+class TestToolsLocalExample:
+    """``.claude/stm32-tools.local.jsonc.example`` is the template the onboarding
+    prompt (README) tells Claude to copy, so it must always be schema-valid and
+    cover every tool — otherwise a copied config is born broken (release-test
+    follow-up: a session that invented its own schema produced an invalid file)."""
+
+    EXAMPLE = (
+        Path(__file__).resolve().parent.parent
+        / ".claude"
+        / "stm32-tools.local.jsonc.example"
+    )
+
+    def test_example_exists(self) -> None:
+        assert self.EXAMPLE.is_file(), f"missing {self.EXAMPLE}"
+
+    def test_example_validates_against_bundled_schema(self) -> None:
+        import jsonschema
+        from importlib.resources import files
+
+        from embedagents.stm32._jsonc import load_jsonc_file
+
+        data = load_jsonc_file(self.EXAMPLE)
+        schema = json.loads(
+            (
+                files("embedagents.stm32.schemas")
+                / "stm32-tools.local.schema.json"
+            ).read_text(encoding="utf-8")
+        )
+        # Raises on any unrecognized key (additionalProperties: false) or shape
+        # mismatch — the exact failure mode the rogue invented config hit.
+        jsonschema.validate(data, schema)
+
+    def test_example_covers_every_tool(self) -> None:
+        from embedagents.stm32._jsonc import load_jsonc_file
+
+        data = load_jsonc_file(self.EXAMPLE)
+        expected = {
+            "cube_programmer",
+            "cubeide",
+            "cubemx",
+            "stlink_gdb_server",
+            "arm_gdb",
+            "stm32_signing_tool_cli",
+            "stm32cubeclt",
+        }
+        assert expected <= set(data.get("tools", {}))
 
 
 # ---------------------------------------------------------------------------
@@ -230,6 +284,114 @@ class TestToolResolution:
 
         ctx = SubstrateContext.from_environment(project_path=tmp_path)
         assert ctx.tools.cube_programmer_cli is None
+
+    def test_unresolved_tool_raises_loud_on_first_use(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Resolution returns None *silently* (test above); the loud contract
+        is deferred to first use. A newcomer with a misconfigured path must
+        then get a ConfigurationError naming the JSON key AND the env var to
+        set -- not a downstream crash they can't diagnose."""
+        monkeypatch.delenv("STM32_PROGRAMMER_CLI", raising=False)
+        monkeypatch.setenv("PATH", "")
+        tools = {
+            "version": 1,
+            "tools": {
+                "cube_programmer": {
+                    "env_var": "STM32_PROGRAMMER_CLI",
+                    "executable_name": "STM32_Programmer_CLI_definitely_absent",
+                    "candidates": {"linux": ["/nonexistent/path"]},
+                }
+            },
+        }
+        cfg = tmp_path / ".claude" / "stm32-tools.local.jsonc"
+        cfg.parent.mkdir()
+        _write_jsonc(cfg, tools)
+        ctx = SubstrateContext.from_environment(project_path=tmp_path)
+
+        prog = CubeProgrammer(ctx)
+        with pytest.raises(ConfigurationError) as excinfo:
+            prog.connect()
+        hint = excinfo.value.hint or ""
+        assert "cube_programmer_path" in hint, hint
+        assert "STM32_PROGRAMMER_CLI" in hint, hint
+
+    def test_candidates_beat_path_lookup(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Resolution order R-003: a configured candidate that exists wins
+        over a same-named binary discovered on PATH."""
+        monkeypatch.delenv("STM32_PROGRAMMER_CLI", raising=False)
+        exe_name = "STM32_Programmer_CLI_t5guard"
+        # A binary on PATH (the decoy) ...
+        path_dir = tmp_path / "pathbin"
+        path_dir.mkdir()
+        on_path = path_dir / exe_name
+        on_path.write_text("#!/bin/sh\n")
+        on_path.chmod(0o755)
+        monkeypatch.setenv("PATH", str(path_dir))
+        # ... and a different configured candidate that also exists (must win).
+        candidate = tmp_path / "configured" / exe_name
+        candidate.parent.mkdir()
+        candidate.write_text("#!/bin/sh\n")
+        candidate.chmod(0o755)
+
+        tools = {
+            "version": 1,
+            "tools": {
+                "cube_programmer": {
+                    "env_var": "STM32_PROGRAMMER_CLI",
+                    "executable_name": exe_name,
+                    "candidates": {"linux": [str(candidate)]},
+                }
+            },
+        }
+        cfg = tmp_path / ".claude" / "stm32-tools.local.jsonc"
+        cfg.parent.mkdir()
+        _write_jsonc(cfg, tools)
+        ctx = SubstrateContext.from_environment(project_path=tmp_path)
+        assert ctx.tools.cube_programmer_cli == candidate
+
+    def test_path_lookup_used_when_candidates_missing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """R-003 fallback tier: env unset + candidates absent -> shutil.which."""
+        monkeypatch.delenv("STM32_PROGRAMMER_CLI", raising=False)
+        exe_name = "STM32_Programmer_CLI_t5fallback"
+        path_dir = tmp_path / "pathbin"
+        path_dir.mkdir()
+        on_path = path_dir / exe_name
+        on_path.write_text("#!/bin/sh\n")
+        on_path.chmod(0o755)
+        monkeypatch.setenv("PATH", str(path_dir))
+
+        tools = {
+            "version": 1,
+            "tools": {
+                "cube_programmer": {
+                    "env_var": "STM32_PROGRAMMER_CLI",
+                    "executable_name": exe_name,
+                    "candidates": {"linux": ["/nonexistent/path"]},
+                }
+            },
+        }
+        cfg = tmp_path / ".claude" / "stm32-tools.local.jsonc"
+        cfg.parent.mkdir()
+        _write_jsonc(cfg, tools)
+        ctx = SubstrateContext.from_environment(project_path=tmp_path)
+        assert ctx.tools.cube_programmer_cli == on_path
+
+    def test_malformed_tools_jsonc_raises_configuration_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A syntactically broken tools config surfaces a clean, typed
+        ConfigurationError (not a raw JSONDecodeError traceback to the user)."""
+        monkeypatch.delenv("STM32_PROGRAMMER_CLI", raising=False)
+        cfg = tmp_path / ".claude" / "stm32-tools.local.jsonc"
+        cfg.parent.mkdir()
+        cfg.write_text('{ "version": 1, "tools": { broken ] ', encoding="utf-8")
+        with pytest.raises(ConfigurationError, match="failed to parse"):
+            SubstrateContext.from_environment(project_path=tmp_path)
 
 
 # ---------------------------------------------------------------------------

@@ -80,7 +80,7 @@ def run_diagnose(
             # elapsed lands exactly on a positive cap.
             if time.monotonic() - start >= timeout_s:
                 log.warning(
-                    "diagnose_micro: bailing after %d attempts — overall "
+                    "diagnose_micro: bailing after %d attempts - overall "
                     "cap (%.1fs) exceeded",
                     len(attempts),
                     timeout_s,
@@ -113,7 +113,7 @@ def run_diagnose(
                 )
                 if ex.error_code is not None and ex.error_code in _FATAL_CODES:
                     log.warning(
-                        "diagnose_micro: aborting ladder — %s is not "
+                        "diagnose_micro: aborting ladder - %s is not "
                         "recoverable",
                         ex.error_code,
                     )

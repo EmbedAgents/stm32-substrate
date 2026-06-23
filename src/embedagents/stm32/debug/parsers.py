@@ -75,7 +75,7 @@ def parse_mi_record(
                 gdb_marker="protocol-violation",
                 hint=(
                     "gdb emitted a result record outside the MI grammar "
-                    "substrate parses — possibly truncated output or an "
+                    "substrate parses - possibly truncated output or an "
                     "MI version drift"
                 ),
             ) from ex

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "embedagents-stm32"
-version = "0.3.0"
+version = "0.3.1"
 description = "Deterministic Python wrapper around the six ST vendor CLIs (CubeProgrammer, CubeIDE, CubeMX, ST-LINK gdbserver, arm-none-eabi-gdb, STM32_SigningTool_CLI) plus a USB virtual COM port reader. Surfaces a Python library, a `stm32` CLI, and five Claude-Code slash commands."
 readme = "README.md"
 requires-python = ">=3.11"

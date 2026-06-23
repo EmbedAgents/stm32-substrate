@@ -369,11 +369,11 @@ def _format_expected(err: jsonschema.ValidationError) -> str:
     if validator == "additionalProperties":
         return "no additional properties"
     if validator == "minLength":
-        return f"string of length ≥ {val}"
+        return f"string of length >= {val}"
     if validator == "minimum":
-        return f"≥ {val}"
+        return f">= {val}"
     if validator == "maximum":
-        return f"≤ {val}"
+        return f"<= {val}"
     return f"{validator}={val!r}"
 
 

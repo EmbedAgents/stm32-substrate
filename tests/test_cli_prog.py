@@ -1224,6 +1224,101 @@ class TestCliErrorBoundary:
 
 
 # ---------------------------------------------------------------------------
+# Destructive-op gate at the CLI surface (HARD RULE 1).
+#
+# TestErase / TestWriteOb above mock the client and only prove the gate flag
+# is *forwarded*. These run the REAL CubeProgrammer (no mock_client) and spy
+# on the vendor-CLI runner to prove the actual contract: an unconfirmed
+# erase / OB-write / RDP-2 transition aborts with a structured SubstrateError
+# envelope (exit 1) and the vendor CLI is NEVER spawned. This is the gap the
+# pre-0.3.1 review flagged: the irreversible flash/RDP-2 safety gate had no
+# real-behaviour coverage at the surface a newcomer actually invokes.
+# ---------------------------------------------------------------------------
+
+
+class TestCliDestructiveGate:
+    @pytest.fixture()
+    def no_run_tool(self, monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+        """Spy on the vendor-CLI runner the real client uses. The gate must
+        fire before this is ever reached; ``call_count == 0`` proves no
+        subprocess was spawned. If the gate regresses, the spy IS called and
+        the structured-abort assertions below fail loudly."""
+        spy = MagicMock(name="run_tool-spy")
+        monkeypatch.setattr(
+            "embedagents.stm32.cubeprogrammer.client.run_tool", spy
+        )
+        return spy
+
+    def _assert_aborted(
+        self,
+        code: int,
+        out: str,
+        err: str,
+        *,
+        error_type: str,
+        spy: MagicMock,
+    ) -> None:
+        assert code == 1, f"expected exit 1 (SubstrateError), got {code} (stderr={err!r})"
+        assert out == "", "no JSON should reach stdout on the abort path"
+        envelope = json.loads(err)  # raises if a raw traceback leaked
+        assert envelope["error_type"] == error_type
+        assert envelope["hint"], "abort envelope must carry an actionable hint"
+        assert spy.call_count == 0, (
+            "vendor CLI must NOT run when the destructive gate aborts "
+            f"(run_tool called {spy.call_count}x)"
+        )
+
+    def test_erase_without_confirm_aborts(
+        self,
+        ensure_cli_on_path,
+        no_run_tool: MagicMock,
+        capsys: pytest.CaptureFixture,
+    ) -> None:
+        code, out, err = _run(["prog", "erase"], capsys)
+        self._assert_aborted(
+            code, out, err, error_type="UserAbortedError", spy=no_run_tool
+        )
+
+    def test_erase_with_reset_without_confirm_aborts(
+        self,
+        ensure_cli_on_path,
+        no_run_tool: MagicMock,
+        capsys: pytest.CaptureFixture,
+    ) -> None:
+        code, out, err = _run(["prog", "erase", "--with-reset"], capsys)
+        self._assert_aborted(
+            code, out, err, error_type="UserAbortedError", spy=no_run_tool
+        )
+
+    def test_write_ob_without_confirm_aborts(
+        self,
+        ensure_cli_on_path,
+        no_run_tool: MagicMock,
+        capsys: pytest.CaptureFixture,
+    ) -> None:
+        code, out, err = _run(["prog", "write-ob", "RDP=0xAA"], capsys)
+        self._assert_aborted(
+            code, out, err, error_type="UserAbortedError", spy=no_run_tool
+        )
+
+    def test_rdp_level_2_without_irreversible_aborts(
+        self,
+        ensure_cli_on_path,
+        no_run_tool: MagicMock,
+        capsys: pytest.CaptureFixture,
+    ) -> None:
+        # Destructive granted but irreversibility NOT: RDP=0xCC sets RDP
+        # level 2 (permanent) and must still abort (ProtocolError) before
+        # any vendor CLI runs.
+        code, out, err = _run(
+            ["prog", "write-ob", "RDP=0xCC", "--confirm-destructive"], capsys
+        )
+        self._assert_aborted(
+            code, out, err, error_type="ProtocolError", spy=no_run_tool
+        )
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 

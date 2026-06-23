@@ -224,7 +224,7 @@ class DebugSession:
         if len(raw) < size:
             self._log.warning(
                 "read_memory: requested %d bytes at %s, got %d "
-                "(unreadable hole in the range — see bytes_read)",
+                "(unreadable hole in the range - see bytes_read)",
                 size,
                 address,
                 len(raw),

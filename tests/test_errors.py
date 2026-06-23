@@ -168,14 +168,14 @@ class TestWorkspaceLocked:
 
 class TestVCPAmbiguousProbe:
     def test_candidates_default_empty(self) -> None:
-        err = VCPAmbiguousProbe(message="multiple probes", vcp_marker="multi-probe-ambiguous")
+        err = VCPAmbiguousProbe(message="multiple probes", vcp_marker="ambiguous-probe")
         assert err.candidates == ()
 
     def test_candidates_preserved(self) -> None:
         candidate = ("/dev/ttyACM0", "066BFF...", "NUCLEO-L476RG")
         err = VCPAmbiguousProbe(
             message="multiple probes",
-            vcp_marker="multi-probe-ambiguous",
+            vcp_marker="ambiguous-probe",
             candidates=(candidate,),
         )
         assert err.candidates == (candidate,)

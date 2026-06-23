@@ -110,7 +110,7 @@
       "properties": {
         "_comment": { "type": "string" },
         "workspace": {
-          "description": "Eclipse workspace location; substrate default: a deterministic per-project dir under the per-OS user cache (~/.cache or %LOCALAPPDATA%), outside the project tree. An in-tree value is rejected (CDT's headless -import refuses a project that contains its workspace).",
+          "description": "Eclipse workspace location. Default (recommended, unset): a substrate-managed per-project dir under the per-OS user cache (~/.cache or %LOCALAPPDATA%), outside the project tree, rebuilt each build so CubeIDE always re-reads the on-disk .project. An explicit value must be outside the project tree (an in-tree value is rejected: CDT's headless -import refuses a project that contains its workspace); it is reused, never auto-deleted, and the build refuses (rather than corrupting .project) if you delete the project's in-tree linked-resource folders while reusing it (RES-054).",
           "type": "string"
         },
         "project_path": {

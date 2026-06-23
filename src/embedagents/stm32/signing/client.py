@@ -214,7 +214,7 @@ class SigningTool:
         bytes_in = _file_size_or_zero(input_path)
         bytes_out = _file_size_or_zero(output_path)
         self._log.info(
-            "signed %s → %s (hv=%s type=%s family=%s duration=%.2fs)",
+            "signed %s -> %s (hv=%s type=%s family=%s duration=%.2fs)",
             input_path,
             output_path,
             header_version,

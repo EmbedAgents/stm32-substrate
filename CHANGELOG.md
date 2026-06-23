@@ -4,6 +4,55 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-06-23
+
+Patch release: a CubeIDE `.project` corruption fix plus build-workspace and
+tool-path robustness, and the Windows first-run fixes staged since 0.3.0. No
+public API changes.
+
+### Fixed
+
+- **CubeIDE no longer corrupts `.project` when you reuse a persistent workspace
+  (RES-054).** If you set your own `build.workspace` and later deleted in-tree
+  linked-resource folders (e.g. `Drivers/`, `Doc/`), a workspace-reuse build
+  could make CubeIDE silently drop the HAL/CMSIS/BSP `<link>` entries from
+  `.project`, link-failing every later build. The substrate now detects missing
+  linked folders and **refuses to build with a hint** rather than corrupt the
+  project; the default substrate-managed workspace is rebuilt each build, so it
+  always reflects your on-disk project.
+- **Clearer error when `stm32 build` can't find a project (RES-052).** The "no
+  descriptor" message is now cwd-aware — it names `--project <dir>` (or
+  `--project .` when the current folder is itself a CubeIDE project).
+- **Debug-session teardown no longer leaves a stray gdbserver process** on the
+  spawn-error / handshake-timeout fallback paths (a `wait()` was missing after
+  the fallback `kill()`).
+- **CubeIDE build workspace now lands outside the project tree (RES-050).**
+  Running `stm32 build` from inside a CubeIDE project directory put the Eclipse
+  `-data` workspace at `<project>/.stm32-substrate-workspace`, inside the dir
+  handed to CDT's headless `-import` — which CDT rejects (`URI … is not valid
+  in the workspace!`, JVM exit 1). The unconfigured default is now a
+  deterministic per-project dir under the per-OS user cache
+  (`~/.cache` / `%LOCALAPPDATA%` → `stm32-substrate/workspaces/<name>-<hash>`):
+  never in-tree, persistent across runs, per-project isolated. An explicit
+  in-tree `build.workspace` now raises `ConfigurationError` with a hint.
+- **`cubeide.path` / `STM32CUBEIDE` may point at the install directory, not
+  only the launcher binary (RES-051).** `resolve_headless_build` now tolerates
+  an install-dir value (e.g. `/opt/st/stm32cubeide_2.1.1`) and finds
+  `headless-build.sh` under it, mirroring the existing `is_dir()` tolerance in
+  SVD resolution.
+- **Windows slash commands work on a per-user pip install.** Each command now
+  has a `python -m embedagents.stm32` PATH-independent fallback (new
+  `embedagents.stm32.__main__`) for when `stm32.exe` is off PATH; CLI help text
+  ASCII-ified for legacy consoles; README Windows PATH note + PowerShell 5.1
+  caveat. Stale ADR-005 "Linux-only" strings reworded to ADR-007.
+
+### Docs
+
+- README Troubleshooting expanded: the workspace-reuse gotcha, guidance for
+  schema-validation / "tool not configured" errors, and a note that the
+  `.cproject.substrate-backup-*` files are an intentional rollback safety net
+  you can delete at any time (RES-058).
+
 ## [0.3.0] — 2026-06-12
 
 Naming release: every identifier we publish is now brand-first — nothing

@@ -44,11 +44,11 @@ ConflictCallback = Callable[[str, str, str], Literal["replace", "skip", "abort"]
 """``(target_field, existing_value, new_value) -> "replace" | "skip" | "abort"``."""
 
 ExistingCallback = Callable[[Path], Literal["replace", "skip", "rename"]]
-"""``(existing_path) -> "replace" | "skip" | "rename"`` — fires when
+"""``(existing_path) -> "replace" | "skip" | "rename"`` - fires when
 ``add_libraries`` / ``add_sources`` would overwrite an existing file."""
 
 AmbiguousCallback = Callable[[list[Path]], Path]
-"""``(candidates) -> picked_path`` — fires from ``find_project`` (B-018 /
+"""``(candidates) -> picked_path`` - fires from ``find_project`` (B-018 /
 B-019) when multiple ``.cproject`` paths match."""
 
 
@@ -187,7 +187,7 @@ class CubeIDE:
             raise ValueError(
                 f"invalid debug_level {debug_level!r}: expected one of "
                 f"{sorted(presets.DEBUG_LEVEL_ALIASES)} "
-                "or a fully-formed CDT enum value (…debuglevel.value.<token>)"
+                "or a fully-formed CDT enum value (...debuglevel.value.<token>)"
             )
         if (
             optimization is not None
@@ -197,13 +197,14 @@ class CubeIDE:
             raise ValueError(
                 f"invalid optimization {optimization!r}: expected one of "
                 f"{sorted(presets.OPTIMIZATION_ALIASES)} "
-                "or a fully-formed CDT enum value (…optimization.level.value.<token>)"
+                "or a fully-formed CDT enum value (...optimization.level.value.<token>)"
             )
 
         # ---- resolve project + configuration ----
         project_path = self._resolve_project_path(project)
         config_name = self._resolve_configuration(configuration)
         workspace_path = self._resolve_workspace(project_path)
+        workspace_is_default = not self._build_workspace_configured()
         project_name = self._resolve_project_name(project_path)
         all_configs = self._resolve_all_configurations(modify_all_configurations)
 
@@ -238,15 +239,59 @@ class CubeIDE:
                     hint="close STM32CubeIDE GUI on this workspace, then re-run",
                 )
 
-            imported_loc = workspace.detect_project_imported(
-                workspace_path, project_name
-            )
-            if imported_loc is not None and imported_loc != project_path:
-                workspace.cleanup_stale_project(
-                    workspace_path, project_name, logger=self._log
+            # ---- import decision + RES-054 workspace-reuse safety ----
+            if workspace_is_default:
+                # The substrate OWNS the default per-project workspace
+                # (RES-050). Rebuild it from scratch every build so CDT
+                # re-reads the on-disk .project instead of a stale cached
+                # model: otherwise, once the user deletes the in-tree
+                # virtual folders (Drivers/, Doc/, ...) that a prior build
+                # materialised, reusing the cache makes CDT silently strip
+                # their <link>s from .project (RES-054). Cleaning the whole
+                # (single-project) workspace also sidesteps the binary
+                # ".projects.workspace.tree" "already exists" path below.
+                workspace.reset_workspace_for_import(
+                    workspace_path, logger=self._log
                 )
-                imported_loc = None
-            needs_import = imported_loc is None
+                needs_import = True
+            else:
+                # User-configured build.workspace — reused, NEVER
+                # auto-deleted (RES-050: explicit is honored, not
+                # overridden). If reuse would skip re-import AND the
+                # project's in-tree linked-resource folders are gone,
+                # building now would let CDT re-save .project dropping
+                # those links — silent source corruption. Raise BEFORE
+                # launching any tool (HIL "raise with a hint"); the user
+                # owns the cleanup. (RES-054)
+                imported_loc = workspace.detect_project_imported(
+                    workspace_path, project_name
+                )
+                if imported_loc is not None and imported_loc != project_path:
+                    workspace.cleanup_stale_project(
+                        workspace_path, project_name, logger=self._log
+                    )
+                    imported_loc = None
+                needs_import = imported_loc is None
+                if not needs_import:
+                    missing = workspace.missing_linked_folders(project_path)
+                    if missing:
+                        raise ConfigurationError(
+                            message=(
+                                f"build.workspace {workspace_path} has a cached "
+                                f"import of {project_name}, but the project's "
+                                f"linked-resource folder(s) {', '.join(missing)} "
+                                f"are missing from {project_path}. Building now "
+                                "would make CubeIDE re-save .project and silently "
+                                "drop those links, corrupting the project."
+                            ),
+                            hint=(
+                                "restore the deleted folder(s), OR delete the "
+                                f"workspace ({workspace_path}) so the next build "
+                                "re-imports the project cleanly from .project. "
+                                "The substrate never auto-deletes a configured "
+                                "build.workspace (HIL mode)."
+                            ),
+                        )
             if needs_import:
                 workspace_path.mkdir(parents=True, exist_ok=True)
 
@@ -422,7 +467,7 @@ class CubeIDE:
         if descriptor is None:
             raise ConfigurationError(
                 message="no project descriptor found; pass project= explicitly",
-                hint="set build.project_path in stm32-project.jsonc",
+                hint=self._no_descriptor_hint(),
             )
         configured = self._descriptor_project_path()
         if configured is None:
@@ -434,6 +479,32 @@ class CubeIDE:
                 ),
             )
         return configured
+
+    def _no_descriptor_hint(self) -> str:
+        """Actionable hint for a bare build with no descriptor.
+
+        The substrate descriptor (``stm32-project.jsonc``) is NOT the Eclipse
+        ``.project``; a bare ``stm32 build`` never falls back to cwd. Name the
+        paths that DO work, and when the current directory already holds a
+        CubeIDE project, give the exact command instead of a generic nudge.
+        """
+        cwd = self.ctx.cwd
+        here_is_project = (cwd / ".project").is_file() or (
+            cwd / ".cproject"
+        ).is_file()
+        if here_is_project:
+            return (
+                "the current directory is a CubeIDE project; run "
+                "`stm32 build --project .` (or pass project=Path('.') to "
+                "build()); or set build.project_path in stm32-project.jsonc "
+                "to make it the default"
+            )
+        return (
+            "point `stm32 build --project <dir>` at a CubeIDE project "
+            "directory (one containing a .project/.cproject), or run "
+            "`stm32 build in-folder` to discover one under the current "
+            "directory; or set build.project_path in stm32-project.jsonc"
+        )
 
     def _resolve_explicit_project(self, project: Path) -> Path:
         """Resolve an explicit ``project=`` path to an importable project.
@@ -472,7 +543,7 @@ class CubeIDE:
         if configured is not None:
             hint = (
                 f"the project descriptor resolves build.project_path to "
-                f"{configured} — omit project= to use it, or pass the "
+                f"{configured} - omit project= to use it, or pass the "
                 "directory containing the .project file"
             )
         else:
@@ -483,7 +554,7 @@ class CubeIDE:
             )
         raise ConfigurationError(
             message=(
-                f"{explicit} contains no .project — not an importable "
+                f"{explicit} contains no .project - not an importable "
                 "CubeIDE project"
             ),
             hint=hint,
@@ -520,6 +591,17 @@ class CubeIDE:
             getattr(build_block, "default_configuration", None) if build_block else None
         )
         return default or "Debug"
+
+    def _build_workspace_configured(self) -> bool:
+        """``True`` when the descriptor pins ``build.workspace`` (user-owned).
+
+        Drives the RES-054 split: a user-configured workspace is reused and
+        never auto-deleted (detect-and-raise on staleness), whereas the
+        substrate-managed default is rebuilt from scratch each build.
+        """
+        descriptor = self.ctx.project
+        build_block = getattr(descriptor, "build", None) if descriptor else None
+        return bool(getattr(build_block, "workspace", None) if build_block else None)
 
     def _resolve_workspace(self, project_path: Path) -> Path:
         descriptor = self.ctx.project
@@ -744,7 +826,7 @@ class CubeIDE:
                     except OSError as ex:
                         raise CProjectEditError(
                             message=(
-                                f"add_sources copy failed: {src_path} → "
+                                f"add_sources copy failed: {src_path} -> "
                                 f"{dest_abs}: {ex}"
                             ),
                             hint=(
@@ -932,7 +1014,7 @@ class CubeIDE:
             )
         if len(substring) == 1:
             self._log.warning(
-                "find_project: substring match (no exact match) — picked %s for name=%r",
+                "find_project: substring match (no exact match) - picked %s for name=%r",
                 substring[0],
                 name,
             )

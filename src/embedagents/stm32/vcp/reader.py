@@ -364,7 +364,7 @@ class _VcpReader:
                 # call) and say so loudly, not at DEBUG.
                 self._drain_failed = True
                 self._log.warning(
-                    "VCP drain thread died on read error (port=%s): %s — "
+                    "VCP drain thread died on read error (port=%s): %s - "
                     "reader marked stale; next call reconnects",
                     self.port,
                     ex,

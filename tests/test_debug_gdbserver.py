@@ -382,6 +382,54 @@ class TestSpawnErrors:
         assert elapsed < 5.0  # previously: hung forever
         assert fake._terminate_called is True
 
+    def test_handshake_timeout_kill_fallback_reaps(
+        self, ctx: SubstrateContext, tmp_path: Path
+    ) -> None:
+        """3a: when the post-terminate wait() times out, the fallback
+        kill() must be followed by a reaping wait() so no zombie is left.
+        Before the _reap fix, the kill() path had no following wait()."""
+
+        class _BlockingStream:
+            def __init__(self) -> None:
+                self._gate = threading.Event()
+
+            def readline(self) -> str:
+                self._gate.wait(timeout=10.0)
+                return ""
+
+            def release(self) -> None:
+                self._gate.set()
+
+        fake = FakePopen()
+        fake.stdout = _BlockingStream()  # type: ignore[assignment]
+
+        # First wait() (the post-terminate reap) times out, forcing the
+        # except -> kill() -> _reap() branch; later waits succeed.
+        wait_calls: list[float | None] = []
+        real_wait = fake.wait
+
+        def counting_wait(timeout: float | None = None) -> int | None:
+            wait_calls.append(timeout)
+            if len(wait_calls) == 1:
+                raise subprocess.TimeoutExpired(cmd="gdbserver", timeout=timeout)
+            return real_wait(timeout=timeout)
+
+        fake.wait = counting_wait  # type: ignore[assignment]
+
+        with pytest.raises(GDBError) as excinfo:
+            spawn_gdbserver(
+                ctx=ctx,
+                options=_options(tmp_path),
+                handshake_timeout_s=0.3,
+                _spawn=lambda *a, **k: fake,
+            )
+        fake.stdout.release()
+        assert excinfo.value.gdb_marker == "command-timeout"
+        assert fake._terminate_called is True
+        assert fake._kill_called is True  # fallback kill fired
+        # The reap: a second wait() ran after kill(). Was exactly 1 before.
+        assert len(wait_calls) >= 2
+
     def test_early_exit_classified(
         self, ctx: SubstrateContext, tmp_path: Path
     ) -> None:

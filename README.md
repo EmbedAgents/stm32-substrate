@@ -98,7 +98,7 @@ and NPU-equipped silicon.
 
 Open Claude Code and paste this. Claude does the rest.
 
-> Install the STM32 substrate: run `pip install embedagents-stm32` to get the `stm32` CLI, then register the plugin with `claude plugin marketplace add EmbedAgents/stm32-substrate` and `claude plugin install embedagents-stm32@embedagents`. Then ask me which ST tools I have installed (STM32CubeProgrammer, STM32CubeIDE, STM32CubeMX, the ST-LINK_gdbserver, arm-none-eabi-gdb, the STM32_SigningTool_CLI) and write a `.claude/stm32-tools.local.jsonc` that points at them.
+> Install the STM32 substrate: run `pipx install embedagents-stm32` (or `pip install embedagents-stm32`; on an externally-managed Python — most modern Linux — plain `pip` is refused, so use `pipx` or a venv) to get the `stm32` CLI on your PATH, then register the plugin with `claude plugin marketplace add EmbedAgents/stm32-substrate` and `claude plugin install embedagents-stm32@embedagents`. Then ask me which ST tools I have installed (STM32CubeProgrammer, STM32CubeIDE, STM32CubeMX, the ST-LINK_gdbserver, arm-none-eabi-gdb, the STM32_SigningTool_CLI) and write a `.claude/stm32-tools.local.jsonc` that points at them — copy the structure from the plugin's `stm32-tools.local.jsonc.example` (don't invent keys; it must conform to the bundled `stm32-tools.local.schema.json`), then confirm it loads with no schema error by running any `stm32` command from the project folder.
 
 That installs the `stm32` CLI + `embedagents.stm32` library and registers the five `/stm32*` slash commands. Restart Claude Code if the commands don't show up right away.
 
@@ -130,7 +130,6 @@ you stop repeating yourself. Only `version` is strictly required.
   "firmware": { "board": "nucleo-l476rg", "flash_address": "0x08000000" },
   "build": {
     "project_path": "STM32CubeIDE",
-    "workspace": ".stm32-substrate-workspace",
     "default_configuration": "Debug",
     "artifact": "Debug/blinky.elf"
   },
@@ -139,9 +138,14 @@ you stop repeating yourself. Only `version` is strictly required.
 }
 ```
 
-`build.workspace` is the Eclipse workspace CubeIDE uses for headless builds (defaults
-to `<repo>/.stm32-substrate-workspace/` if omitted). Don't want to hand-write it? Ask
-Claude to scaffold one, or run a command in the folder and it'll offer.
+`build.workspace` is the Eclipse workspace CubeIDE uses for headless builds. **Leave
+it unset** unless you have a reason not to: by default the substrate uses a private,
+per-project workspace under your user cache (`~/.cache` / `%LOCALAPPDATA%`), outside
+the project tree, and rebuilds it each build so it always reflects your on-disk
+project. If you do set it, the path must be **outside** the project directory (an
+in-tree value is rejected — CubeIDE's headless import refuses a project that contains
+its own workspace), and you then own it — see the workspace gotcha under
+[Troubleshooting](#troubleshooting).
 
 ### How you tell a command which project or file to use
 
@@ -225,6 +229,13 @@ leaves nothing else on your machine — no caches, no dotfiles, no daemons.
   The error names the exact env var / JSON key to set. Point it at the tool in
   `.claude/stm32-tools.local.jsonc`, or export the named variable (e.g.
   `STM32_PROGRAMMER_CLI`).
+- **A build/flash fails with a schema-validation error, or a tool you configured
+  still reports "not configured"** — check your `.claude/stm32-tools.local.jsonc` for
+  correctness: it must conform to the bundled schema (compare against
+  `stm32-tools.local.jsonc.example`; remove any unrecognized keys the error names). The
+  substrate uses the **nearest** such file searching upward from your project dir, so a
+  stale or invalid one in a parent directory can shadow a correct one. Run any `stm32`
+  command from the project folder to see the exact validation error.
 - **The `/stm32*` commands don't show up** — restart Claude Code, then check
   `claude plugin list`. Re-run Step 1 if the plugin isn't listed.
 - **`macOS is not supported`** — v1 runs on Linux and Windows only; macOS is
@@ -236,6 +247,24 @@ leaves nothing else on your machine — no caches, no dotfiles, no daemons.
 - **A destructive operation was refused** — that's the safety gate working. Re-run
   with `confirm_destructive=True` (library) or the matching `--confirm-…` flag
   (CLI).
+- **Build fails after you deleted folders like `Drivers/` or `Doc/` from the project,
+  and you set your own `build.workspace`** — those folders are linked-resource
+  containers CubeIDE materializes; deleting them while reusing a persistent workspace
+  would make CubeIDE silently strip them from `.project`. The substrate detects this
+  and **refuses to build** rather than corrupt the project. Either restore the deleted
+  folders, or delete your `build.workspace` directory so the next build re-imports the
+  project cleanly. (The default, substrate-managed workspace handles this for you — it
+  rebuilds each build — so this only applies when you configure `build.workspace`
+  yourself.)
+- **`.cproject.substrate-backup-<timestamp>` files pile up next to your project** —
+  that's intentional, not a leak. Whenever a build modifies your `.cproject` (changing
+  compiler/linker options or symbols, or applying a preset), the substrate first saves a
+  timestamped copy of the original. It could delete these automatically, but keeps them
+  **by design**: they're a zero-cost safety net that lets you roll back to a known-good
+  `.cproject` if an edit ever goes wrong — and in practice they have been the only way to
+  recover a project after its `.cproject` was damaged. They're plain copies; delete the
+  `.cproject.substrate-backup-*` files whenever you like (the newest is the most recent
+  pre-edit state).
 - **Schema validation failed at startup** — fix the reported field in your config.
   For a one-off debug bypass, set `STM32_SUBSTRATE_SKIP_SCHEMA_VALIDATION=1` (it
   warns loudly).

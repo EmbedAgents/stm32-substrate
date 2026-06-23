@@ -52,11 +52,14 @@ class SettingsModification:
 class BuildResult:
     """Returned by every ``CubeIDE.build()`` call.
 
-    ``success`` is just ``exit_code == 0``. Build-level failures
-    (compile / link errors) surface here as ``success=False`` with the
-    error text in ``console_output`` / ``log_path``; substrate-side
-    failures (workspace locked, headless script missing, etc.) raise
-    ``CubeIDEError`` instead.
+    ``success`` is ``exit_code == 0`` EXCEPT a zero-exit "Nothing to
+    build for project" run that produced no artifact, which is a failure
+    (RES-034); an up-to-date incremental rebuild also prints "Nothing to
+    build" but keeps its artifact, so it stays a success. Build-level
+    failures (compile / link errors) surface here as ``success=False``
+    with the error text in ``console_output`` / ``log_path``;
+    substrate-side failures (workspace locked, headless script missing,
+    etc.) raise ``CubeIDEError`` instead.
     """
 
     success: bool

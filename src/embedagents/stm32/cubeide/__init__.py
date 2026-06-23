@@ -7,8 +7,8 @@ all 12 build-shaped prompts) and ``find_project()`` (B-018 + B-019).
 
 Out of this module:
 
-- **B-003 / B-016 / CP-004 / CP-005** — multi-tool compounds; live in
-  ``compound/``.
+- **B-003 / B-016 / CP-004 / CP-005** — multi-tool compounds; Claude-composed
+  per RES-044 (no ``compound/`` subpackage).
 - **B-017** — dropped per P-037 (CubeMX scope cut).
 - **B-010 / B-015 / B-020 / B-021** — T3 prompts deferred per M-014.
 

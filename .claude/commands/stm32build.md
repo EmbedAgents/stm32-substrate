@@ -19,7 +19,7 @@ The `build` group has one verb + several `add-*` shapes. Pick by request shape:
 **Base build:**
 - `stm32 build [PATH | --project PATH] [--config NAME] [--clean] [--debug-level={none|-g1|-g|-g3}] [--opt={-O0|-O1|-O2|-O3|-Og|-Os|-Ofast|-Oz}] [--preset {fast|size|balanced}] [--all-configs]`
   - Values starting with `-` need the `=` form: `--opt=-O2`, `--debug-level=-g3` (space-separated `--opt -O2` fails argparse). Any other value raises a loud `ValueError` naming the accepted forms.
-  - No PATH → autodiscover from cwd / descriptor.
+  - No PATH → resolves the project from a `stm32-project.jsonc` **descriptor** only (the substrate descriptor, searched up from cwd — NOT the Eclipse `.project`). A bare `stm32 build` does NOT fall back to a CubeIDE project in the current directory. So when the user says "build my/this project" and the current directory is a CubeIDE project (holds a `.project`/`.cproject`) with no `stm32-project.jsonc`, **pass the path explicitly: `stm32 build --project .`** (or `stm32 build in-folder` to discover one under cwd). The error's `hint` already names these if you hit it.
   - PATH may be passed positionally or via `--project`; both work.
   - PATH may be the repo root: if it has no `.project`, the descriptor's
     `build.project_path` (when nested under PATH) is built instead.

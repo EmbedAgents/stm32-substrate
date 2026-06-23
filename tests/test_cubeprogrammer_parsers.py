@@ -6,8 +6,10 @@ from pathlib import Path
 
 import pytest
 
+from embedagents.stm32.cubeprogrammer import parsers as _parsers
 from embedagents.stm32.cubeprogrammer.parsers import parse_banner
 from embedagents.stm32.cubeprogrammer.results import BannerResult
+from embedagents.stm32.errors import SubstrateError
 
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "cubeprogrammer" / "banners"
@@ -236,3 +238,72 @@ class TestLiveBannerL476RG_v2_22:
         assert result.voltage_v == pytest.approx(3.25, abs=0.05)
         assert result.device_id == "0x415"
         assert result.device_cpu == "Cortex-M4"
+
+
+# ---------------------------------------------------------------------------
+# Adversarial-input containment (ADR-004 "substrate captures, doesn't
+# interpret"). Banner / probe-list / option-byte / hex-dump / hardfault / ITM
+# output is device- and firmware-controlled and flows into these parsers raw.
+# The load-bearing contract: a parser may return a (possibly partial) result
+# or raise a SubstrateError, but a hostile blob must NEVER escape as a raw
+# Python exception (ValueError/IndexError/KeyError/...) that bypasses the
+# SubstrateError boundary and surfaces as a traceback to a newcomer.
+# ---------------------------------------------------------------------------
+
+
+# Each entry fuzzes only the vendor-output STRING; non-output kwargs stay
+# valid (they are substrate-controlled, not attacker-controlled).
+_PARSERS = [
+    ("parse_banner", lambda s: _parsers.parse_banner(s)),
+    ("parse_error", lambda s: _parsers.parse_error(s, 1)),
+    ("parse_probe_list", lambda s: _parsers.parse_probe_list(s)),
+    ("parse_option_bytes", lambda s: _parsers.parse_option_bytes(s, device_name="X")),
+    ("parse_hex_dump", lambda s: _parsers.parse_hex_dump(s, address="0x20000000", size=32)),
+    ("parse_hardfault", lambda s: _parsers.parse_hardfault(s)),
+    ("parse_itm_line", lambda s: _parsers.parse_itm_line(s)),
+    ("is_swv_dropped_bytes_warning", lambda s: _parsers.is_swv_dropped_bytes_warning(s)),
+]
+
+_HOSTILE_INPUTS = [
+    ("empty", ""),
+    ("whitespace", "   \n\t  \r\n "),
+    ("nul_and_high_bytes", "\x00\x01\x02\xff\xfe garbage \x00 board"),
+    ("very_long_line", "A" * 500_000),
+    ("many_lines", "x\n" * 50_000),
+    ("shell_injection", "RDP=0xAA; rm -rf /\n$(whoami)\n`id`\n${HOME}"),
+    ("ansi_escapes", "\x1b[31mError\x1b[0m \x1b[1mBoard\x1b[0m : x"),
+    ("partial_fields", "Board :\nDevice ID :\nFlash size :\nNVIC :\n"),
+    ("non_numeric_numbers", "Device ID : 0xZZZZ\nNVIC IRQ : not-a-number\nPort : --\n"),
+    ("oversized_numbers", "NVIC : 999999999999999999999999\nPort : 88888888888888888\n"),
+    ("unicode_and_emoji", "Board : 中文 \U0001F600 éè\nDevice ID : 0xÿ"),
+    ("only_delimiters", "::::====\n||||\n,,,,\n"),
+    ("truncated_hexdump", "0x20000000: 00 11 22"),
+    ("itm_lookalike", "\x01\x00\x00\x00garbled-itm-frame\xee"),
+]
+
+
+class TestParserContainment:
+    @pytest.mark.parametrize(
+        "parser_name,call",
+        _PARSERS,
+        ids=[name for name, _ in _PARSERS],
+    )
+    @pytest.mark.parametrize(
+        "input_name,blob",
+        _HOSTILE_INPUTS,
+        ids=[name for name, _ in _HOSTILE_INPUTS],
+    )
+    def test_hostile_input_stays_within_substrate_error_boundary(
+        self, parser_name: str, call, input_name: str, blob: str
+    ) -> None:
+        try:
+            call(blob)
+        except SubstrateError:
+            # Allowed: a typed, structured failure inside the boundary.
+            pass
+        except Exception as exc:  # noqa: BLE001 - the whole point is to catch leaks
+            pytest.fail(
+                f"{parser_name} leaked a raw {type(exc).__name__} on "
+                f"{input_name!r} input (must return a result or raise "
+                f"SubstrateError): {exc!r}"
+            )

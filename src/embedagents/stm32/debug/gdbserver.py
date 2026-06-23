@@ -54,6 +54,19 @@ _ERROR_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
 )
 
 
+def _reap(proc: subprocess.Popen[str], *, timeout_s: float = 1.0) -> None:
+    """Collect the exit status of an already-signalled process (no zombie).
+
+    The caller has already issued ``terminate()``/``kill()``; this only
+    reaps. A process that ignores SIGKILL within the window, or is already
+    gone, needs no further action here.
+    """
+    try:
+        proc.wait(timeout=timeout_s)
+    except (subprocess.TimeoutExpired, ProcessLookupError):
+        pass
+
+
 @dataclass(frozen=True)
 class GDBServerOptions:
     """Spawn-time options for ``GDBServerProcess``."""
@@ -251,6 +264,7 @@ def spawn_gdbserver(
                 proc.wait(timeout=1.0)
             except (subprocess.TimeoutExpired, ProcessLookupError):
                 proc.kill()
+                _reap(proc)
             raise GDBError(
                 message=(
                     f"gdbserver output indicated {marker}: {line.strip()[:200]}"
@@ -267,6 +281,7 @@ def spawn_gdbserver(
         proc.wait(timeout=1.0)
     except (subprocess.TimeoutExpired, ProcessLookupError):
         proc.kill()
+        _reap(proc)
     raise GDBError(
         message=(
             f"gdbserver did not announce listener within "

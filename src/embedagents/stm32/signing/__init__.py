@@ -12,7 +12,8 @@ Cross-module consumers:
 - ``cubeprogrammer.flash_signed_pair(sign_unsigned=True)`` constructs a
   ``SigningTool`` per leg to materialise unsigned inputs into trusted
   binaries before flashing.
-- ``compound/n6_flash_boot.py`` (F-015 — Pass 2).
+- F-015 (N6 flash + boot) — Claude-composed per RES-044 (no ``compound/``
+  subpackage).
 """
 
 from __future__ import annotations

@@ -8,6 +8,7 @@ exercise the kwargs validation + workspace lifecycle + CProject protocol
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -18,6 +19,7 @@ import pytest
 from embedagents.stm32.context import SubstrateContext
 from embedagents.stm32.cubeide import BuildResult, CubeIDE
 from embedagents.stm32.errors import (
+    ConfigurationError,
     CProjectEditError,
     CubeIDEError,
     WorkspaceLockedError,
@@ -421,6 +423,47 @@ class TestExplicitPathResolution:
         client = CubeIDE(_ctx_for(root, tmp_path, monkeypatch))
         with pytest.raises(ConfigurationError, match=r"no \.project"):
             client.build(project=root)
+
+    def test_bare_build_no_descriptor_hint_names_project_flag(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """E2: a bare ``build()`` (no project, no descriptor) names the paths
+        that actually work — ``--project`` and ``in-folder`` — not just
+        ``build.project_path``. cwd here is the repo root (no .project at top),
+        so the generic form fires."""
+        from embedagents.stm32.errors import ConfigurationError
+
+        root = _make_repo_root(tmp_path, descriptor=False)
+        client = CubeIDE(_ctx_for(root, tmp_path, monkeypatch))
+        with pytest.raises(
+            ConfigurationError, match="no project descriptor found"
+        ) as excinfo:
+            client.build()
+        hint = excinfo.value.hint or ""
+        assert "--project" in hint
+        assert "in-folder" in hint
+        assert "current directory is a CubeIDE project" not in hint
+
+    def test_bare_build_no_descriptor_hint_detects_cwd_project(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """E2: when cwd itself is a CubeIDE project dir (has .project) but has
+        no descriptor, the hint gives the exact command."""
+        from embedagents.stm32.errors import ConfigurationError
+
+        proj = tmp_path / "STM32CubeIDE"
+        proj.mkdir()
+        project_xml = ET.Element("projectDescription")
+        ET.SubElement(project_xml, "name").text = "blinky"
+        ET.ElementTree(project_xml).write(proj / ".project")
+        (proj / ".cproject").write_bytes(_make_cproject_xml())
+
+        client = CubeIDE(_ctx_for(proj, tmp_path, monkeypatch))
+        with pytest.raises(
+            ConfigurationError, match="no project descriptor found"
+        ) as excinfo:
+            client.build()
+        assert "stm32 build --project ." in (excinfo.value.hint or "")
 
     def test_descriptor_outside_explicit_path_raises(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -1035,11 +1078,14 @@ class TestWorkspaceMutationOrdering:
         project_dir: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """IMP-10: cleanup_stale_project (and the workspace mkdir) used
-        to run BEFORE acquire_workspace_lock — a concurrent invocation
-        could purge metadata out from under a running build, then raise
-        WorkspaceLockedError. All workspace mutations now happen inside
-        the lock."""
+        """IMP-10: workspace mutation (the workspace mkdir, stale-project
+        cleanup, and — since RES-054 — the default-workspace reset) used
+        to run BEFORE acquire_workspace_lock; a concurrent invocation could
+        purge metadata out from under a running build, then raise
+        WorkspaceLockedError. All workspace mutations now happen inside the
+        lock. ``ctx`` here has no descriptor, so this exercises the default
+        (substrate-managed) workspace, whose RES-054 mutation is
+        ``reset_workspace_for_import``."""
         import contextlib as _ctxlib
 
         from embedagents.stm32.cubeide import workspace as ws_mod
@@ -1055,17 +1101,11 @@ class TestWorkspaceMutationOrdering:
             events.append("lock-exit")
 
         monkeypatch.setattr(ws_mod, "acquire_workspace_lock", recording_lock)
-        # Simulate a stale import: workspace says the project lives
-        # somewhere else → cleanup path fires.
+        # The default-workspace reset is the in-lock mutation under RES-054.
         monkeypatch.setattr(
             ws_mod,
-            "detect_project_imported",
-            lambda w, n: Path("/somewhere/else"),
-        )
-        monkeypatch.setattr(
-            ws_mod,
-            "cleanup_stale_project",
-            lambda w, n, logger=None: events.append("cleanup"),
+            "reset_workspace_for_import",
+            lambda w, logger=None: events.append("reset"),
         )
 
         client = CubeIDE(ctx)
@@ -1075,10 +1115,10 @@ class TestWorkspaceMutationOrdering:
         ):
             result = client.build(project=project_dir)
         assert result.success is True
-        assert "cleanup" in events
+        assert "reset" in events
         assert (
             events.index("lock-enter")
-            < events.index("cleanup")
+            < events.index("reset")
             < events.index("lock-exit")
         )
 
@@ -1161,6 +1201,136 @@ class TestAlreadyExistsRetry:
 # ---------------------------------------------------------------------------
 # ARC-02 + IMP-09 — add_sources/add_symbols gates and typed copy errors
 # ---------------------------------------------------------------------------
+
+
+class TestWorkspaceReuseSafety:
+    """RES-054 (amends RES-050) — workspace-reuse ``.project`` corruption.
+
+    A persistent workspace + deleted in-tree virtual folders (Drivers/,
+    Doc/, ...) made CDT silently strip the project's <link>s on a
+    reuse-without-import. Default (substrate-owned) workspaces now rebuild
+    from scratch each build; explicit user-owned workspaces raise rather
+    than corrupt.
+    """
+
+    def _make_linked_project_xml(
+        self, name: str = "demo", folders: tuple[str, ...] = ("Drivers", "Doc")
+    ) -> bytes:
+        """A ``.project`` whose links live under in-tree virtual folders."""
+        root = ET.Element("projectDescription")
+        ET.SubElement(root, "name").text = name
+        linked = ET.SubElement(root, "linkedResources")
+        for folder in folders:
+            link = ET.SubElement(linked, "link")
+            ET.SubElement(link, "name").text = f"{folder}/{folder.lower()}_file.c"
+            ET.SubElement(link, "type").text = "1"
+            ET.SubElement(link, "locationURI").text = (
+                f"PARENT-1-PROJECT_LOC/Src/{folder.lower()}_file.c"
+            )
+        return ET.tostring(root)
+
+    def _explicit_ws_ctx(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        *,
+        folders: tuple[str, ...] = ("Drivers", "Doc"),
+    ) -> tuple[SubstrateContext, Path, Path]:
+        """Project with an explicit ``build.workspace`` + materialised folders."""
+        cubeide_bin, _ = _make_cubeide_stubs(tmp_path)
+        monkeypatch.setenv("STM32CUBEIDE", str(cubeide_bin))
+        proj = tmp_path / "demo"
+        proj.mkdir()
+        (proj / ".cproject").write_bytes(_make_cproject_xml())
+        (proj / ".project").write_bytes(self._make_linked_project_xml("demo", folders))
+        for folder in folders:
+            (proj / folder).mkdir()
+        external_ws = tmp_path / "external_ws"
+        descriptor = {
+            "version": 1,
+            "build": {"workspace": str(external_ws), "project_path": str(proj)},
+        }
+        (proj / "stm32-project.jsonc").write_text(json.dumps(descriptor))
+        ctx = SubstrateContext.from_environment(project_path=proj)
+        return ctx, proj, external_ws
+
+    def test_default_workspace_resets_and_imports_each_build(
+        self,
+        ctx: SubstrateContext,
+        project_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Default (substrate-owned) workspace: rebuilt + re-imported every
+        build, so CDT always re-reads the on-disk .project."""
+        from embedagents.stm32.cubeide import workspace as ws_mod
+
+        resets: list[Path] = []
+        monkeypatch.setattr(
+            ws_mod,
+            "reset_workspace_for_import",
+            lambda w, logger=None: resets.append(w),
+        )
+        client = CubeIDE(ctx)
+        with patch(
+            "embedagents.stm32.cubeide.headless.run_tool",
+            return_value=_build_run_tool_success(),
+        ):
+            result = client.build(project=project_dir)
+        assert result.success is True
+        assert result.project_imported is True
+        assert len(resets) == 1
+
+    def test_explicit_workspace_raises_on_missing_linked_folder(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Explicit build.workspace + cached reuse + a deleted in-tree
+        virtual folder → raise BEFORE launching CDT (never corrupt)."""
+        from embedagents.stm32.cubeide import workspace as ws_mod
+
+        ctx, proj, _ext = self._explicit_ws_ctx(tmp_path, monkeypatch)
+        # Workspace already has the project cached → build would skip import.
+        monkeypatch.setattr(ws_mod, "detect_project_imported", lambda w, n: proj)
+        # User deleted the materialised Drivers/ folder.
+        shutil.rmtree(proj / "Drivers")
+
+        ran: list[int] = []
+
+        def record(*args, **kwargs):
+            ran.append(1)
+            return _build_run_tool_success()
+
+        client = CubeIDE(ctx)
+        with patch(
+            "embedagents.stm32.cubeide.headless.run_tool", side_effect=record
+        ):
+            with pytest.raises(ConfigurationError, match="Drivers") as excinfo:
+                client.build()
+        assert "delete the workspace" in (excinfo.value.hint or "")
+        assert not ran  # raised before any tool launched → no corruption
+
+    def test_explicit_workspace_never_auto_resets_and_reuses_intact(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Explicit workspace with folders intact: reused as-is, never
+        reset/deleted, build proceeds normally."""
+        from embedagents.stm32.cubeide import workspace as ws_mod
+
+        ctx, proj, _ext = self._explicit_ws_ctx(tmp_path, monkeypatch)
+        monkeypatch.setattr(ws_mod, "detect_project_imported", lambda w, n: proj)
+        resets: list[Path] = []
+        monkeypatch.setattr(
+            ws_mod,
+            "reset_workspace_for_import",
+            lambda w, logger=None: resets.append(w),
+        )
+        client = CubeIDE(ctx)
+        with patch(
+            "embedagents.stm32.cubeide.headless.run_tool",
+            return_value=_build_run_tool_success(),
+        ):
+            result = client.build()
+        assert result.success is True
+        assert resets == []  # user-owned workspace is never auto-reset
 
 
 class TestAddSourcesExistingGate:

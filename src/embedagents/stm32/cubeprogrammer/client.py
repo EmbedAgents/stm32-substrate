@@ -178,8 +178,8 @@ class CubeProgrammer:
     DIAG-001 / DIAG-018 / VCP-007. T2 orchestrators (``diagnose_micro``,
     ``flash_pair``, ``flash_external``, ``download_image``,
     ``verify_option_bytes``) live in this class because they only call
-    other CubeProgrammer methods. Multi-tool compounds live in
-    ``src/embedagents/stm32/compound/``.
+    other CubeProgrammer methods. Multi-tool compounds are Claude-composed
+    per RES-044 - there is no ``compound/`` subpackage.
     """
 
     def __init__(self, ctx: "SubstrateContext") -> None:
@@ -517,7 +517,7 @@ class CubeProgrammer:
             if mcu:
                 svd_path = self.ctx.svd_db.find_for(str(mcu))
         self._log.info(
-            "svd_for_attached device=%s → %s",
+            "svd_for_attached device=%s -> %s",
             banner.device_name,
             svd_path,
         )
@@ -613,7 +613,7 @@ class CubeProgrammer:
         layer wires to ``AskUserQuestion``. Falsy → ``UserAbortedError``.
         """
         self._confirm_destructive_or_abort(
-            confirm_destructive, ["mass erase — entire flash"]
+            confirm_destructive, ["mass erase - entire flash"]
         )
         args: list[str] = ["-c", "port=swd"] + self._sn_args() + ["-e", "all"]
         timeout_s = self._timeout_s("atomic_timeout_s", 30.0)
@@ -637,7 +637,7 @@ class CubeProgrammer:
         ``UserAbortedError``.
         """
         self._confirm_destructive_or_abort(
-            confirm_destructive, ["mass erase + reset — entire flash"]
+            confirm_destructive, ["mass erase + reset - entire flash"]
         )
         args: list[str] = (
             ["-c", "port=swd"] + self._sn_args() + ["-e", "all", "-rst"]
@@ -835,7 +835,7 @@ class CubeProgrammer:
         )
         if result.suspicious_unmapped:
             self._log.warning(
-                "read_memory %s returned all-0xFF (%d bytes) — likely unmapped region",
+                "read_memory %s returned all-0xFF (%d bytes) - likely unmapped region",
                 address,
                 result.bytes_read,
             )
@@ -1048,7 +1048,7 @@ class CubeProgrammer:
         """
         if bank not in (1, 2):
             raise ValueError(
-                f"flash_to_bank requires bank ∈ {{1, 2}}; got {bank!r}"
+                f"flash_to_bank requires bank in {{1, 2}}; got {bank!r}"
             )
         result = self._flash_invoke(path, address=address, signed=False)
         return replace(result, bank=bank)
@@ -1222,7 +1222,7 @@ class CubeProgrammer:
             raise ValueError(
                 f"{leg} input {path.name!r} is unsigned; sign_unsigned=True "
                 "requires signing_header_version= (see SigningTool."
-                "sign_binary / UM2543 §2.1)"
+                "sign_binary / UM2543 section 2.1)"
             )
         if address is None:
             raise ValueError(
@@ -1411,7 +1411,7 @@ class CubeProgrammer:
         raise ValueError(
             f"download_image cannot infer route from extension {ext!r}; "
             "supported firmware extensions are .elf .hex .axf .s19 .srec "
-            ".bin (UM2237 §3.2.3) — use flash_data(path, address) for "
+            ".bin (UM2237 section 3.2.3) - use flash_data(path, address) for "
             "non-firmware payloads"
         )
 

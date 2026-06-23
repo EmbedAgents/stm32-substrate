@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 _FORBIDDEN_SCRIPT_CHARS: tuple[str, ...] = ('"',)
 """CubeMX's ``-q`` script parser accepts simple double-quoted strings
-but has no documented escape syntax for embedded ``"`` — substrate
+but has no documented escape syntax for embedded ``"`` - substrate
 refuses that character at the boundary rather than guessing at vendor
 escaping rules. Backslash (``\\``) is no longer refused: Windows paths
 contain backslashes natively, and CubeMX (Java-based) accepts both
@@ -38,7 +38,7 @@ slashes so substrate-generated scripts are platform-uniform."""
 
 
 EXIT_COMMAND = "exit_mx"
-"""Hardcoded permanently per RES-016 / Q14 — no config knob."""
+"""Hardcoded permanently per RES-016 / Q14 - no config knob."""
 
 
 def _quote(value: str) -> str:

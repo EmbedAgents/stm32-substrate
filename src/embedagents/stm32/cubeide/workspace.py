@@ -13,6 +13,12 @@ Public surface:
 - ``cleanup_stale_project(workspace, project_name, *, logger)`` —
   broader purge: project tree + every ``.projects/<name>/`` entry + stale
   ``.lock``; logs WARNING enumerating deletions.
+- ``reset_workspace_for_import(workspace, *, logger)`` — wipe a
+  substrate-owned workspace for a guaranteed-fresh CDT ``-import``,
+  preserving only the held substrate lock (RES-054). Default path only.
+- ``missing_linked_folders(project_path)`` — top-level in-tree virtual
+  folders referenced by ``.project`` ``<link>``s that are absent on disk
+  (the explicit-workspace staleness signal — RES-054).
 - ``acquire_workspace_lock(workspace)`` — context manager; raises
   ``WorkspaceLockedError`` immediately on contention (HIL-mode M-019).
 - ``default_workspace_root(project_path)`` — deterministic per-project
@@ -33,6 +39,7 @@ import logging
 import os
 import re
 import shutil
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterator
@@ -175,6 +182,100 @@ def cleanup_stale_project(
                 path.unlink()
         except OSError as ex:
             log.warning("cleanup_stale_project: failed to remove %s (%s)", path, ex)
+
+
+def _remove_path(path: Path) -> None:
+    """Best-effort recursive remove of a single entry (dir or file)."""
+    try:
+        if path.is_dir() and not path.is_symlink():
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def reset_workspace_for_import(
+    workspace: Path, *, logger: logging.Logger | None = None
+) -> None:
+    """Wipe a substrate-owned workspace for a guaranteed-fresh CDT ``-import``.
+
+    Removes every entry under ``workspace`` EXCEPT the held substrate lock
+    file (``.metadata/.substrate-lock``) — so the caller may keep holding
+    ``acquire_workspace_lock`` across the reset (on Windows that file is
+    locked open and cannot be deleted anyway). This clears Eclipse's binary
+    project-tree snapshot under ``.metadata/.plugins/`` — state that
+    ``cleanup_stale_project`` cannot reach, which otherwise (a) makes
+    ``-import`` fail with "already exists in the workspace" and (b) lets CDT
+    re-save a project's ``.project`` dropping linked resources whose in-tree
+    virtual folders were deleted (RES-054, amending RES-050).
+
+    Called ONLY on the DEFAULT substrate-managed workspace, which holds
+    exactly one project (RES-050). NEVER on a user-configured
+    ``build.workspace`` — the substrate must not delete a dir the user owns.
+    """
+    if not workspace.is_dir():
+        return
+    log = logger or logging.getLogger("embedagents.stm32.cubeide.workspace")
+    meta_name = _SUBSTRATE_LOCK_REL.parent.name  # ".metadata"
+    keep_name = _SUBSTRATE_LOCK_REL.name  # ".substrate-lock"
+    removed = 0
+    for entry in workspace.iterdir():
+        if entry.name == meta_name and entry.is_dir():
+            for sub in entry.iterdir():
+                if sub.name == keep_name:
+                    continue
+                _remove_path(sub)
+                removed += 1
+        else:
+            _remove_path(entry)
+            removed += 1
+    if removed:
+        log.info(
+            "reset_workspace_for_import: cleared %d entr%s under %s for a "
+            "fresh import (substrate lock preserved)",
+            removed,
+            "y" if removed == 1 else "ies",
+            workspace,
+        )
+
+
+def missing_linked_folders(project_path: Path) -> list[str]:
+    """Top-level in-tree virtual folders referenced by ``.project`` links
+    that are absent on disk.
+
+    STM32Cube example projects host their HAL/CMSIS/BSP sources as Eclipse
+    *linked resources*: each ``<link>`` carries a ``<name>`` such as
+    ``Drivers/STM32L4xx_HAL_Driver/stm32l4xx_hal.c`` whose first path
+    segment (``Drivers``) is a *virtual folder* CDT materialises as a real
+    (initially empty) directory in the project tree on ``-import``. If the
+    user deletes that in-tree folder and a later build reuses a cached
+    workspace (skips re-import), CDT re-saves ``.project`` dropping every
+    ``<link>`` under the missing folder — silently stripping the project
+    (RES-054). This returns the referenced top-level folders that are
+    currently missing on disk (empty list = nothing to worry about).
+
+    Reads only structured ``.project`` XML (ADR-004 — no interpretive
+    parsing). Returns ``[]`` if ``.project`` is absent or unparseable.
+    """
+    project_xml = project_path / ".project"
+    if not project_xml.is_file():
+        return []
+    try:
+        tree = ET.parse(project_xml)
+    except ET.ParseError:
+        return []
+    roots: list[str] = []
+    seen: set[str] = set()
+    for link in tree.getroot().iter("link"):
+        name_el = link.find("name")
+        if name_el is None or not name_el.text:
+            continue
+        first = name_el.text.strip().split("/", 1)[0].strip()
+        if first and first not in seen:
+            seen.add(first)
+            roots.append(first)
+    return [r for r in roots if not (project_path / r).exists()]
 
 
 @contextlib.contextmanager
