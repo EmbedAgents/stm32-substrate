@@ -167,9 +167,22 @@ class TestSvdDbPopulated:
         assert ctx.svd_db is not None
         assert isinstance(ctx.svd_db, SvdDb)
 
-    def test_svd_db_has_roots(self, ctx: SubstrateContext) -> None:
-        # No tools configured in tmp_path → all three roots are None.
+    def test_svd_db_has_roots(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Hermetic: force tool resolution to find nothing, regardless of
+        # whether ST tools happen to be installed on the test runner. The
+        # env-var / PATH fallback in _resolve_one_tool otherwise resolves a
+        # real STM32CubeIDE on a tool-equipped machine (e.g. a Windows
+        # release-test station with CubeIDE installed), which gives the SVD
+        # roots a live cubeide source and breaks the "no tools" premise —
+        # the test passed on Linux CI only because no ST tools are on PATH
+        # there.
+        from embedagents.stm32 import context as _context
+
+        monkeypatch.setattr(_context, "_resolve_one_tool", lambda _def: None)
+        ctx = SubstrateContext.from_environment(project_path=tmp_path)
         roots = ctx.svd_db.roots
         assert isinstance(roots, SvdSourceRoots)
-        # All sources None / unresolved when no tools configured.
+        # All sources None / unresolved when no tools resolve.
         assert roots.configured() == ()
